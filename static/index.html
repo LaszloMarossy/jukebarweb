@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JukeBar — Bar Jukebox for iPhone</title>
+<meta name="description" content="JukeBar turns an iPhone into a self-contained bar jukebox. Customers scan a QR code to browse and request songs. Bartenders approve on any browser. No cloud, no internet required.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2072%2072'%3E%3Ccircle%20cx='36'%20cy='36'%20r='34'%20fill='%23fbbe84'%20stroke='%23dc7955'%20stroke-width='1.5'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='29'%20fill='%23ffffff'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='24'%20fill='%23fda185'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='12'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='60'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='60'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='12'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #1a1a1a;
+    --bg2:     #111111;
+    --bg3:     #222222;
+    --fg:      #ffffff;
+    --dim:     #888888;
+    --coral:   #fda185;
+    --orange:  #fbbe84;
+    --yellow:  #ffc24a;
+    --brown:   #dc7955;
+    --red:     #e8406a;
+    --divider: #333333;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    line-height: 1.65;
+  }
+
+  a { color: var(--coral); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Header ──────────────────────────────────────────────────────────── */
+  header {
+    background: var(--bg2);
+    border-bottom: 2px solid var(--divider);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .logo-svg { flex-shrink: 0; }
+  h1 {
+    font-family: 'Bubblegum Sans', cursive;
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    line-height: 1.1;
+  }
+  .tagline {
+    color: var(--dim);
+    font-size: clamp(0.85rem, 2vw, 1rem);
+    margin-top: 2px;
+  }
+
+  /* ── Nav ─────────────────────────────────────────────────────────────── */
+  nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--divider);
+    padding: 10px 24px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  nav a {
+    color: var(--dim);
+    font-size: 0.85rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: color 0.15s, background 0.15s;
+  }
+  nav a:hover { color: var(--fg); background: var(--bg3); text-decoration: none; }
+
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  .page { max-width: 740px; margin: 0 auto; padding: 0 20px 60px; }
+
+  section { padding: 40px 0 0; }
+  section + section { border-top: 1px solid var(--divider); margin-top: 40px; }
+
+  h2 {
+    font-family: 'Bubblegum Sans', cursive;
+    font-size: clamp(1.3rem, 4vw, 1.9rem);
+    color: var(--coral);
+    margin-bottom: 16px;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--orange);
+    margin: 20px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  p { margin-bottom: 12px; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── Hero ────────────────────────────────────────────────────────────── */
+  .hero {
+    background: linear-gradient(135deg, #1e1612 0%, #1a1a1a 60%);
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    padding: 28px 24px;
+    margin-top: 32px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .hero-text { flex: 1; }
+  .hero-text strong { color: var(--coral); }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .badge {
+    display: inline-block;
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 20px;
+    padding: 5px 13px;
+    font-size: 0.82rem;
+    color: var(--dim);
+  }
+  .badge.hi { border-color: var(--brown); color: var(--orange); }
+
+  /* ── Feature grid ────────────────────────────────────────────────────── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .feature-card {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .feature-card .icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .feature-card .title { font-weight: bold; margin-bottom: 4px; }
+  .feature-card p { font-size: 0.9rem; color: var(--dim); margin: 0; }
+
+  /* ── Role cards ──────────────────────────────────────────────────────── */
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .role-card {
+    background: var(--bg3);
+    border-radius: 10px;
+    padding: 18px;
+    border-top: 3px solid var(--brown);
+  }
+  .role-card.customer { border-top-color: var(--coral); }
+  .role-card.bartender { border-top-color: var(--yellow); }
+  .role-card .role-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .role-card ol { padding-left: 18px; font-size: 0.92rem; }
+  .role-card ol li { margin-bottom: 6px; }
+
+  /* ── Steps ───────────────────────────────────────────────────────────── */
+  .steps { list-style: none; counter-reset: steps; padding: 0; }
+  .steps li {
+    counter-increment: steps;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+    align-items: flex-start;
+  }
+  .steps li::before {
+    content: counter(steps);
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--brown);
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .steps li .step-body { flex: 1; }
+  .steps li .step-body strong { color: var(--fg); }
+  .steps li .step-body p { color: var(--dim); font-size: 0.92rem; margin-top: 2px; }
+
+  /* ── Callout / tip ───────────────────────────────────────────────────── */
+  .tip {
+    background: #1c1a13;
+    border-left: 4px solid var(--yellow);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 0.93rem;
+  }
+  .tip .tip-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--yellow);
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .tip p { color: var(--dim); margin: 0; }
+  .tip p + p { margin-top: 8px; }
+  .tip strong { color: var(--fg); }
+
+  .warn {
+    background: #1c1313;
+    border-left-color: var(--red);
+  }
+  .warn .tip-label { color: var(--red); }
+
+  /* ── FAQ ─────────────────────────────────────────────────────────────── */
+  .faq { margin-top: 8px; }
+  details {
+    border-bottom: 1px solid var(--divider);
+    padding: 14px 0;
+  }
+  details:first-child { border-top: 1px solid var(--divider); }
+  summary {
+    cursor: pointer;
+    font-weight: bold;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "+";
+    color: var(--coral);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+  details[open] summary::after { transform: rotate(45deg); }
+  details .answer {
+    padding-top: 12px;
+    color: var(--dim);
+    font-size: 0.93rem;
+  }
+  details .answer p + p { margin-top: 8px; }
+  details .answer code {
+    background: var(--bg3);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: 0.88em;
+    color: var(--orange);
+  }
+
+  /* ── Privacy table ───────────────────────────────────────────────────── */
+  .privacy-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.9rem;
+  }
+  .privacy-table th {
+    text-align: left;
+    color: var(--dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .privacy-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--divider);
+    vertical-align: top;
+  }
+  .privacy-table tr:last-child td { border-bottom: none; }
+  .check { color: #4ade80; font-weight: bold; }
+  .cross { color: var(--red); }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--divider);
+    padding: 24px 24px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--dim);
+    margin-top: 60px;
+  }
+  footer a { color: var(--coral); }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="logo-svg" width="56" height="56" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#dc7955" stroke-width="1.5"/>
+    <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+    <circle cx="36" cy="36" r="24" fill="#fda185"/>
+    <line x1="36" y1="36" x2="36"    y2="12"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="60"    y2="36"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="36"    y2="60"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="12"    y2="36"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+  </svg>
+  <div>
+    <h1 id="site-title">JukeBar</h1>
+    <div class="tagline">Bar jukebox for iPhone — no cloud, no subscriptions</div>
+  </div>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#how-it-works">How it works</a>
+  <a href="#setup">Setup guide</a>
+  <a href="#network">Network setup</a>
+  <a href="#faq">FAQ</a>
+  <a href="#privacy">Privacy</a>
+  <a href="#contact">Contact</a>
+</nav>
+
+<div class="page">
+
+  <!-- ── Overview ──────────────────────────────────────────────────────── -->
+  <section id="overview">
+    <h2>What is JukeBar?</h2>
+
+    <div class="hero">
+      <div class="hero-text">
+        <p><strong>JukeBar turns an iPhone or iPad into a self-contained bar jukebox.</strong> It plays an Apple Music playlist, lets customers browse and request songs by scanning a QR code on their own phones, and gives bartenders a browser-based interface to approve or deny requests — all on the local WiFi network, with no internet required during operation.</p>
+        <p>No cloud service. No subscriptions. No setup beyond an Apple Music playlist and a WiFi connection. One device runs everything.</p>
+        <div class="badge-row">
+          <span class="badge hi">No cloud</span>
+          <span class="badge hi">No internet required</span>
+          <span class="badge hi">No subscriptions</span>
+          <span class="badge">Apple Music</span>
+          <span class="badge">iPhone · iPad</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-grid" style="margin-top:24px;">
+      <div class="feature-card">
+        <div class="icon">🎵</div>
+        <div class="title">Apple Music playback</div>
+        <p>Plays any playlist from your Apple Music library. Songs must be downloaded to the device — no streaming needed.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📱</div>
+        <div class="title">QR-code requests</div>
+        <p>Customers scan a QR code and browse the full catalog on their own phone. No app to install.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">✅</div>
+        <div class="title">Bartender approval</div>
+        <p>Bartenders approve or deny requests from any browser on the same network. Approved songs play next.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">💰</div>
+        <div class="title">Configurable pricing</div>
+        <p>Set a per-song price and a bundle price for 3 songs. Bartender collects payment manually.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <div class="title">Session reports</div>
+        <p>Every session is archived to a CSV file — request history, songs, prices, timestamps. Shareable via AirDrop or email.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔒</div>
+        <div class="title">PIN-protected admin</div>
+        <p>Admin mode is behind a PIN. Long-press the bar name on the kiosk screen to open it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How it works ───────────────────────────────────────────────────── -->
+  <section id="how-it-works">
+    <h2>How it works</h2>
+    <p>Three people, three simple flows.</p>
+
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-label">Bar owner / admin</div>
+        <ol>
+          <li>Open JukeBar, run through the one-time setup wizard</li>
+          <li>Pick an Apple Music playlist, set prices and PIN</li>
+          <li>Choose network mode (WiFi or Personal Hotspot)</li>
+          <li>Long-press the title to access admin controls — playback, catalog refresh, reports</li>
+        </ol>
+      </div>
+      <div class="role-card customer">
+        <div class="role-label">Customer</div>
+        <ol>
+          <li>Join the bar's WiFi network</li>
+          <li>Scan the QR code shown on the kiosk screen</li>
+          <li>Browse artists and albums, pick up to 3 songs</li>
+          <li>Enter your name and submit — the bartender handles the rest</li>
+        </ol>
+      </div>
+      <div class="role-card bartender">
+        <div class="role-label">Bartender</div>
+        <ol>
+          <li>Open the bartender URL shown in admin settings on any browser</li>
+          <li>Enter your name and the bar PIN to pair</li>
+          <li>Approve or deny incoming requests</li>
+          <li>Approved songs play immediately after the current song</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Setup guide ────────────────────────────────────────────────────── -->
+  <section id="setup">
+    <h2>Setup guide</h2>
+    <p>JukeBar shows a setup wizard every time it starts. Go through it once to configure the session; pre-filled fields make subsequent launches quick.</p>
+
+    <ul class="steps">
+      <li>
+        <div class="step-body">
+          <strong>Authorize Apple Music</strong>
+          <p>Grant JukeBar access to your Apple Music library. This is required to read your playlists and play songs.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <strong>Pick a playlist</strong>
+          <p>Choose the Apple Music playlist you want to use as the jukebox source. All songs in the playlist must be downloaded to the device — streaming is not supported.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <strong>Enter bar details</strong>
+          <p>Bar name (shown on the kiosk screen and in the customer web app), admin email (for your records), currency symbol, per-song price, and 3-song bundle price.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <strong>Set a PIN</strong>
+          <p>4–6 digit PIN that unlocks the admin panel and lets bartenders pair. Leave blank to keep the existing PIN on subsequent setups.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <strong>Choose network mode</strong>
+          <p><strong>Bartender approval</strong> — customers use QR codes on their own phones; bartender approves via browser. Requires a shared WiFi network or Personal Hotspot.<br>
+          <strong>Auto-accept</strong> — requests are entered directly on the host device and accepted automatically. No network needed.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <strong>Set QR expiry</strong>
+          <p>How long the current QR code URL stays valid (default 8 hours). After expiry, customers need a new QR scan — useful if the device IP changes overnight.</p>
+        </div>
+      </li>
+    </ul>
+
+    <div class="tip">
+      <div class="tip-label">Admin controls</div>
+      <p>Once running, <strong>long-press the bar name</strong> on the kiosk screen and enter your PIN to open admin controls: playback (play/pause/skip), catalog refresh, approval mode toggle, network diagnostics, session reports, and End Session.</p>
+    </div>
+
+    <h3>Downloading songs</h3>
+    <p>JukeBar plays only songs that are physically downloaded to the device. In the Apple Music app, open your playlist, tap the download button (⬇), and wait for all tracks to download before starting a session. Songs marked with a cloud icon are not yet downloaded.</p>
+
+    <h3>Bartender pairing</h3>
+    <p>Share the bartender URL shown in admin settings (format: <code>http://&lt;device-IP&gt;:8080/bartender</code>) with your bartender. They open it in any browser on the same WiFi, enter their name and the bar PIN, and are ready to approve requests. The first person to pair becomes the session admin; additional bartenders need approval from the admin.</p>
+  </section>
+
+  <!-- ── Network setup ──────────────────────────────────────────────────── -->
+  <section id="network">
+    <h2>Network setup</h2>
+    <p>JukeBar runs a local web server on port 8080. Customers and bartenders connect to it over WiFi — no internet required.</p>
+
+    <h3>Option A — Shared WiFi (recommended for venues)</h3>
+    <p>Connect the iPhone and all customer/bartender devices to the same WiFi network. The customer QR code and bartender URL point directly to the iPhone's local IP address.</p>
+
+    <div class="tip warn">
+      <div class="tip-label">Common issue — AP isolation</div>
+      <p>Most venue/bar routers have <strong>client isolation</strong> (also called AP isolation or wireless isolation) enabled on guest networks by default. This blocks devices from talking to each other — customers can reach the internet but not JukeBar.</p>
+      <p><strong>Fix:</strong> In your router's guest-network settings, disable "Isolate WiFi clients" or "AP Isolation." <strong>Reboot the router</strong> after changing the setting — many routers require a restart for isolation policies to take effect.</p>
+      <p>Use a dedicated guest network for JukeBar with isolation disabled. Keep your main network isolated for security.</p>
+    </div>
+
+    <h3>Option B — Personal Hotspot (simplest, no router needed)</h3>
+    <p>Enable Personal Hotspot on the iPhone. Customers and bartenders join the iPhone's WiFi hotspot directly — no router involved, no isolation issues. Requires a cellular plan that supports hotspot.</p>
+    <p>The hotspot network name and password are shown in the setup wizard and on the kiosk screen.</p>
+
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>Personal Hotspot is the most reliable option if you can't control your venue's router settings. The iPhone handles everything — no external equipment needed.</p>
+    </div>
+
+    <h3>Option C — Local only (no network)</h3>
+    <p>In local mode, all requests are entered directly on the host device and auto-accepted. No WiFi needed. Useful for small venues or testing.</p>
+  </section>
+
+  <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
+  <section id="faq">
+    <h2>FAQ</h2>
+
+    <div class="faq">
+      <details>
+        <summary>Customers can't reach the QR code URL</summary>
+        <div class="answer">
+          <p>The most common cause is AP isolation on the router — see the Network setup section above. Switching to Personal Hotspot mode bypasses this entirely.</p>
+          <p>Also check that the customer's device is on the same network as the iPhone (not on a separate network band). Some routers have separate 2.4 GHz and 5 GHz networks — customers need to be on the same band as the host device, or both bands need to be on the same subnet.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Songs aren't playing / "playlist not found" error</summary>
+        <div class="answer">
+          <p>Make sure all songs in your Apple Music playlist are downloaded to the device. Songs with a cloud icon are not downloaded. Open the Music app, find your playlist, and tap the download button.</p>
+          <p>If you recently added songs to the playlist, use the <strong>Refresh Catalog</strong> button in admin settings to reload it.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>An approved request isn't playing</summary>
+        <div class="answer">
+          <p>Approved songs play after the currently playing song ends. If playback is paused, resume it from the admin controls.</p>
+          <p>If a request was approved before playback had started, JukeBar re-queues it automatically the next time playback begins — it won't be lost.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>The bartender web app shows "No pending requests" even though requests were submitted</summary>
+        <div class="answer">
+          <p>The bartender app polls for new requests every 20 seconds. Pull down to refresh manually, or wait for the next poll cycle.</p>
+          <p>Check that the bartender's device is on the same network as the iPhone and that the bartender is paired (status shows "✓ Approved" in the pairing screen).</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>I forgot my PIN</summary>
+        <div class="answer">
+          <p>Long-press the bar name on the kiosk screen — if you can't get past the PIN prompt, run the setup wizard again. Tap <strong>End Session</strong> (accessible if you can unlock admin) and confirm, or delete and reinstall the app to reset everything.</p>
+          <p>In the setup wizard's PIN step, enter a new PIN to replace the old one. Leaving both fields blank keeps the existing PIN.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>How do I switch from "Bartender approval" to "Auto-accept" mid-session?</summary>
+        <div class="answer">
+          <p>Open admin settings (long-press bar name → PIN), scroll to the Approval section, and tap the toggle button. The change takes effect immediately — no restart needed.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>How do I get session reports?</summary>
+        <div class="answer">
+          <p>Reports are available in admin settings under the Reports section. Each session produces a CSV file with all request details. Tap the share icon to send via AirDrop, email, or Files. Reports are kept for 10 days and then deleted automatically.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Can multiple bartenders use the app at the same time?</summary>
+        <div class="answer">
+          <p>Yes. Each bartender opens the bartender URL in their browser and pairs with the PIN. The first to pair becomes the session admin; the admin approves subsequent bartenders. All paired bartenders can approve and deny requests simultaneously.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Does JukeBar work without internet?</summary>
+        <div class="answer">
+          <p>Yes — entirely. JukeBar uses Apple Music for playback, which works offline as long as songs are downloaded to the device. The QR code, customer web app, and bartender web app are all served from the iPhone itself. No cloud service is involved at any point.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>What happens when the iPhone restarts or JukeBar is relaunched?</summary>
+        <div class="answer">
+          <p>JukeBar archives the current session to a CSV report and starts a fresh session. The setup wizard appears with all fields pre-filled from the previous session — tap through quickly to resume. Pending requests from the previous session are not carried over.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ── Privacy ────────────────────────────────────────────────────────── -->
+  <section id="privacy">
+    <h2>Privacy policy</h2>
+    <p>JukeBar is designed to keep all data local. Nothing is sent to any external server.</p>
+
+    <table class="privacy-table">
+      <thead>
+        <tr>
+          <th>Data type</th>
+          <th>Where it goes</th>
+          <th>Leaves the device?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Bar configuration (name, PIN hash, prices)</td>
+          <td>Stored in the app's local Documents folder</td>
+          <td><span class="cross">✗ No</span></td>
+        </tr>
+        <tr>
+          <td>Customer names and song requests</td>
+          <td>Stored locally; included in session CSV reports you generate and share manually</td>
+          <td><span class="cross">✗ No</span></td>
+        </tr>
+        <tr>
+          <td>Apple Music library access</td>
+          <td>Read locally to build the song catalog. No track data is sent anywhere by JukeBar.</td>
+          <td><span class="cross">✗ No</span></td>
+        </tr>
+        <tr>
+          <td>Location / network (WiFi SSID)</td>
+          <td>Used only to display the WiFi network name on the kiosk screen. Not stored or transmitted.</td>
+          <td><span class="cross">✗ No</span></td>
+        </tr>
+        <tr>
+          <td>Analytics or crash data</td>
+          <td>None collected</td>
+          <td><span class="cross">✗ No</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip" style="margin-top:20px;">
+      <div class="tip-label">Data retention</div>
+      <p>Session CSV reports are kept on-device for <strong>10 days</strong> and then deleted automatically. You can delete individual reports at any time from admin settings. Deleting the app removes all data permanently.</p>
+    </div>
+
+    <h3>Apple Music</h3>
+    <p>Playback uses Apple's MediaPlayer framework and your existing Apple Music subscription. JukeBar only reads your library — it does not access your listening history, purchases, or account information. Apple's own privacy policy governs how Apple Music data is handled by iOS.</p>
+
+    <h3>Local network</h3>
+    <p>JukeBar runs a local HTTP server on port 8080. It is reachable only by devices on the same WiFi network or Personal Hotspot. No data from this server is relayed to any external service.</p>
+  </section>
+
+  <!-- ── Contact ────────────────────────────────────────────────────────── -->
+  <section id="contact">
+    <h2>Support &amp; contact</h2>
+    <p>For questions, bug reports, or feature requests, email <a href="mailto:marossy@gmail.com">marossy@gmail.com</a>.</p>
+    <p>JukeBar is made by the same team behind <a href="https://grapefruitplayer.onrender.com">Grapefruitplayer</a> — a concert discovery tool that plays music from bands performing live near you.</p>
+  </section>
+
+</div><!-- /page -->
+
+<footer>
+  JukeBar · <a href="mailto:marossy@gmail.com">marossy@gmail.com</a> · <a href="https://grapefruitplayer.onrender.com">Grapefruitplayer</a>
+</footer>
+
+<script>
+// Rainbow-colorize the title
+(function() {
+  const COLORS = ["#fda185","#fbbe84","#ffc24a","#dc7955","#e8406a","#ffffff"];
+  const h1 = document.getElementById("site-title");
+  const text = h1.textContent;
+  let html = "";
+  let lastColor = "";
+  for (const ch of text) {
+    if (ch === " ") { html += " "; continue; }
+    const pool  = COLORS.filter(c => c !== lastColor);
+    const color = pool[Math.floor(Math.random() * pool.length)];
+    lastColor   = color;
+    html += `<span style="color:${color}">${ch}</span>`;
+  }
+  h1.innerHTML = html;
+})();
+</script>
+</body>
+</html>
