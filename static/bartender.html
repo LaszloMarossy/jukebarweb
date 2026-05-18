@@ -46,6 +46,33 @@
     .err-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
     .err-msg { color: var(--muted); font-size: 15px; line-height: 1.6; }
 
+    /* ── PIN gate ── */
+    #s-pin {
+      min-height: 100dvh; display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      padding: 40px 24px; gap: 24px; text-align: center;
+    }
+    #s-pin.active { display: flex; }
+    .pin-logo { margin-bottom: 4px; }
+    .pin-title { font-size: 20px; font-weight: 700; }
+    .pin-sub   { font-size: 14px; color: var(--muted); margin-top: -12px; }
+    .pin-field {
+      width: 100%; max-width: 220px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      color: var(--text); font-size: 28px; font-weight: 700; letter-spacing: 8px;
+      text-align: center; padding: 14px 16px;
+      -webkit-text-security: disc;
+    }
+    .pin-field:focus { outline: none; border-color: var(--accent); }
+    .pin-btn {
+      width: 100%; max-width: 220px;
+      background: var(--accent); color: #000; font-weight: 800; font-size: 16px;
+      padding: 14px; border-radius: 12px; transition: opacity .15s;
+    }
+    .pin-btn:active { opacity: .8; }
+    .pin-btn:disabled { opacity: .4; pointer-events: none; }
+    .pin-err { font-size: 14px; color: var(--red); min-height: 20px; }
+
     /* ── main layout ── */
     #s-main { max-width: 640px; margin: 0 auto; padding: 0 16px 60px; }
 
@@ -190,6 +217,33 @@
   <div class="err-msg"   id="err-msg">Something went wrong.</div>
 </div>
 
+<!-- ── PIN gate ─────────────────────────────────────────────────────────── -->
+<div id="s-pin" class="screen">
+  <div class="pin-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="64" height="64">
+      <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+      <circle cx="36" cy="36" r="24" fill="#fda185"/>
+      <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+    </svg>
+  </div>
+  <div class="pin-title">Bartender Access</div>
+  <div class="pin-sub">Enter the admin PIN to continue</div>
+  <input class="pin-field" id="pin-input" type="tel" inputmode="numeric"
+         maxlength="6" placeholder="••••" autocomplete="off"
+         oninput="onPinInput()" onkeydown="if(event.key==='Enter') verifyPin()">
+  <div class="pin-err" id="pin-err"></div>
+  <button class="pin-btn" id="pin-btn" onclick="verifyPin()" disabled>Enter</button>
+</div>
+
 <div id="s-main" class="screen">
   <div class="header">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="40" height="40">
@@ -241,9 +295,64 @@ async function boot() {
   if (!S.jukebarId || !S.session)
     return showError('Invalid link', 'Please get the bartender QR code from the JukeBar admin panel.');
 
+  // Check for cached auth in sessionStorage (valid until tab is closed or session rotates)
+  const authKey = `jb_auth_${S.jukebarId}_${S.session}`;
+  $('s-loading').style.display = 'none';
+  if (sessionStorage.getItem(authKey) === 'ok') {
+    await startMain();
+  } else {
+    showScreen('s-pin');
+    $('pin-input').focus();
+  }
+}
+
+// ── PIN gate ────────────────────────────────────────────────────────────────
+function onPinInput() {
+  const val = $('pin-input').value.replace(/\D/g, '');
+  $('pin-input').value = val;
+  $('pin-btn').disabled = val.length < 4;
+  $('pin-err').textContent = '';
+}
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyPin() {
+  const pin = $('pin-input').value.trim();
+  if (pin.length < 4) return;
+  $('pin-btn').disabled = true;
+  $('pin-err').textContent = '';
+
+  try {
+    const hash = await sha256hex(pin);
+    const res  = await fetch(`/api/bar/${S.jukebarId}/authenticate?s=${enc(S.session)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin_hash: hash }),
+    });
+    if (res.status === 403) {
+      $('pin-err').textContent = 'Incorrect PIN — try again.';
+      $('pin-input').value = '';
+      $('pin-btn').disabled = true;
+      $('pin-input').focus();
+      return;
+    }
+    if (res.status === 404) return showError('Bar offline', 'The JukeBar is not reachable right now.');
+    if (!res.ok) throw new Error(res.status);
+
+    // Cache so they don't have to re-enter on refresh (cleared when tab closes)
+    sessionStorage.setItem(`jb_auth_${S.jukebarId}_${S.session}`, 'ok');
+    await startMain();
+  } catch {
+    $('pin-err').textContent = 'Connection error — check your internet.';
+    $('pin-btn').disabled = false;
+  }
+}
+
+async function startMain() {
   await poll();
-  const el = $('s-loading');
-  if (el) el.style.display = 'none';
   showScreen('s-main');
   S.pollTimer = setInterval(poll, 5000);
 }

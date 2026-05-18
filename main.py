@@ -93,6 +93,7 @@ class BarSession:
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
+    pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
 
 
 _map_entries: dict[str, MapEntry] = {}   # persisted to disk
@@ -252,6 +253,7 @@ async def host_register(body: dict[str, Any]):
         price_for_three=body.get("price_for_three", 0.0),
         currency=body.get("currency", ""),
         now_playing_id=body.get("now_playing_id"),
+        pin_hash=body.get("pin_hash", ""),
     )
     # Keep map entry's last_seen fresh if the bar is registered there
     if jukebar_id in _map_entries:
@@ -344,6 +346,21 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
         },
         headers={"Cache-Control": "max-age=300, private"},
     )
+
+
+@app.post("/api/bar/{jukebar_id}/authenticate")
+async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+    """
+    Bartender PIN gate. Client hashes the PIN with SHA-256 (same algorithm as iOS CryptoKit)
+    and posts the hex digest. Returns 200 OK or 403 Forbidden.
+    If the bar has no pin_hash (legacy / not yet set), access is denied — PIN is mandatory.
+    """
+    bar = _customer_bar(jukebar_id, s)
+    if not bar.pin_hash:
+        raise HTTPException(403, "No PIN configured for this bar")
+    if body.get("pin_hash") != bar.pin_hash:
+        raise HTTPException(403, "Incorrect PIN")
+    return {"ok": True}
 
 
 @app.get("/api/bar/{jukebar_id}/nowplaying")
