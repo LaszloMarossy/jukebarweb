@@ -194,6 +194,59 @@
 
     .section-gap { margin-top: 28px; }
 
+    /* ── tabs ── */
+    .tab-bar {
+      display: flex; gap: 0; margin-top: 20px; margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 0; font-size: 13px; font-weight: 700;
+      letter-spacing: .5px; text-align: center; background: none;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      transition: color .15s;
+    }
+    .tab-btn.active { color: var(--accent); border-color: var(--accent); }
+    .tab-pane { display: none; padding-top: 16px; }
+    .tab-pane.active { display: block; }
+
+    /* ── reports ── */
+    .report-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+    .btn-report {
+      flex: 1; background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: 14px; font-weight: 600;
+      padding: 11px 10px; border-radius: 10px; transition: opacity .15s;
+    }
+    .btn-report:active { opacity: .7; }
+    .report-summary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+    }
+    .summary-card {
+      background: var(--card); border-radius: 12px; border: 1px solid var(--border);
+      padding: 14px; text-align: center;
+    }
+    .summary-num { font-size: 28px; font-weight: 800; }
+    .summary-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .summary-card.approved .summary-num { color: var(--green); }
+    .summary-card.denied   .summary-num { color: var(--red); }
+    .summary-card.played   .summary-num { color: var(--accent); }
+    .summary-card.pending  .summary-num { color: var(--muted); }
+    .history-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-status {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    }
+    .hs-approved { background: rgba(74,222,128,.12); color: var(--green); }
+    .hs-denied   { background: rgba(248,113,113,.12); color: var(--red); }
+    .hs-played   { background: rgba(253,161,133,.12); color: var(--accent); }
+    .hs-pending  { background: rgba(136,136,136,.12); color: var(--muted); }
+    .history-songs { flex: 1; min-width: 0; color: var(--text); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-who { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
     /* ── loading overlay ── */
     #s-loading {
       position: fixed; inset: 0; display: flex;
@@ -289,19 +342,38 @@
     </div>
   </div>
 
-  <div id="pending-section" style="margin-top:20px">
-    <div class="section-title">Requests</div>
-    <div id="pending-list"></div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-requests" onclick="switchTab('requests')">Requests</button>
+    <button class="tab-btn"        id="tab-btn-reports"  onclick="switchTab('reports')">Reports</button>
   </div>
 
-  <div id="upnext-section" class="section-gap" style="display:none">
-    <div class="section-title">Up Next</div>
-    <div id="upnext-list"></div>
+  <div id="pane-requests" class="tab-pane active">
+    <div id="pending-section">
+      <div class="section-title">Requests</div>
+      <div id="pending-list"></div>
+    </div>
+    <div id="upnext-section" class="section-gap" style="display:none">
+      <div class="section-title">Up Next</div>
+      <div id="upnext-list"></div>
+    </div>
+  </div>
+
+  <div id="pane-reports" class="tab-pane">
+    <div class="report-actions">
+      <button class="btn-report" onclick="downloadCSV()">↓ Download CSV</button>
+    </div>
+    <div class="report-summary">
+      <div class="summary-card approved"><div class="summary-num" id="sum-approved">—</div><div class="summary-label">Approved</div></div>
+      <div class="summary-card denied"><div class="summary-num" id="sum-denied">—</div><div class="summary-label">Denied</div></div>
+      <div class="summary-card played"><div class="summary-num" id="sum-played">—</div><div class="summary-label">Played</div></div>
+      <div class="summary-card pending"><div class="summary-num" id="sum-pending">—</div><div class="summary-label">Pending</div></div>
+    </div>
+    <div id="history-list"><div class="empty-state">Loading history…</div></div>
   </div>
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, historyData: [], activeTab: 'requests' };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -367,10 +439,20 @@ async function verifyPin() {
 }
 
 async function startMain() {
-  await Promise.all([poll(), fetchNowPlaying()]);
+  await Promise.all([poll(), fetchNowPlaying(), loadReports()]);
   showScreen('s-main');
   S.pollTimer = setInterval(poll, 5000);
   setInterval(fetchNowPlaying, 5000);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  S.activeTab = name;
+  ['requests', 'reports'].forEach(t => {
+    $('tab-btn-' + t)?.classList.toggle('active', t === name);
+    $('pane-' + t)?.classList.toggle('active', t === name);
+  });
+  if (name === 'reports') loadReports();
 }
 
 // ── Poll (requests) ──────────────────────────────────────────────────────────
@@ -495,6 +577,60 @@ async function deny(requestId) {
 function disableCard(requestId) {
   const card = $(`req-${requestId}`);
   if (card) card.querySelectorAll('button').forEach(b => b.classList.add('btn-disabled'));
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+async function loadReports() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/history?s=${enc(S.session)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    S.historyData = d.requests || [];
+    renderReports(S.historyData);
+  } catch {}
+}
+
+function renderReports(requests) {
+  const counts = { approved: 0, denied: 0, played: 0, pending: 0 };
+  requests.forEach(r => {
+    const k = r.status === 'approved' ? 'approved' : r.status === 'denied' ? 'denied' : r.status === 'played' ? 'played' : 'pending';
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  $('sum-approved').textContent = counts.approved;
+  $('sum-denied').textContent   = counts.denied;
+  $('sum-played').textContent   = counts.played;
+  $('sum-pending').textContent  = counts.pending;
+
+  if (!requests.length) {
+    $('history-list').innerHTML = '<div class="empty-state">No requests yet.</div>';
+    return;
+  }
+  const rows = [...requests].reverse().map(r => {
+    const songs = (r.song_titles || []).join(', ');
+    const who   = esc(r.requester_name || 'Guest');
+    const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const st    = r.status || 'pending';
+    return `<div class="history-row">
+      <span class="history-status hs-${esc(st)}">${esc(st)}</span>
+      <span class="history-songs">${esc(songs)}</span>
+      <span class="history-who">${who}${time ? ' · ' + time : ''}</span>
+    </div>`;
+  }).join('');
+  $('history-list').innerHTML = rows;
+}
+
+function downloadCSV() {
+  const rows = [['Status', 'Songs', 'Requester', 'Time']];
+  S.historyData.forEach(r => {
+    const time = r.created_at ? new Date(r.created_at * 1000).toISOString() : '';
+    rows.push([r.status || '', (r.song_titles || []).join(' | '), r.requester_name || '', time]);
+  });
+  const csv = rows.map(row => row.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `jukebar-${S.jukebarId}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────

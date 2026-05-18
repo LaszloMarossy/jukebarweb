@@ -261,6 +261,21 @@ async def host_register(body: dict[str, Any]):
     return {"ok": True}
 
 
+@app.post("/api/host/nowplaying")
+async def host_nowplaying(body: dict[str, Any]):
+    """
+    Called by iOS immediately when the now-playing item changes.
+    Lightweight alternative to waiting for the next /sync cycle.
+    """
+    jukebar_id = body.get("jukebar_id", "")
+    session    = body.get("session", "")
+    bar = _get_bar(jukebar_id)
+    _validate_session(bar, session)
+    _touch(bar)
+    bar.now_playing_id = body.get("now_playing_id")  # None = nothing playing
+    return {"ok": True}
+
+
 @app.post("/api/host/sync")
 async def host_sync(body: dict[str, Any]):
     """
@@ -452,6 +467,26 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
         "jump": jump,
     })
     return {"ok": True}
+
+
+@app.get("/api/bar/{jukebar_id}/history")
+async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
+    """All requests for the current session — used by admin page reports tab."""
+    bar = _customer_bar(jukebar_id, s)
+    return {
+        "bar_name": bar.bar_name,
+        "requests": [
+            {
+                "id": r.id,
+                "song_titles": r.song_titles,
+                "requester_name": r.requester_name,
+                "status": r.status,
+                "jump": r.jump,
+                "created_at": r.created_at,
+            }
+            for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
+        ],
+    }
 
 
 @app.post("/api/bar/{jukebar_id}/control")
