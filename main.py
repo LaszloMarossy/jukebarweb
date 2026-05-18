@@ -329,7 +329,7 @@ async def bartender_page(jukebar_id: str):
 
 @app.get("/admin/{jukebar_id}", response_class=HTMLResponse)
 async def admin_page(jukebar_id: str):
-    return (Path("static") / "bartender.html").read_text(encoding="utf-8")
+    return (Path("static") / "admin.html").read_text(encoding="utf-8")
 
 
 @app.get("/api/bar/{jukebar_id}/catalog")
@@ -451,6 +451,16 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
         "song_ids": req.song_ids,
         "jump": jump,
     })
+    return {"ok": True}
+
+
+@app.post("/api/bar/{jukebar_id}/control")
+async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+    bar = _customer_bar(jukebar_id, s)
+    action = body.get("action", "")
+    if action not in ("play", "pause", "next", "prev"):
+        raise HTTPException(400, "action must be play, pause, next, or prev")
+    bar.pending_actions.append({"type": "control", "action": action})
     return {"ok": True}
 
 
