@@ -78,6 +78,16 @@
       padding: 24px 20px; text-align: center; gap: 20px;
     }
 
+    .play-art {
+      width: min(36dvh, 72vw); height: min(36dvh, 72vw);
+      border-radius: 16px; overflow: hidden;
+      background: rgba(255,255,255,.07);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .play-art img { width: 100%; height: 100%; object-fit: cover; }
+    .play-art-ph svg { width: min(14dvh, 28vw); height: min(14dvh, 28vw); }
+
     .play-np-section { width: 100%; max-width: 440px; }
     .play-np-label {
       font-size: 11px; letter-spacing: 2.5px; font-weight: 700;
@@ -90,6 +100,10 @@
     .play-np-title {
       font-size: clamp(16px, 3.5dvh, 28px); font-weight: 600;
       color: var(--text); line-height: 1.3; margin-top: 6px;
+    }
+    .play-np-album {
+      font-size: clamp(12px, 2.2dvh, 20px); color: rgba(255,255,255,.45);
+      margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .play-np-idle { font-size: 16px; color: var(--muted); }
 
@@ -323,6 +337,13 @@
   </div>
 
   <div class="play-body">
+    <div class="play-art" id="play-art">
+      <div class="play-art-ph" id="play-art-ph">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.5">
+          <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+        </svg>
+      </div>
+    </div>
     <div class="play-np-section">
       <div class="play-np-label">Now Playing</div>
       <div id="play-np"><div class="play-np-idle">Nothing playing right now</div></div>
@@ -523,9 +544,28 @@ async function fetchNowPlaying() {
       ? `<b>${esc(song.artist || '')}</b>${song.title ? ` · ${esc(song.title)}` : ''}`
       : 'Nothing playing right now';
 
-    // Play screen (large)
+    // Play screen artwork
+    const artPh = $('play-art-ph');
+    const existingImg = $('play-art')?.querySelector('img');
+    if (song?.artwork_data_url) {
+      if (existingImg) {
+        existingImg.src = song.artwork_data_url;
+      } else {
+        const img = document.createElement('img');
+        img.src = song.artwork_data_url;
+        $('play-art').prepend(img);
+      }
+      if (artPh) artPh.style.display = 'none';
+    } else {
+      if (existingImg) existingImg.remove();
+      if (artPh) artPh.style.display = '';
+    }
+
+    // Play screen text (large)
     $('play-np').innerHTML = song
-      ? `<div class="play-np-artist">${esc(song.artist || '')}</div><div class="play-np-title">${esc(song.title || '')}</div>`
+      ? `<div class="play-np-artist">${esc(song.artist || '')}</div>
+         <div class="play-np-title">${esc(song.title || '')}</div>
+         ${song.album ? `<div class="play-np-album">${esc(song.album)}</div>` : ''}`
       : `<div class="play-np-idle">Nothing playing right now</div>`;
   } catch {}
 }
