@@ -42,7 +42,8 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 MAP_ENTRIES_FILE = DATA_DIR / "map_entries.json"
 
 BAR_TIMEOUT_SECONDS  = 300    # bar shown as offline on the map after 5 min without a sync
-BAR_CLEANUP_SECONDS  = 7200   # bar session purged from memory after 2 h of inactivity
+BAR_CLEANUP_INACTIVE = 7200   # last_seen must be this old (2 h) before cleanup considers it
+BAR_CLEANUP_MIN_AGE  = 1800   # session must also be at least this old (30 min) to be swept
 CLEANUP_INTERVAL     = 300    # sweep runs every 5 minutes
 
 
@@ -92,6 +93,7 @@ class BarSession:
     price_for_three: float = 0.0
     currency: str = ""
     now_playing: dict | None = None    # full song dict pushed by iOS on song change
+    created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
@@ -133,11 +135,15 @@ async def _save_map_entries() -> None:
 # ---------------------------------------------------------------------------
 
 async def _cleanup_loop():
-    """Purge BarSessions that haven't synced in BAR_CLEANUP_SECONDS."""
+    """Purge BarSessions that haven't synced in BAR_CLEANUP_INACTIVE and are older than BAR_CLEANUP_MIN_AGE."""
     while True:
         await asyncio.sleep(CLEANUP_INTERVAL)
-        cutoff = time.time() - BAR_CLEANUP_SECONDS
-        stale = [jid for jid, bar in _bars.items() if bar.last_seen < cutoff]
+        now = time.time()
+        stale = [
+            jid for jid, bar in _bars.items()
+            if (now - bar.last_seen  > BAR_CLEANUP_INACTIVE and
+                now - bar.created_at > BAR_CLEANUP_MIN_AGE)
+        ]
         for jid in stale:
             del _bars[jid]
         if stale:
