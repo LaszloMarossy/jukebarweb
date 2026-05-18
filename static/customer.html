@@ -76,6 +76,7 @@
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       padding: 24px 20px; text-align: center; gap: 20px;
+      overflow-y: auto;
     }
 
     .play-art {
@@ -90,8 +91,8 @@
 
     .play-np-section { width: 100%; max-width: 440px; }
     .play-np-label {
-      font-size: 11px; letter-spacing: 2.5px; font-weight: 700;
-      color: var(--accent); text-transform: uppercase; margin-bottom: 12px;
+      font-size: clamp(18px, 4dvh, 32px); font-weight: 800;
+      color: var(--accent); margin-bottom: 8px;
     }
     .play-np-artist {
       font-size: clamp(22px, 5dvh, 40px); font-weight: 800;
@@ -348,7 +349,10 @@
       <div class="play-np-label">Now Playing</div>
       <div id="play-np"><div class="play-np-idle">Nothing playing right now</div></div>
     </div>
-    <div class="play-upnext" id="play-upnext"></div>
+    <div class="play-upnext" id="play-upnext">
+    <div class="play-un-label">Up Next</div>
+    <div class="play-un-item" style="color:var(--muted);opacity:.5">Shuffling…</div>
+  </div>
   </div>
 
   <div class="play-footer">
@@ -586,7 +590,7 @@ async function fetchUpNext() {
         .map(t => `<div class="play-un-item">${esc(t)}</div>`).join('');
       unEl.innerHTML = `<div class="play-un-label">Up Next</div>${items}`;
     } else {
-      unEl.innerHTML = '';
+      unEl.innerHTML = `<div class="play-un-label">Up Next</div><div class="play-un-item" style="color:var(--muted);opacity:.5">Shuffling…</div>`;
     }
 
     // Browse letters screen
