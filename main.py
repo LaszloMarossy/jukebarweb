@@ -366,8 +366,10 @@ async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body
 @app.get("/api/bar/{jukebar_id}/nowplaying")
 async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
-    # Return just the song ID — client already has the catalog and resolves it locally
-    return {"now_playing_id": bar.now_playing_id}
+    song = bar.song_index.get(bar.now_playing_id) if bar.now_playing_id else None
+    # now_playing_id for customers who have the catalog and resolve locally;
+    # now_playing full object for the bartender page which has no catalog
+    return {"now_playing_id": bar.now_playing_id, "now_playing": song}
 
 
 @app.post("/api/bar/{jukebar_id}/request")

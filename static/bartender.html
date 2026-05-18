@@ -352,12 +352,13 @@ async function verifyPin() {
 }
 
 async function startMain() {
-  await poll();
+  await Promise.all([poll(), fetchNowPlaying()]);
   showScreen('s-main');
   S.pollTimer = setInterval(poll, 5000);
+  setInterval(fetchNowPlaying, 5000);
 }
 
-// ── Poll ────────────────────────────────────────────────────────────────────
+// ── Poll (requests + approval queue) ────────────────────────────────────────
 async function poll() {
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
@@ -372,9 +373,18 @@ async function poll() {
       document.title = `Bartender — ${d.bar_name}`;
     }
 
-    renderNowPlaying(d.now_playing);
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {}
+}
+
+// ── Now playing (polled separately — relay syncs this from iOS every 5 s) ──
+async function fetchNowPlaying() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
+    if (!res.ok) return;
+    const { now_playing } = await res.json();
+    renderNowPlaying(now_playing);
   } catch {}
 }
 
