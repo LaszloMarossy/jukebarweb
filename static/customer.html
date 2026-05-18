@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+  <title>JukeBar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #1a1a1a;
+      --card:    #1e1e1e;
+      --card2:   #252525;
+      --accent:  #fda185;
+      --accent2: #e8723a;
+      --text:    #f0ece8;
+      --muted:   #888;
+      --border:  #2d2d2d;
+      --error:   #f87171;
+    }
+
+    html, body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      min-height: 100dvh; -webkit-font-smoothing: antialiased; overscroll-behavior: none;
+    }
+    button { cursor: pointer; border: none; background: none; color: inherit; font: inherit; }
+    input  { font: inherit; color: inherit; background: none; border: none; outline: none; }
+
+    /* ── screens ── */
+    .screen { display: none; min-height: 100dvh; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 44px; height: 44px; border: 4px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       LOADING SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #s-loading { align-items: center; justify-content: center; gap: 20px; }
+    .load-logo { margin-bottom: 8px; }
+    .load-text  { color: var(--muted); font-size: 14px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       ERROR SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #s-error { align-items: center; justify-content: center; padding: 40px 32px; text-align: center; gap: 16px; }
+    .err-icon  { font-size: 52px; }
+    .err-title { font-size: 20px; font-weight: 700; }
+    .err-msg   { color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+    /* ══════════════════════════════════════════════════════════════
+       BROWSE SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #s-browse { padding-bottom: 0; }
+
+    /* sticky header */
+    .top-bar {
+      position: sticky; top: 0; z-index: 10;
+      background: #111; border-bottom: 1px solid var(--border);
+    }
+    .bar-header  { padding: 0 14px; min-height: clamp(80px, 20dvh, 180px); display: flex; align-items: center; gap: 10px; }
+    .browse-logo { flex-shrink: 0; cursor: pointer; display: flex; }
+    .browse-logo svg { width: clamp(44px, 13dvh, 100px); height: clamp(44px, 13dvh, 100px); }
+    .bar-info    { flex: 1; min-width: 0; }
+    .bar-name    { font-family: 'Bubblegum Sans', cursive; font-size: clamp(22px, 5dvh, 48px); line-height: 1.2; }
+    .now-playing { font-size: clamp(13px, 2.2dvh, 22px); color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .now-playing b { color: var(--text); font-weight: 500; }
+
+    /* breadcrumb */
+    .breadcrumb {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+      padding: 8px 14px 6px; min-height: 36px; border-bottom: 1px solid var(--border);
+    }
+    .crumb-link { color: var(--accent); font-size: 14px; font-weight: 600; padding: 2px 0; }
+    .crumb-sep  { color: var(--muted); font-size: 13px; }
+    .crumb-cur  { color: var(--text); font-size: 14px; font-weight: 600; }
+
+    /* search */
+    .search-wrap { padding: 8px 14px 10px; }
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card2); border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 14px;
+    }
+    .search-box svg { flex-shrink: 0; color: var(--muted); }
+    .search-box input { font-size: 16px; width: 100%; }
+    .search-box input::placeholder { color: var(--muted); }
+    .clear-btn { color: var(--muted); font-size: 18px; flex-shrink: 0; display: none; }
+    .clear-btn.visible { display: block; }
+
+    /* catalog area */
+    .catalog { padding: 14px; }
+    .section-title {
+      font-family: 'Bubblegum Sans', cursive;
+      font-size: clamp(14px, 2.2dvh, 22px); font-weight: 700; letter-spacing: 1.2px;
+      color: rgba(255,255,255,.85); text-transform: uppercase;
+      padding-bottom: clamp(8px, 1.5dvh, 14px);
+    }
+    .empty { text-align: center; color: var(--muted); padding: 48px 16px; font-size: 15px; }
+
+    /* letter circles — flex-wrap so they reflow naturally in any width */
+    .letter-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .letter-btn {
+      flex-shrink: 0;
+      width: clamp(44px, 13vmin, 68px); height: clamp(44px, 13vmin, 68px);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(14px, 4vmin, 22px); font-weight: 800; color: #111;
+      transition: transform .1s;
+    }
+    .letter-btn:not(.dim):active { transform: scale(0.88); }
+    .letter-btn.dim { background: #181818 !important; color: #2a2a2a; pointer-events: none; }
+
+    /* name bubbles (artists, albums, songs) */
+    .bubble-wrap { display: flex; flex-wrap: wrap; gap: clamp(9px, 1.5dvh, 14px); }
+    .bubble {
+      padding: 6px clamp(14px, 2dvh, 18px); border-radius: 50px;
+      line-height: 1.05; font-size: clamp(22px, 4dvh, 34px); font-weight: 700;
+      color: #111;
+      transition: opacity .1s;
+    }
+    .bubble:active { opacity: .72; }
+    .bubble.selected { box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
+    .bubble.dim-out  { opacity: .3; pointer-events: none; }
+
+    /* ══════════════════════════════════════════════════════════════
+       BASKET (fixed bottom panel, slides up)
+    ══════════════════════════════════════════════════════════════ */
+    .basket {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+      background: #111; border-top: 2px solid var(--accent);
+      padding: 12px 16px 28px;
+      transform: translateY(100%); transition: transform .28s ease;
+    }
+    .basket.show { transform: translateY(0); }
+
+    .basket-songs { margin-bottom: 10px; }
+    .basket-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+    }
+    .basket-row:last-child { border-bottom: none; }
+    .basket-num  { color: var(--accent); font-weight: 800; font-size: 15px; width: 18px; flex-shrink: 0; }
+    .basket-info { flex: 1; min-width: 0; }
+    .basket-title  { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .basket-artist { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .basket-rm { color: var(--error); font-size: 22px; flex-shrink: 0; line-height: 1; }
+
+    .basket-footer { display: flex; gap: 8px; margin-top: 10px; }
+    .basket-name {
+      flex: 1; background: var(--card2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 14px; font-size: 15px;
+    }
+    .basket-name::placeholder { color: var(--muted); }
+    .basket-name.missing     { border-color: var(--error); }
+    .basket-submit {
+      background: var(--accent); color: #000; font-weight: 800;
+      font-size: 15px; padding: 11px 18px; border-radius: 10px; white-space: nowrap;
+    }
+    .basket-submit:disabled { opacity: .45; pointer-events: none; }
+
+    /* ══════════════════════════════════════════════════════════════
+       LANDSCAPE  —  browse screen: no scroll, compact bubbles
+    ══════════════════════════════════════════════════════════════ */
+    @media (orientation: landscape) {
+      /* Lock browse screen to viewport — no scrolling */
+      #s-browse { height: 100dvh; overflow: hidden; }
+      /* padding-bottom:0 !important overrides the inline style="padding-bottom:180px" on #catalog */
+      .catalog { flex: 1; overflow: hidden; min-height: 0; padding: 10px 14px; padding-bottom: 0 !important; }
+
+      /* Section title — 2x in landscape */
+      .section-title { font-size: clamp(22px, 3.5dvh, 32px); padding-bottom: clamp(4px, 0.8dvh, 10px); }
+
+      /* Bubbles: slightly smaller than portrait so more fit, but still readable */
+      .bubble { font-size: clamp(18px, 3.5dvh, 28px); padding: 5px clamp(12px, 1.8dvh, 16px); }
+
+      /* Compact header/search so catalog gets maximum vertical space */
+      .breadcrumb { padding: 4px 14px; min-height: 24px; }
+      .search-wrap { padding: 4px 14px 5px; }
+      .search-box { padding: 6px 12px; }
+
+      /* Compact basket so it covers less of the catalog when a request is pending */
+      .basket { padding: 8px 14px 10px; }
+      .basket-songs { margin-bottom: 6px; }
+      .basket-row { padding: 4px 0; }
+      .basket-footer { margin-top: 6px; }
+      .basket-name { padding: 7px 10px; font-size: 13px; }
+      .basket-submit { font-size: 13px; padding: 7px 14px; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       STATUS SCREEN
+    ══════════════════════════════════════════════════════════════ */
+    #s-status { align-items: center; justify-content: center; padding: 40px 32px; text-align: center; gap: 18px; }
+    .st-icon     { font-size: 60px; line-height: 1; }
+    .st-title    { font-size: 22px; font-weight: 800; }
+    .st-subtitle { color: var(--muted); font-size: 15px; line-height: 1.6; }
+    .st-songs    { margin-top: 4px; }
+    .st-song     { font-size: 14px; padding: 3px 0; }
+    .st-song::before { content: "♪  "; color: var(--accent); }
+    .more-btn {
+      background: var(--card2); border: 1px solid var(--border);
+      padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── LOADING ───────────────────────────────────────────────────────────── -->
+<div id="s-loading" class="screen active">
+  <div class="load-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+      <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+      <circle cx="36" cy="36" r="24" fill="#fda185"/>
+      <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="58.2" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="58.2" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="45.2" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="26.8" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="13.8" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="13.8" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="26.8" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+    </svg>
+  </div>
+  <div class="spinner"></div>
+  <div class="load-text">Loading…</div>
+</div>
+
+<!-- ── ERROR ─────────────────────────────────────────────────────────────── -->
+<div id="s-error" class="screen">
+  <div class="err-icon">🎵</div>
+  <div class="err-title" id="err-title">Unavailable</div>
+  <div class="err-msg"   id="err-msg">Something went wrong.</div>
+</div>
+
+<!-- ── BROWSE ────────────────────────────────────────────────────────────── -->
+<div id="s-browse" class="screen">
+  <div class="top-bar">
+    <div class="bar-header">
+      <div class="browse-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+          <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+          <circle cx="36" cy="36" r="24" fill="#fda185"/>
+          <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+        </svg>
+      </div>
+      <div class="bar-info">
+        <div class="bar-name"    id="bar-name">JukeBar</div>
+        <div class="now-playing" id="now-playing">—</div>
+      </div>
+    </div>
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input id="search" type="search" placeholder="Search songs or artists…" autocomplete="off" autocorrect="off">
+        <button class="clear-btn" id="clear-btn" onclick="clearSearch()">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="catalog" id="catalog" style="padding-bottom:180px"></div>
+
+  <!-- basket -->
+  <div class="basket" id="basket">
+    <div class="basket-songs" id="basket-songs"></div>
+    <div class="basket-footer">
+      <input class="basket-name" id="requester-name" type="text" placeholder="Your name" maxlength="40">
+      <button class="basket-submit" id="submit-btn" onclick="submitRequest()">Submit →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STATUS ─────────────────────────────────────────────────────────────── -->
+<div id="s-status" class="screen">
+  <div class="st-icon"     id="st-icon"></div>
+  <div class="st-title"    id="st-title"></div>
+  <div class="st-subtitle" id="st-subtitle"></div>
+  <div class="st-songs"    id="st-songs"></div>
+  <button class="more-btn" onclick="resetAndBrowse()">Request More Songs</button>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const PALETTE    = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a'];
+const ALPHA      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
+const TITLE_COLS = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
+
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  jukebarId:       '',
+  session:         '',
+  requireApproval: true,
+  pricePerSong:    0,
+  priceForThree:   0,
+  currency:        '',
+  catalog:         [],
+  songById:        {},
+  tree:            [],   // [{artist, albums:[{album,songs:[...]}]}]
+  selected:        [],   // max 3 song objects
+  submittedSongs:  [],   // copy of selected saved at submit time for status screen
+  upNext:          [],
+  colorMap:        new Map(), // artist → palette color (assigned once, stable)
+  nav:             { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 },
+  requestId:       null,
+  pollTimer:       null,
+};
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function boot() {
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  S.jukebarId = pathParts[pathParts.length - 1];
+  S.session   = new URLSearchParams(location.search).get('s') || '';
+
+  if (!S.jukebarId || !S.session)
+    return showError('Invalid link', 'Please scan the QR code at the bar to get a fresh link.');
+
+  try {
+    const cacheKey = `jb_${S.jukebarId}_${S.session}`;
+    let d;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      d = JSON.parse(cached);
+    } else {
+      const res = await fetch(`/api/bar/${S.jukebarId}/catalog?s=${enc(S.session)}`);
+      if (res.status === 403) return showError('Link expired', 'This session has expired. Ask the bartender to scan a new QR code.');
+      if (res.status === 404) return showError('Bar offline', 'This JukeBar is not reachable right now. Try again in a moment.');
+      if (!res.ok)            return showError('Error', 'Could not load the playlist. Check your connection and try again.');
+      d = await res.json();
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(d)); } catch {}
+    }
+    S.requireApproval = d.require_approval !== false;
+    S.pricePerSong    = d.price_per_song  || 0;
+    S.priceForThree   = d.price_for_three || 0;
+    S.currency        = d.currency        || '';
+    S.catalog         = d.catalog         || [];
+
+    const barName = d.bar_name || 'JukeBar';
+    const title   = barName.startsWith('JukeBar') ? barName : `JukeBar ${barName}`;
+    colorize($('bar-name'), title);
+    document.title = title;
+
+    buildIndex();
+    renderBrowse();
+    showScreen('s-browse');
+
+    fetchNowPlaying();
+    fetchUpNext();
+    setInterval(fetchNowPlaying, 5_000);
+    setInterval(fetchUpNext, 10_000);
+  } catch {
+    showError('Network error', 'Check your connection and try again.');
+  }
+}
+
+// ── Index ──────────────────────────────────────────────────────────────────
+function sortKey(s) {
+  return s.replace(/^the\s+/i, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+function firstLetter(artist) {
+  const ch = (sortKey(artist).charAt(0) || '').toUpperCase();
+  return /[A-Z]/.test(ch) ? ch : '#';
+}
+
+function buildIndex() {
+  S.songById = {};
+  const map  = {};
+  for (const s of S.catalog) {
+    S.songById[s.id] = s;
+    const a  = s.artist || 'Unknown Artist';
+    const al = s.album  || 'Unknown Album';
+    if (!map[a])     map[a] = {};
+    if (!map[a][al]) map[a][al] = [];
+    map[a][al].push(s);
+  }
+  S.tree = Object.keys(map)
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)))
+    .map(artist => ({
+      artist,
+      albums: Object.keys(map[artist])
+        .sort((a, b) => a.localeCompare(b))
+        .map(album => ({ album, songs: map[artist][album].sort((a, b) => (a.title||'').localeCompare(b.title||'')) }))
+    }));
+  S.colorMap = new Map(S.tree.map((node, i) => [node.artist, PALETTE[i % PALETTE.length]]));
+}
+
+// Rainbow colorize (Bubblegum Sans style)
+function colorize(el, text) {
+  if (!el) return;
+  el.innerHTML = '';
+  let last = '';
+  for (const ch of text) {
+    if (ch === ' ') { el.appendChild(document.createTextNode(' ')); continue; }
+    const pool = TITLE_COLS.filter(c => c !== last);
+    const color = pool[Math.floor(Math.random() * pool.length)];
+    last = color;
+    const s = document.createElement('span');
+    s.style.color = color; s.textContent = ch;
+    el.appendChild(s);
+  }
+}
+
+// ── Now playing ─────────────────────────────────────────────────────────────
+async function fetchNowPlaying() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
+    if (!res.ok) return;
+    const { now_playing_id } = await res.json();
+    const song = now_playing_id ? S.songById[now_playing_id] : null;
+    $('now-playing').innerHTML = song
+      ? `<b>${esc(song.artist || '')}</b>${song.title ? ` · ${esc(song.title)}` : ''}`
+      : 'Nothing playing right now';
+  } catch {}
+}
+
+// ── Up Next ───────────────────────────────────────────────────────────────────
+async function fetchUpNext() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const approved = (d.requests || []).filter(r => r.status === 'approved');
+    S.upNext = approved;
+    if (S.nav.level === 'letters' && $('s-browse').classList.contains('active')) renderLetters();
+  } catch {}
+}
+
+// ── Render browse ────────────────────────────────────────────────────────────
+function renderBrowse() {
+  const q = ($('search').value || '').trim().toLowerCase();
+  renderBreadcrumb();
+  if (q) { renderSearch(q); return; }
+  const { level } = S.nav;
+  if (level === 'letters') renderLetters();
+  else if (level === 'artists') renderArtists();
+  else if (level === 'albums')  renderAlbums();
+  else renderSongs();
+}
+
+function renderBreadcrumb() {
+  const { level, letter, artistIdx, albumIdx } = S.nav;
+  const parts = [];
+  parts.push(`<button class="crumb-link" onclick="drillBack('letters')">A–Z</button>`);
+  if (level !== 'letters') {
+    parts.push(`<span class="crumb-sep">›</span>`);
+    if (level === 'artists')
+      parts.push(`<span class="crumb-cur">${esc(letter)}</span>`);
+    else
+      parts.push(`<button class="crumb-link" onclick="drillBack('artists')">${esc(letter)}</button>`);
+  }
+  if (level === 'albums' || level === 'songs') {
+    const artist = S.tree[artistIdx]?.artist || '';
+    parts.push(`<span class="crumb-sep">›</span>`);
+    if (level === 'albums')
+      parts.push(`<span class="crumb-cur">${esc(artist)}</span>`);
+    else
+      parts.push(`<button class="crumb-link" onclick="drillBack('albums')">${esc(artist)}</button>`);
+  }
+  if (level === 'songs') {
+    const album = S.tree[artistIdx]?.albums[albumIdx]?.album || 'Unknown Album';
+    parts.push(`<span class="crumb-sep">›</span>`);
+    parts.push(`<span class="crumb-cur">${esc(album)}</span>`);
+  }
+  $('breadcrumb').innerHTML = parts.join('');
+}
+
+function _fgFor(hex) {
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  return (0.2126*r + 0.7152*g + 0.0722*b) > 0.55 ? '#111' : '#fff';
+}
+
+function renderLetters() {
+  if (!S.tree.length) { $('catalog').innerHTML = '<div class="empty">No songs in this playlist.</div>'; return; }
+  const has = new Set(S.tree.map(n => firstLetter(n.artist)));
+  const upNextHtml = S.upNext.length
+    ? `<div class="section-title" style="margin-top:4px">UP NEXT</div>` +
+      S.upNext.flatMap(r => r.song_titles || []).slice(0, 4)
+        .map(t => `<div style="font-size:14px;padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--accent)">▸ </span>${esc(t)}</div>`)
+        .join('') + '<div style="margin-bottom:12px"></div>'
+    : '';
+  $('catalog').innerHTML = upNextHtml + '<div class="section-title">BANDS</div><div class="letter-grid">' +
+    ALPHA.map((l, i) => {
+      const active = has.has(l);
+      const col    = PALETTE[i % PALETTE.length];
+      const style  = active ? `background:${col};color:${_fgFor(col)}` : '';
+      return `<div class="letter-btn${active ? '' : ' dim'}" style="${style}"${active ? ` onclick="drillLetter('${l}')"` : ''}>${l}</div>`;
+    }).join('') + '</div>';
+}
+
+function renderArtists() {
+  const artists = S.tree
+    .map((node, i) => ({ node, i }))
+    .filter(({ node }) => firstLetter(node.artist) === S.nav.letter);
+  if (!artists.length) { drillBack('letters'); return; }
+  $('catalog').innerHTML = '<div class="section-title">BANDS</div><div class="bubble-wrap">' +
+    artists.map(({ node, i }) => {
+      const col = S.colorMap.get(node.artist) ?? PALETTE[i % PALETTE.length];
+      const fg  = _fgFor(col);
+      return `<div class="bubble" style="background:${col};color:${fg}" onclick="drillArtist(${i})">${esc(node.artist)}</div>`;
+    }).join('') + '</div>';
+}
+
+function renderAlbums() {
+  const node = S.tree[S.nav.artistIdx];
+  if (!node) { drillBack('artists'); return; }
+  $('catalog').innerHTML = '<div class="section-title">ALBUMS</div><div class="bubble-wrap">' +
+    node.albums.map((a, i) => {
+      const col = PALETTE[i % PALETTE.length];
+      const fg  = _fgFor(col);
+      return `<div class="bubble" style="background:${col};color:${fg}" onclick="drillAlbum(${i})">${esc(a.album || 'Unknown Album')}</div>`;
+    }).join('') + '</div>';
+}
+
+function renderSongs() {
+  const node  = S.tree[S.nav.artistIdx];
+  const album = node?.albums[S.nav.albumIdx];
+  if (!album) { drillBack('albums'); return; }
+  const full = S.selected.length >= 3;
+  $('catalog').innerHTML = '<div class="section-title">SONGS — tap to select (max 3)</div><div class="bubble-wrap">' +
+    album.songs.map((s, i) => {
+      const sel  = S.selected.some(x => x.id === s.id);
+      const dim  = !sel && full;
+      const col  = PALETTE[i % PALETTE.length];
+      const fg   = _fgFor(col);
+      const mark = sel ? ' ✓' : '';
+      const cls  = `bubble${sel ? ' selected' : ''}${dim ? ' dim-out' : ''}`;
+      return `<div class="${cls}" style="background:${col};color:${fg}" data-id="${esc(s.id)}" onclick="toggleSong(this)">${esc(s.title)}${mark}</div>`;
+    }).join('') + '</div>';
+}
+
+function renderSearch(q) {
+  const hits = S.catalog.filter(s =>
+    (s.title || '').toLowerCase().includes(q) ||
+    (s.artist|| '').toLowerCase().includes(q) ||
+    (s.album || '').toLowerCase().includes(q)
+  );
+  if (!hits.length) { $('catalog').innerHTML = '<div class="empty">No results.</div>'; return; }
+  const full = S.selected.length >= 3;
+  $('catalog').innerHTML = '<div class="bubble-wrap">' +
+    hits.map((s, i) => {
+      const sel  = S.selected.some(x => x.id === s.id);
+      const dim  = !sel && full;
+      const col  = PALETTE[i % PALETTE.length];
+      const fg   = _fgFor(col);
+      const mark = sel ? ' ✓' : '';
+      const cls  = `bubble${sel ? ' selected' : ''}${dim ? ' dim-out' : ''}`;
+      const label = esc(s.title) + (s.artist ? ` — ${esc(s.artist)}` : '');
+      return `<div class="${cls}" style="background:${col};color:${fg}" data-id="${esc(s.id)}" onclick="toggleSong(this)">${label}${mark}</div>`;
+    }).join('') + '</div>';
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function drillLetter(l)  { S.nav = { level: 'artists', letter: l, artistIdx: -1, albumIdx: -1 }; renderBrowse(); }
+function drillArtist(i)  { S.nav = { ...S.nav, level: 'albums',  artistIdx: i, albumIdx: -1 }; renderBrowse(); }
+function drillAlbum(i)   { S.nav = { ...S.nav, level: 'songs',   albumIdx: i }; renderBrowse(); }
+function drillBack(to) {
+  if (to === 'letters') S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
+  else if (to === 'artists') S.nav = { ...S.nav, level: 'artists', albumIdx: -1 };
+  else if (to === 'albums')  S.nav = { ...S.nav, level: 'albums',  albumIdx: -1 };
+  renderBrowse();
+}
+
+// ── Song selection ─────────────────────────────────────────────────────────────
+function toggleSong(el) {
+  const id = el.dataset.id;
+  const s  = S.songById[id];
+  if (!s) return;
+  const idx = S.selected.findIndex(x => x.id === id);
+  if (idx >= 0) S.selected.splice(idx, 1);
+  else if (S.selected.length < 3) S.selected.push(s);
+  renderBrowse();
+  renderBasket();
+}
+
+function removeFromBasket(i) {
+  S.selected.splice(i, 1);
+  renderBrowse();
+  renderBasket();
+}
+
+function renderBasket() {
+  const basket = $('basket');
+  if (!S.selected.length) { basket.classList.remove('show'); return; }
+  $('basket-songs').innerHTML = S.selected.map((s, i) => `
+<div class="basket-row">
+  <div class="basket-num">${i + 1}</div>
+  <div class="basket-info">
+    <div class="basket-title">${esc(s.title)}</div>
+    <div class="basket-artist">${esc(s.artist)}${s.album ? ` · ${esc(s.album)}` : ''}</div>
+  </div>
+  <button class="basket-rm" onclick="removeFromBasket(${i})">✕</button>
+</div>`).join('');
+  basket.classList.add('show');
+}
+
+// ── Submit ─────────────────────────────────────────────────────────────────────
+async function submitRequest() {
+  if (!S.selected.length) return;
+  const nameEl = $('requester-name');
+  const name   = (nameEl.value || '').trim();
+  if (!name) {
+    nameEl.classList.add('missing');
+    nameEl.focus();
+    nameEl.addEventListener('input', () => nameEl.classList.remove('missing'), { once: true });
+    return;
+  }
+  const btn = $('submit-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/request?s=${enc(S.session)}`, {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        song_ids:       S.selected.map(s => s.id),
+        song_titles:    S.selected.map(s => s.title),
+        requester_name: name,
+        jump:           false,
+      }),
+    });
+    if (!res.ok) throw new Error(res.status);
+    const { request_id, status } = await res.json();
+    S.requestId     = request_id;
+    S.submittedSongs = [...S.selected];
+    S.selected = [];
+    S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
+    btn.disabled = false; btn.textContent = 'Submit →';
+    renderBasket();
+    showStatusScreen(status || 'pending');
+  } catch {
+    btn.disabled = false; btn.textContent = 'Submit →';
+    alert('Submission failed — check your connection and try again.');
+  }
+}
+
+// ── Status screen ──────────────────────────────────────────────────────────────
+const STATUS_META = {
+  pending:       { icon: '⏳', title: 'Waiting for approval', sub: () => S.requireApproval ? 'The bartender will review your request shortly.' : 'Your request is queued.' },
+  approved:      { icon: '✅', title: 'Approved!',             sub: () => 'Your songs are in the queue — sit tight!' },
+  approved_jump: { icon: '✅', title: 'Next up!',              sub: () => 'Your songs are playing next!' },
+  denied:        { icon: '❌', title: 'Not this time',         sub: () => 'The bartender passed on this one. Feel free to try another.' },
+  played:        { icon: '🎵', title: 'Now playing!',          sub: () => 'Hope you enjoyed it!' },
+};
+
+function showStatusScreen(status) {
+  renderStatus(status);
+  showScreen('s-status');
+  if (status === 'pending') S.pollTimer = setInterval(pollStatus, 10_000);
+}
+
+function renderStatus(status) {
+  const m = STATUS_META[status] || STATUS_META.pending;
+  $('st-icon').textContent     = m.icon;
+  $('st-title').textContent    = m.title;
+  $('st-subtitle').textContent = m.sub();
+  $('st-songs').innerHTML      = S.submittedSongs.map(s => `<div class="st-song">${esc(s.title)}</div>`).join('');
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/request/${S.requestId}?s=${enc(S.session)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    renderStatus(d.status || 'pending');
+    if (d.status !== 'pending') { clearInterval(S.pollTimer); S.pollTimer = null; }
+  } catch {}
+}
+
+function resetAndBrowse() {
+  clearInterval(S.pollTimer); S.pollTimer = null; S.requestId = null;
+  S.selected = []; S.submittedSongs = [];
+  S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
+  $('search').value = ''; $('clear-btn').classList.remove('visible');
+  $('submit-btn').disabled = false; $('submit-btn').textContent = 'Submit →';
+  renderBasket();
+  renderBrowse();
+  showScreen('s-browse');
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────────
+function clearSearch() {
+  $('search').value = ''; $('clear-btn').classList.remove('visible');
+  renderBrowse();
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+function showError(title, msg) {
+  $('err-title').textContent = title;
+  $('err-msg').textContent   = msg;
+  showScreen('s-error');
+}
+function $(id)    { return document.getElementById(id); }
+function enc(s)   { return encodeURIComponent(s); }
+function esc(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Start ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = $('search');
+  inp.addEventListener('input', e => {
+    $('clear-btn').classList.toggle('visible', e.target.value.length > 0);
+    renderBrowse();
+  });
+  inp.addEventListener('search', () => renderBrowse());
+  boot();
+});
+</script>
+</body>
+</html>

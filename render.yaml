@@ -5,3 +5,10 @@ services:
     pythonVersion: "3.11"
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: jukebar-data
+      mountPath: /data
+      sizeGB: 1
