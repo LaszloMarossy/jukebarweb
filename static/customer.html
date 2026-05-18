@@ -58,6 +58,80 @@
     .err-msg   { color: var(--muted); font-size: 15px; line-height: 1.6; }
 
     /* ══════════════════════════════════════════════════════════════
+       PLAY SCREEN (landing)
+    ══════════════════════════════════════════════════════════════ */
+    #s-play { min-height: 100dvh; }
+
+    .play-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 16px 0;
+    }
+    .play-header svg { flex-shrink: 0; }
+    .play-bar-name {
+      font-family: 'Bubblegum Sans', cursive;
+      font-size: clamp(22px, 5dvh, 48px); line-height: 1.2;
+    }
+
+    .play-body {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px 20px; text-align: center; gap: 20px;
+    }
+
+    .play-np-section { width: 100%; max-width: 440px; }
+    .play-np-label {
+      font-size: 11px; letter-spacing: 2.5px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; margin-bottom: 12px;
+    }
+    .play-np-artist {
+      font-size: clamp(22px, 5dvh, 40px); font-weight: 800;
+      color: var(--accent); line-height: 1.2;
+    }
+    .play-np-title {
+      font-size: clamp(16px, 3.5dvh, 28px); font-weight: 600;
+      color: var(--text); line-height: 1.3; margin-top: 6px;
+    }
+    .play-np-idle { font-size: 16px; color: var(--muted); }
+
+    .play-upnext { width: 100%; max-width: 440px; }
+    .play-un-label {
+      font-size: 11px; letter-spacing: 2px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+    }
+    .play-un-item {
+      font-size: 14px; color: var(--text); padding: 3px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .play-un-item::before { content: "▸  "; color: var(--accent); }
+
+    .play-footer { padding: 0 20px 40px; }
+    .play-req-btn {
+      width: 100%; background: var(--accent); color: #000;
+      font-size: 18px; font-weight: 800; padding: 18px;
+      border-radius: 16px; transition: opacity .15s;
+    }
+    .play-req-btn:active { opacity: .8; }
+
+    /* ══════════════════════════════════════════════════════════════
+       TOAST (confirmation popup on play screen)
+    ══════════════════════════════════════════════════════════════ */
+    .toast {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: var(--card); border-top: 2px solid var(--accent);
+      padding: 16px 20px 40px;
+      transform: translateY(100%); transition: transform .3s ease;
+    }
+    .toast.show { transform: translateY(0); }
+    .toast-head { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+    .toast-song { font-size: 14px; color: var(--accent); padding: 2px 0; }
+    .toast-song::before { content: "♪  "; }
+    .toast-msg  { font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+    .toast-close {
+      position: absolute; top: 12px; right: 16px;
+      color: var(--muted); font-size: 20px; padding: 4px; line-height: 1;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        BROWSE SCREEN
     ══════════════════════════════════════════════════════════════ */
     #s-browse { padding-bottom: 0; }
@@ -107,7 +181,7 @@
     }
     .empty { text-align: center; color: var(--muted); padding: 48px 16px; font-size: 15px; }
 
-    /* letter circles — flex-wrap so they reflow naturally in any width */
+    /* letter circles */
     .letter-grid { display: flex; flex-wrap: wrap; gap: 8px; }
     .letter-btn {
       flex-shrink: 0;
@@ -120,7 +194,7 @@
     .letter-btn:not(.dim):active { transform: scale(0.88); }
     .letter-btn.dim { background: #181818 !important; color: #2a2a2a; pointer-events: none; }
 
-    /* name bubbles (artists, albums, songs) */
+    /* name bubbles */
     .bubble-wrap { display: flex; flex-wrap: wrap; gap: clamp(9px, 1.5dvh, 14px); }
     .bubble {
       padding: 6px clamp(14px, 2dvh, 18px); border-radius: 50px;
@@ -169,47 +243,22 @@
     .basket-submit:disabled { opacity: .45; pointer-events: none; }
 
     /* ══════════════════════════════════════════════════════════════
-       LANDSCAPE  —  browse screen: no scroll, compact bubbles
+       LANDSCAPE  —  browse screen
     ══════════════════════════════════════════════════════════════ */
     @media (orientation: landscape) {
-      /* Lock browse screen to viewport — no scrolling */
       #s-browse { height: 100dvh; overflow: hidden; }
-      /* padding-bottom:0 !important overrides the inline style="padding-bottom:180px" on #catalog */
       .catalog { flex: 1; overflow: hidden; min-height: 0; padding: 10px 14px; padding-bottom: 0 !important; }
-
-      /* Section title — 2x in landscape */
       .section-title { font-size: clamp(22px, 3.5dvh, 32px); padding-bottom: clamp(4px, 0.8dvh, 10px); }
-
-      /* Bubbles: slightly smaller than portrait so more fit, but still readable */
       .bubble { font-size: clamp(18px, 3.5dvh, 28px); padding: 5px clamp(12px, 1.8dvh, 16px); }
-
-      /* Compact header/search so catalog gets maximum vertical space */
       .breadcrumb { padding: 4px 14px; min-height: 24px; }
       .search-wrap { padding: 4px 14px 5px; }
       .search-box { padding: 6px 12px; }
-
-      /* Compact basket so it covers less of the catalog when a request is pending */
       .basket { padding: 8px 14px 10px; }
       .basket-songs { margin-bottom: 6px; }
       .basket-row { padding: 4px 0; }
       .basket-footer { margin-top: 6px; }
       .basket-name { padding: 7px 10px; font-size: 13px; }
       .basket-submit { font-size: 13px; padding: 7px 14px; }
-    }
-
-    /* ══════════════════════════════════════════════════════════════
-       STATUS SCREEN
-    ══════════════════════════════════════════════════════════════ */
-    #s-status { align-items: center; justify-content: center; padding: 40px 32px; text-align: center; gap: 18px; }
-    .st-icon     { font-size: 60px; line-height: 1; }
-    .st-title    { font-size: 22px; font-weight: 800; }
-    .st-subtitle { color: var(--muted); font-size: 15px; line-height: 1.6; }
-    .st-songs    { margin-top: 4px; }
-    .st-song     { font-size: 14px; padding: 3px 0; }
-    .st-song::before { content: "♪  "; color: var(--accent); }
-    .more-btn {
-      background: var(--card2); border: 1px solid var(--border);
-      padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-top: 8px;
     }
   </style>
 </head>
@@ -252,11 +301,51 @@
   <div class="err-msg"   id="err-msg">Something went wrong.</div>
 </div>
 
+<!-- ── PLAY (landing) ────────────────────────────────────────────────────── -->
+<div id="s-play" class="screen">
+  <div class="play-header">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="clamp(44px,11dvh,80px)" height="clamp(44px,11dvh,80px)" style="width:clamp(44px,11dvh,80px);height:clamp(44px,11dvh,80px)">
+      <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+      <circle cx="36" cy="36" r="24" fill="#fda185"/>
+      <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+    </svg>
+    <div class="play-bar-name" id="play-bar-name">JukeBar</div>
+  </div>
+
+  <div class="play-body">
+    <div class="play-np-section">
+      <div class="play-np-label">Now Playing</div>
+      <div id="play-np"><div class="play-np-idle">Nothing playing right now</div></div>
+    </div>
+    <div class="play-upnext" id="play-upnext"></div>
+  </div>
+
+  <div class="play-footer">
+    <button class="play-req-btn" onclick="startRequest()">Request a Song</button>
+  </div>
+
+  <!-- confirmation toast -->
+  <div class="toast" id="toast">
+    <button class="toast-close" onclick="dismissToast()">✕</button>
+    <div id="toast-inner"></div>
+  </div>
+</div>
+
 <!-- ── BROWSE ────────────────────────────────────────────────────────────── -->
 <div id="s-browse" class="screen">
   <div class="top-bar">
     <div class="bar-header">
-      <div class="browse-logo">
+      <div class="browse-logo" onclick="showScreen('s-play')" title="Back">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
           <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
           <circle cx="36" cy="36" r="29" fill="#ffffff"/>
@@ -302,15 +391,6 @@
   </div>
 </div>
 
-<!-- ── STATUS ─────────────────────────────────────────────────────────────── -->
-<div id="s-status" class="screen">
-  <div class="st-icon"     id="st-icon"></div>
-  <div class="st-title"    id="st-title"></div>
-  <div class="st-subtitle" id="st-subtitle"></div>
-  <div class="st-songs"    id="st-songs"></div>
-  <button class="more-btn" onclick="resetAndBrowse()">Request More Songs</button>
-</div>
-
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const PALETTE    = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a'];
@@ -329,13 +409,11 @@ const S = {
   songById:        {},
   tree:            [],   // [{artist, albums:[{album,songs:[...]}]}]
   selected:        [],   // max 3 song objects
-  submittedSongs:  [],   // copy of selected saved at submit time for status screen
   upNext:          [],
-  colorMap:        new Map(), // artist → palette color (assigned once, stable)
+  colorMap:        new Map(),
   nav:             { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 },
-  requestId:       null,
-  pollTimer:       null,
 };
+let _toastTimer = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -368,12 +446,13 @@ async function boot() {
 
     const barName = d.bar_name || 'JukeBar';
     const title   = barName.startsWith('JukeBar') ? barName : `JukeBar ${barName}`;
-    colorize($('bar-name'), title);
+    colorize($('bar-name'),      title);
+    colorize($('play-bar-name'), title);
     document.title = title;
 
     buildIndex();
     renderBrowse();
-    showScreen('s-browse');
+    showScreen('s-play');
 
     fetchNowPlaying();
     fetchUpNext();
@@ -438,9 +517,16 @@ async function fetchNowPlaying() {
     if (!res.ok) return;
     const { now_playing_id } = await res.json();
     const song = now_playing_id ? S.songById[now_playing_id] : null;
+
+    // Browse header (small)
     $('now-playing').innerHTML = song
       ? `<b>${esc(song.artist || '')}</b>${song.title ? ` · ${esc(song.title)}` : ''}`
       : 'Nothing playing right now';
+
+    // Play screen (large)
+    $('play-np').innerHTML = song
+      ? `<div class="play-np-artist">${esc(song.artist || '')}</div><div class="play-np-title">${esc(song.title || '')}</div>`
+      : `<div class="play-np-idle">Nothing playing right now</div>`;
   } catch {}
 }
 
@@ -452,6 +538,18 @@ async function fetchUpNext() {
     const d = await res.json();
     const approved = (d.requests || []).filter(r => r.status === 'approved');
     S.upNext = approved;
+
+    // Play screen up-next list
+    const unEl = $('play-upnext');
+    if (approved.length) {
+      const items = approved.flatMap(r => r.song_titles || []).slice(0, 4)
+        .map(t => `<div class="play-un-item">${esc(t)}</div>`).join('');
+      unEl.innerHTML = `<div class="play-un-label">Up Next</div>${items}`;
+    } else {
+      unEl.innerHTML = '';
+    }
+
+    // Browse letters screen
     if (S.nav.level === 'letters' && $('s-browse').classList.contains('active')) renderLetters();
   } catch {}
 }
@@ -626,7 +724,11 @@ function renderBasket() {
   basket.classList.add('show');
 }
 
-// ── Submit ─────────────────────────────────────────────────────────────────────
+// ── Request flow ───────────────────────────────────────────────────────────────
+function startRequest() {
+  showScreen('s-browse');
+}
+
 async function submitRequest() {
   if (!S.selected.length) return;
   const nameEl = $('requester-name');
@@ -652,62 +754,46 @@ async function submitRequest() {
       }),
     });
     if (!res.ok) throw new Error(res.status);
-    const { request_id, status } = await res.json();
-    S.requestId     = request_id;
-    S.submittedSongs = [...S.selected];
+    const { status } = await res.json();
+    const submitted = [...S.selected];
+
     S.selected = [];
     S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
     btn.disabled = false; btn.textContent = 'Submit →';
     renderBasket();
-    showStatusScreen(status || 'pending');
+    renderBrowse();
+
+    returnToPlay(status || 'pending', submitted);
   } catch {
     btn.disabled = false; btn.textContent = 'Submit →';
     alert('Submission failed — check your connection and try again.');
   }
 }
 
-// ── Status screen ──────────────────────────────────────────────────────────────
-const STATUS_META = {
-  pending:       { icon: '⏳', title: 'Waiting for approval', sub: () => S.requireApproval ? 'The bartender will review your request shortly.' : 'Your request is queued.' },
-  approved:      { icon: '✅', title: 'Approved!',             sub: () => 'Your songs are in the queue — sit tight!' },
-  approved_jump: { icon: '✅', title: 'Next up!',              sub: () => 'Your songs are playing next!' },
-  denied:        { icon: '❌', title: 'Not this time',         sub: () => 'The bartender passed on this one. Feel free to try another.' },
-  played:        { icon: '🎵', title: 'Now playing!',          sub: () => 'Hope you enjoyed it!' },
-};
-
-function showStatusScreen(status) {
-  renderStatus(status);
-  showScreen('s-status');
-  if (status === 'pending') S.pollTimer = setInterval(pollStatus, 10_000);
+function returnToPlay(status, songs) {
+  showScreen('s-play');
+  showToast(status, songs);
 }
 
-function renderStatus(status) {
-  const m = STATUS_META[status] || STATUS_META.pending;
-  $('st-icon').textContent     = m.icon;
-  $('st-title').textContent    = m.title;
-  $('st-subtitle').textContent = m.sub();
-  $('st-songs').innerHTML      = S.submittedSongs.map(s => `<div class="st-song">${esc(s.title)}</div>`).join('');
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function showToast(status, songs) {
+  const msg = status === 'approved'
+    ? 'Your songs are in the queue — sit tight!'
+    : S.requireApproval
+      ? 'Get with the bartender to approve your request!'
+      : 'Your songs are in the queue — sit tight!';
+
+  const songHtml = songs.map(s => `<div class="toast-song">${esc(s.title)}</div>`).join('');
+  $('toast-inner').innerHTML =
+    `<div class="toast-head">Request submitted!</div>${songHtml}<div class="toast-msg">${msg}</div>`;
+
+  $('toast').classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(dismissToast, 6000);
 }
 
-async function pollStatus() {
-  try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/request/${S.requestId}?s=${enc(S.session)}`);
-    if (!res.ok) return;
-    const d = await res.json();
-    renderStatus(d.status || 'pending');
-    if (d.status !== 'pending') { clearInterval(S.pollTimer); S.pollTimer = null; }
-  } catch {}
-}
-
-function resetAndBrowse() {
-  clearInterval(S.pollTimer); S.pollTimer = null; S.requestId = null;
-  S.selected = []; S.submittedSongs = [];
-  S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
-  $('search').value = ''; $('clear-btn').classList.remove('visible');
-  $('submit-btn').disabled = false; $('submit-btn').textContent = 'Submit →';
-  renderBasket();
-  renderBrowse();
-  showScreen('s-browse');
+function dismissToast() {
+  $('toast').classList.remove('show');
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────────

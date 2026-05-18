@@ -320,6 +320,16 @@ async def bar_page(jukebar_id: str):
     return (Path("static") / "customer.html").read_text(encoding="utf-8")
 
 
+@app.get("/bartender/{jukebar_id}", response_class=HTMLResponse)
+async def bartender_page(jukebar_id: str):
+    return (Path("static") / "bartender.html").read_text(encoding="utf-8")
+
+
+@app.get("/admin/{jukebar_id}", response_class=HTMLResponse)
+async def admin_page(jukebar_id: str):
+    return (Path("static") / "bartender.html").read_text(encoding="utf-8")
+
+
 @app.get("/api/bar/{jukebar_id}/catalog")
 async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
@@ -403,7 +413,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
         if r.status in ("pending", "approved")
     ]
     song = bar.song_index.get(bar.now_playing_id) if bar.now_playing_id else None
-    return {"requests": pending, "now_playing": song}
+    return {"bar_name": bar.bar_name, "requests": pending, "now_playing": song}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")

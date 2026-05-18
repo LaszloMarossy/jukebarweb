@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+  <title>JukeBar — Bartender</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #111;
+      --card:    #1a1a1a;
+      --card2:   #222;
+      --accent:  #fda185;
+      --text:    #f0ece8;
+      --muted:   #888;
+      --border:  #2a2a2a;
+      --green:   #4ade80;
+      --red:     #f87171;
+    }
+
+    html, body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      min-height: 100dvh; -webkit-font-smoothing: antialiased;
+    }
+    button { cursor: pointer; border: none; font: inherit; }
+
+    /* ── spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 0 auto;
+    }
+
+    /* ── screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── error ── */
+    #s-error { padding: 60px 24px; text-align: center; }
+    .err-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+    .err-msg { color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+    /* ── main layout ── */
+    #s-main { max-width: 640px; margin: 0 auto; padding: 0 16px 60px; }
+
+    /* ── header ── */
+    .header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 0 12px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .header svg { flex-shrink: 0; }
+    .header-info { flex: 1; min-width: 0; }
+    .bar-name {
+      font-family: 'Bubblegum Sans', cursive;
+      font-size: clamp(18px, 4dvh, 32px); line-height: 1.1;
+    }
+    .header-role {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--accent); margin-top: 1px;
+    }
+    .refresh-badge {
+      font-size: 11px; color: var(--muted); white-space: nowrap;
+    }
+
+    /* ── now playing ── */
+    .now-playing-card {
+      margin: 16px 0 20px;
+      background: var(--card); border-radius: 14px;
+      padding: 14px 16px; border: 1px solid var(--border);
+    }
+    .np-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    }
+    .np-track { font-size: 17px; font-weight: 700; color: var(--accent); }
+    .np-artist { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .np-idle { font-size: 14px; color: var(--muted); }
+
+    /* ── section title ── */
+    .section-title {
+      font-family: 'Bubblegum Sans', cursive;
+      font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: rgba(255,255,255,.6); margin-bottom: 10px; margin-top: 4px;
+    }
+    .empty-state {
+      text-align: center; color: var(--muted);
+      padding: 32px 16px; font-size: 14px;
+      background: var(--card); border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── request card ── */
+    .req-card {
+      background: var(--card); border-radius: 14px;
+      border: 1px solid var(--border); margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .req-card.approved { border-color: rgba(74,222,128,.2); }
+
+    .req-body { padding: 14px 16px 10px; }
+    .req-who {
+      font-size: 13px; color: var(--muted); margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .req-who strong { color: var(--text); font-weight: 600; }
+    .req-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 50px;
+    }
+    .req-badge.pending  { background: rgba(253,161,133,.15); color: var(--accent); }
+    .req-badge.approved { background: rgba(74,222,128,.12);  color: var(--green); }
+
+    .req-songs { display: flex; flex-direction: column; gap: 4px; }
+    .req-song {
+      font-size: 15px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .req-song::before { content: "♪  "; color: var(--accent); }
+
+    .req-actions {
+      display: flex; gap: 8px;
+      padding: 10px 16px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-deny {
+      flex: 1; background: rgba(248,113,113,.12); color: var(--red);
+      font-weight: 700; font-size: 14px; padding: 10px;
+      border-radius: 10px; border: 1px solid rgba(248,113,113,.2);
+      transition: opacity .15s;
+    }
+    .btn-deny:active { opacity: .7; }
+    .btn-approve {
+      flex: 2; background: rgba(74,222,128,.12); color: var(--green);
+      font-weight: 700; font-size: 14px; padding: 10px;
+      border-radius: 10px; border: 1px solid rgba(74,222,128,.2);
+      transition: opacity .15s;
+    }
+    .btn-approve:active { opacity: .7; }
+    .btn-jump {
+      flex: 0 0 auto; background: rgba(253,161,133,.12); color: var(--accent);
+      font-weight: 700; font-size: 14px; padding: 10px 14px;
+      border-radius: 10px; border: 1px solid rgba(253,161,133,.2);
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    .btn-jump:active { opacity: .7; }
+    .btn-disabled { opacity: .35; pointer-events: none; }
+
+    .section-gap { margin-top: 28px; }
+
+    /* ── loading overlay ── */
+    #s-loading {
+      position: fixed; inset: 0; display: flex;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: var(--bg);
+    }
+    .load-text { color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="s-loading">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="56" height="56">
+    <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+    <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+    <circle cx="36" cy="36" r="24" fill="#fda185"/>
+    <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+  </svg>
+  <div class="spinner"></div>
+  <div class="load-text">Connecting…</div>
+</div>
+
+<div id="s-error" class="screen">
+  <div class="err-title" id="err-title">Unavailable</div>
+  <div class="err-msg"   id="err-msg">Something went wrong.</div>
+</div>
+
+<div id="s-main" class="screen">
+  <div class="header">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="40" height="40">
+      <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+      <circle cx="36" cy="36" r="24" fill="#fda185"/>
+      <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+    </svg>
+    <div class="header-info">
+      <div class="bar-name" id="bar-name">JukeBar</div>
+      <div class="header-role">Bartender</div>
+    </div>
+    <div class="refresh-badge" id="refresh-badge"></div>
+  </div>
+
+  <div class="now-playing-card">
+    <div class="np-label">Now Playing</div>
+    <div id="now-playing"><div class="np-idle">Nothing playing</div></div>
+  </div>
+
+  <div id="pending-section">
+    <div class="section-title">Requests</div>
+    <div id="pending-list"></div>
+  </div>
+
+  <div id="upnext-section" class="section-gap" style="display:none">
+    <div class="section-title">Up Next</div>
+    <div id="upnext-list"></div>
+  </div>
+</div>
+
+<script>
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null };
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function boot() {
+  const parts = location.pathname.split('/').filter(Boolean);
+  S.jukebarId = parts[parts.length - 1];
+  S.session   = new URLSearchParams(location.search).get('s') || '';
+
+  if (!S.jukebarId || !S.session)
+    return showError('Invalid link', 'Please get the bartender QR code from the JukeBar admin panel.');
+
+  await poll();
+  const el = $('s-loading');
+  if (el) el.style.display = 'none';
+  showScreen('s-main');
+  S.pollTimer = setInterval(poll, 5000);
+}
+
+// ── Poll ────────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
+    if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
+    if (res.status === 404) return showError('Bar offline', 'The JukeBar is not reachable right now. Try again in a moment.');
+    if (!res.ok) return;
+    const d = await res.json();
+
+    if (d.bar_name && !S.barName) {
+      S.barName = d.bar_name;
+      $('bar-name').textContent = d.bar_name;
+      document.title = `Bartender — ${d.bar_name}`;
+    }
+
+    renderNowPlaying(d.now_playing);
+    renderRequests(d.requests || []);
+    $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {}
+}
+
+// ── Render now playing ────────────────────────────────────────────────────
+function renderNowPlaying(song) {
+  $('now-playing').innerHTML = song
+    ? `<div class="np-track">${esc(song.title || '')}</div><div class="np-artist">${esc(song.artist || '')}</div>`
+    : `<div class="np-idle">Nothing playing</div>`;
+}
+
+// ── Render requests ────────────────────────────────────────────────────────
+function renderRequests(requests) {
+  const pending  = requests.filter(r => r.status === 'pending');
+  const approved = requests.filter(r => r.status === 'approved');
+
+  // Pending
+  if (pending.length) {
+    $('pending-list').innerHTML = pending.map(r => requestCard(r, true)).join('');
+  } else {
+    $('pending-list').innerHTML = '<div class="empty-state">No pending requests</div>';
+  }
+
+  // Approved / up next
+  const unEl = $('upnext-section');
+  if (approved.length) {
+    $('upnext-list').innerHTML = approved.map(r => requestCard(r, false)).join('');
+    unEl.style.display = '';
+  } else {
+    unEl.style.display = 'none';
+  }
+}
+
+function requestCard(r, showActions) {
+  const badge    = r.status === 'approved'
+    ? `<span class="req-badge approved">In queue</span>`
+    : `<span class="req-badge pending">Pending</span>`;
+  const songs    = (r.song_titles || []).map(t => `<div class="req-song">${esc(t)}</div>`).join('');
+  const actions  = showActions ? `
+<div class="req-actions">
+  <button class="btn-deny"    onclick="deny('${esc(r.id)}')">Deny</button>
+  <button class="btn-approve" onclick="approve('${esc(r.id)}', false)">Approve</button>
+  <button class="btn-jump"    onclick="approve('${esc(r.id)}', true)">↑ Next</button>
+</div>` : '';
+
+  return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
+<div class="req-body">
+  <div class="req-who">${badge} <strong>${esc(r.requester_name || 'Guest')}</strong></div>
+  <div class="req-songs">${songs}</div>
+</div>${actions}</div>`;
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────
+async function approve(requestId, jump) {
+  disableCard(requestId);
+  try {
+    await fetch(`/api/bar/${S.jukebarId}/approve?s=${enc(S.session)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: requestId, jump }),
+    });
+  } catch {}
+  await poll();
+}
+
+async function deny(requestId) {
+  disableCard(requestId);
+  try {
+    await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: requestId }),
+    });
+  } catch {}
+  await poll();
+}
+
+function disableCard(requestId) {
+  const card = $(`req-${requestId}`);
+  if (card) card.querySelectorAll('button').forEach(b => b.classList.add('btn-disabled'));
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+function showError(title, msg) {
+  const el = $('s-loading');
+  if (el) el.style.display = 'none';
+  $('err-title').textContent = title;
+  $('err-msg').textContent   = msg;
+  showScreen('s-error');
+}
+function $(id)    { return document.getElementById(id); }
+function enc(s)   { return encodeURIComponent(s || ''); }
+function esc(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
