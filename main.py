@@ -349,19 +349,22 @@ def _customer_bar(jukebar_id: str, session: str) -> BarSession:
     return bar
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+
 @app.get("/bar/{jukebar_id}", response_class=HTMLResponse)
 async def bar_page(jukebar_id: str):
-    return (Path("static") / "customer.html").read_text(encoding="utf-8")
+    return HTMLResponse((Path("static") / "customer.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
 @app.get("/bartender/{jukebar_id}", response_class=HTMLResponse)
 async def bartender_page(jukebar_id: str):
-    return (Path("static") / "bartender.html").read_text(encoding="utf-8")
+    return HTMLResponse((Path("static") / "bartender.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
 @app.get("/admin/{jukebar_id}", response_class=HTMLResponse)
 async def admin_page(jukebar_id: str):
-    return (Path("static") / "admin.html").read_text(encoding="utf-8")
+    return HTMLResponse((Path("static") / "admin.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
 @app.get("/api/bar/{jukebar_id}/catalog")
