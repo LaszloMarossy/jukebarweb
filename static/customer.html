@@ -515,8 +515,8 @@ async function fetchNowPlaying() {
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
     if (!res.ok) return;
-    const { now_playing_id } = await res.json();
-    const song = now_playing_id ? S.songById[now_playing_id] : null;
+    const { now_playing } = await res.json();
+    const song = now_playing || null;
 
     // Browse header (small)
     $('now-playing').innerHTML = song
