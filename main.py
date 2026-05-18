@@ -41,7 +41,9 @@ from fastapi.staticfiles import StaticFiles
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 MAP_ENTRIES_FILE = DATA_DIR / "map_entries.json"
 
-BAR_TIMEOUT_SECONDS = 300  # bar considered offline after 5 minutes without a poll
+BAR_TIMEOUT_SECONDS  = 300    # bar shown as offline on the map after 5 min without a sync
+BAR_CLEANUP_SECONDS  = 7200   # bar session purged from memory after 2 h of inactivity
+CLEANUP_INTERVAL     = 300    # sweep runs every 5 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -130,10 +132,23 @@ async def _save_map_entries() -> None:
 # App lifecycle
 # ---------------------------------------------------------------------------
 
+async def _cleanup_loop():
+    """Purge BarSessions that haven't synced in BAR_CLEANUP_SECONDS."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL)
+        cutoff = time.time() - BAR_CLEANUP_SECONDS
+        stale = [jid for jid, bar in _bars.items() if bar.last_seen < cutoff]
+        for jid in stale:
+            del _bars[jid]
+        if stale:
+            print(f"[cleanup] purged {len(stale)} stale session(s): {stale}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _map_entries
     _map_entries = _load_map_entries()
+    asyncio.create_task(_cleanup_loop())
     yield
 
 
