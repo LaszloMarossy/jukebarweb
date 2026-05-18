@@ -167,7 +167,11 @@
     /* breadcrumb */
     .breadcrumb {
       display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
-      padding: 8px 14px 6px; min-height: 36px; border-bottom: 1px solid var(--border);
+      padding: 8px 14px 6px; min-height: 40px; border-bottom: 1px solid var(--border);
+    }
+    .crumb-home {
+      color: var(--accent); font-size: 20px; font-weight: 800;
+      padding: 2px 0; margin-right: 8px; letter-spacing: .5px;
     }
     .crumb-link { color: var(--accent); font-size: 14px; font-weight: 600; padding: 2px 0; }
     .crumb-sep  { color: var(--muted); font-size: 13px; }
@@ -613,7 +617,7 @@ function renderBrowse() {
 function renderBreadcrumb() {
   const { level, letter, artistIdx, albumIdx } = S.nav;
   const parts = [];
-  parts.push(`<button class="crumb-link" onclick="drillBack('letters')">A–Z</button>`);
+  parts.push(`<button class="crumb-home" onclick="drillBack('letters')">A–Z</button>`);
   if (level !== 'letters') {
     parts.push(`<span class="crumb-sep">›</span>`);
     if (level === 'artists')
