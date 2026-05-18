@@ -89,7 +89,7 @@ class BarSession:
     price_per_song: float = 0.0
     price_for_three: float = 0.0
     currency: str = ""
-    now_playing_id: str | None = None  # just the song ID — looked up from song_index on demand
+    now_playing: dict | None = None    # full song dict pushed by iOS on song change
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
@@ -252,7 +252,7 @@ async def host_register(body: dict[str, Any]):
         price_per_song=body.get("price_per_song", 0.0),
         price_for_three=body.get("price_for_three", 0.0),
         currency=body.get("currency", ""),
-        now_playing_id=body.get("now_playing_id"),
+        now_playing=body.get("now_playing"),
         pin_hash=body.get("pin_hash", ""),
     )
     # Keep map entry's last_seen fresh if the bar is registered there
@@ -272,7 +272,7 @@ async def host_nowplaying(body: dict[str, Any]):
     bar = _get_bar(jukebar_id)
     _validate_session(bar, session)
     _touch(bar)
-    bar.now_playing_id = body.get("now_playing_id")  # None = nothing playing
+    bar.now_playing = body.get("now_playing")  # full song dict or null
     return {"ok": True}
 
 
@@ -294,10 +294,6 @@ async def host_sync(body: dict[str, Any]):
     bar = _get_bar(jukebar_id)
     _validate_session(bar, session)
     _touch(bar)
-
-    # Update now-playing — iOS sends just the song ID; full details resolved from song_index
-    if "now_playing_id" in body:
-        bar.now_playing_id = body["now_playing_id"]  # None = nothing playing
 
     for rid in body.get("played_request_ids", []):
         if rid in bar.requests:
@@ -381,10 +377,7 @@ async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body
 @app.get("/api/bar/{jukebar_id}/nowplaying")
 async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
-    song = bar.song_index.get(bar.now_playing_id) if bar.now_playing_id else None
-    # now_playing_id for customers who have the catalog and resolve locally;
-    # now_playing full object for the bartender page which has no catalog
-    return {"now_playing_id": bar.now_playing_id, "now_playing": song}
+    return {"now_playing": bar.now_playing}
 
 
 @app.post("/api/bar/{jukebar_id}/request")
@@ -446,8 +439,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
         for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
         if r.status in ("pending", "approved")
     ]
-    song = bar.song_index.get(bar.now_playing_id) if bar.now_playing_id else None
-    return {"bar_name": bar.bar_name, "requests": pending, "now_playing": song}
+    return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
