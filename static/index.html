@@ -317,7 +317,7 @@
   </svg>
   <div>
     <h1 id="site-title">JukeBar</h1>
-    <div class="tagline">Bar jukebox for iPhone — no cloud, no subscriptions</div>
+    <div class="tagline">Give your bar a music character!</div>
   </div>
 </header>
 
@@ -340,13 +340,13 @@
 
     <div class="hero">
       <div class="hero-text">
-        <p><strong>JukeBar turns an iPhone or iPad into a self-contained bar jukebox.</strong> It plays an Apple Music playlist, lets customers browse and request songs by scanning a QR code on their own phones, and gives bartenders a browser-based interface to approve or deny requests — all on the local WiFi network, with no internet required during operation.</p>
-        <p>No cloud service. No subscriptions. No setup beyond an Apple Music playlist and a WiFi connection. One device runs everything.</p>
+        <p><strong>A jukebox for your bar, pub, party, or family gathering — iPhone plays, any mobile requests and approves.</strong> JukeBar plays your own music: playlists from your Apple Music app, including your own MP3s, purchased tracks, and Apple Music library songs.</p>
+        <p>Works offline, online, or in mixed mode — tailored to your situation. No subscriptions required.</p>
         <div class="badge-row">
-          <span class="badge hi">No cloud</span>
-          <span class="badge hi">No internet required</span>
+          <span class="badge hi">Works offline / online / mixed</span>
           <span class="badge hi">No subscriptions</span>
-          <span class="badge">Apple Music</span>
+          <span class="badge">Your Apple Music playlists</span>
+          <span class="badge">Own MP3s · Purchased · Streaming</span>
           <span class="badge">iPhone · iPad</span>
         </div>
         <div style="margin-top:20px">
@@ -358,23 +358,23 @@
     <div class="feature-grid" style="margin-top:24px;">
       <div class="feature-card">
         <div class="icon">🎵</div>
-        <div class="title">Apple Music playback</div>
-        <p>Plays any playlist from your Apple Music library. Songs must be downloaded to the device — no streaming needed.</p>
+        <div class="title">Plays your music</div>
+        <p>Uses playlists from your Apple Music app — your own MP3s, purchased tracks, or Apple Music streaming titles. One device runs everything.</p>
       </div>
       <div class="feature-card">
         <div class="icon">📱</div>
-        <div class="title">QR-code requests</div>
-        <p>Customers scan a QR code and browse the full catalog on their own phone. No app to install.</p>
+        <div class="title">Any mobile can request</div>
+        <p>Customers scan a QR code and browse the full catalog on their own phone. No app to install — works in any mobile browser.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🌐</div>
+        <div class="title">Four play modes</div>
+        <p>Standalone (no network), shared WiFi, Personal Hotspot, or full internet mode — pick what suits your venue and situation.</p>
       </div>
       <div class="feature-card">
         <div class="icon">✅</div>
         <div class="title">Bartender approval</div>
-        <p>Bartenders approve or deny requests from any browser on the same network. Approved songs play next.</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon">💰</div>
-        <div class="title">Configurable pricing</div>
-        <p>Set a per-song price and a bundle price for 3 songs. Bartender collects payment manually.</p>
+        <p>Bartenders approve or deny requests from any browser. Approved songs play next, with optional pricing per request.</p>
       </div>
       <div class="feature-card">
         <div class="icon">📊</div>
@@ -382,9 +382,9 @@
         <p>Every session is archived to a CSV file — request history, songs, prices, timestamps. Shareable via AirDrop or email.</p>
       </div>
       <div class="feature-card">
-        <div class="icon">🔒</div>
-        <div class="title">PIN-protected admin</div>
-        <p>Admin mode is behind a PIN. Long-press the bar name on the kiosk screen to open it.</p>
+        <div class="icon">🗺</div>
+        <div class="title">Community discovery</div>
+        <p>Optionally publish your bar name and playlist bands on the JukeBar map so music-loving guests can find you before they arrive.</p>
       </div>
     </div>
   </section>
@@ -508,6 +508,14 @@
 
     <h3>Option C — Local only (no network)</h3>
     <p>In local mode, all requests are entered directly on the host device and auto-accepted. No WiFi needed. Useful for small venues or testing.</p>
+
+    <h3>Option D — Internet mode (remote access from anywhere)</h3>
+    <p>JukeBar connects to the <strong>jukebarweb.onrender.com</strong> relay server over the internet. Customers use a shareable QR link that works on any network — no shared WiFi required. Bartenders can approve requests from any device on any internet connection, including remotely.</p>
+    <p>The iPhone still plays the music locally; only requests, approvals, and now-playing state are relayed through the server. No song data leaves the device.</p>
+    <div class="tip">
+      <div class="tip-label">Best for</div>
+      <p>Venues where customers can't easily join the bar's WiFi, events with guests on different networks, or situations where the bartender needs to manage requests from a separate location.</p>
+    </div>
   </section>
 
   <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
@@ -595,7 +603,7 @@
   <!-- ── Privacy ────────────────────────────────────────────────────────── -->
   <section id="privacy">
     <h2>Privacy policy</h2>
-    <p>JukeBar is designed to keep all data local. Nothing is sent to any external server.</p>
+    <p>JukeBar is designed to keep all data local by default. The only data that leaves the device is what you explicitly choose to share.</p>
 
     <table class="privacy-table">
       <thead>
@@ -627,6 +635,16 @@
           <td><span class="cross">✗ No</span></td>
         </tr>
         <tr>
+          <td>Internet mode relay (requests &amp; approvals)</td>
+          <td>Request and approval actions pass through jukebarweb.onrender.com when internet mode is active. No song audio or personal data is included.</td>
+          <td><span class="check">⚡ Internet mode only</span></td>
+        </tr>
+        <tr>
+          <td>Community map (voluntary opt-in)</td>
+          <td>Bar name, playlist band names, and device GPS location are published to the JukeBar discovery map. Only sent when you explicitly enable "List on map" in setup.</td>
+          <td><span class="check">✓ Opt-in only</span></td>
+        </tr>
+        <tr>
           <td>Analytics or crash data</td>
           <td>None collected</td>
           <td><span class="cross">✗ No</span></td>
@@ -635,6 +653,11 @@
     </table>
 
     <div class="tip" style="margin-top:20px;">
+      <div class="tip-label">Community programme — voluntary opt-in</div>
+      <p>Bars can optionally appear on the <a href="/discover">JukeBar discovery map</a> so that music-loving guests can find them before arriving. When enabled, your bar name, the GPS location of the host device at registration time, and the band names from your playlist are published to the map. This setting is off by default and can be changed at any time in the setup wizard.</p>
+    </div>
+
+    <div class="tip" style="margin-top:12px;">
       <div class="tip-label">Data retention</div>
       <p>Session CSV reports are kept on-device for <strong>10 days</strong> and then deleted automatically. You can delete individual reports at any time from admin settings. Deleting the app removes all data permanently.</p>
     </div>
@@ -643,7 +666,7 @@
     <p>Playback uses Apple's MediaPlayer framework and your existing Apple Music subscription. JukeBar only reads your library — it does not access your listening history, purchases, or account information. Apple's own privacy policy governs how Apple Music data is handled by iOS.</p>
 
     <h3>Local network</h3>
-    <p>JukeBar runs a local HTTP server on port 8080. It is reachable only by devices on the same WiFi network or Personal Hotspot. No data from this server is relayed to any external service.</p>
+    <p>JukeBar runs a local HTTP server on port 8080. It is reachable only by devices on the same WiFi network or Personal Hotspot. No data from this server is relayed to any external service when operating in local or hotspot mode.</p>
   </section>
 
   <!-- ── Contact ────────────────────────────────────────────────────────── -->
