@@ -66,7 +66,7 @@
       display: flex; align-items: center; gap: 10px;
       padding: 16px 16px 0;
     }
-    .play-header svg { flex-shrink: 0; }
+    .play-header a { flex-shrink: 0; display: flex; }
     .play-bar-name {
       font-family: 'Bubblegum Sans', cursive;
       font-size: clamp(22px, 5dvh, 48px); line-height: 1.2;
@@ -173,7 +173,7 @@
     .browse-logo { flex-shrink: 0; cursor: pointer; display: flex; }
     .browse-logo svg { width: clamp(44px, 13dvh, 100px); height: clamp(44px, 13dvh, 100px); }
     .bar-info    { flex: 1; min-width: 0; }
-    .bar-name    { font-family: 'Bubblegum Sans', cursive; font-size: clamp(22px, 5dvh, 48px); line-height: 1.2; }
+    .bar-name    { font-family: 'Bubblegum Sans', cursive; font-size: clamp(22px, 5dvh, 48px); line-height: 1.2; cursor: pointer; }
     .now-playing { font-size: clamp(13px, 2.2dvh, 22px); color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .now-playing b { color: var(--text); font-weight: 500; }
 
@@ -337,21 +337,23 @@
 <!-- ── PLAY (landing) ────────────────────────────────────────────────────── -->
 <div id="s-play" class="screen">
   <div class="play-header">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="clamp(44px,11dvh,80px)" height="clamp(44px,11dvh,80px)" style="width:clamp(44px,11dvh,80px);height:clamp(44px,11dvh,80px)">
-      <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
-      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
-      <circle cx="36" cy="36" r="24" fill="#fda185"/>
-      <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="36" cy="36" r="4" fill="#ffffff"/>
-    </svg>
+    <a href="/discover" title="Find other bars">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="clamp(44px,11dvh,80px)" height="clamp(44px,11dvh,80px)" style="width:clamp(44px,11dvh,80px);height:clamp(44px,11dvh,80px)">
+        <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+        <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+        <circle cx="36" cy="36" r="24" fill="#fda185"/>
+        <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="36" cy="36" r="4" fill="#ffffff"/>
+      </svg>
+    </a>
     <div class="play-bar-name" id="play-bar-name">JukeBar</div>
   </div>
 
@@ -390,7 +392,7 @@
 <div id="s-browse" class="screen">
   <div class="top-bar">
     <div class="bar-header">
-      <div class="browse-logo" onclick="showScreen('s-play')" title="Back">
+      <div class="browse-logo" onclick="location.href='/discover'" title="Find other bars">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
           <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
           <circle cx="36" cy="36" r="29" fill="#ffffff"/>
@@ -408,7 +410,7 @@
         </svg>
       </div>
       <div class="bar-info">
-        <div class="bar-name"    id="bar-name">JukeBar</div>
+        <div class="bar-name" id="bar-name" onclick="showScreen('s-play')" title="Now Playing">JukeBar</div>
         <div class="now-playing" id="now-playing">—</div>
       </div>
     </div>
