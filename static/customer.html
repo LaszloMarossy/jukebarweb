@@ -131,21 +131,33 @@
        TOAST (confirmation popup on play screen)
     ══════════════════════════════════════════════════════════════ */
     .toast {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-      background: var(--card); border-top: 2px solid var(--accent);
-      padding: 16px 20px 40px;
-      transform: translateY(100%); transition: transform .3s ease;
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,.82);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; pointer-events: none; transition: opacity .25s ease;
     }
-    .toast.show { transform: translateY(0); }
-    .toast-head { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
-    .toast-song { font-size: 14px; color: var(--accent); padding: 2px 0; }
+    .toast.show { opacity: 1; pointer-events: auto; }
+    .toast-box {
+      background: var(--card); border: 2px solid var(--accent);
+      border-radius: 18px; padding: 28px 24px 24px;
+      width: 100%; max-width: 400px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .toast-head { font-size: 20px; font-weight: 800; color: var(--text); text-align: center; }
+    .toast-songs { display: flex; flex-direction: column; gap: 4px; }
+    .toast-song { font-size: 15px; color: var(--accent); padding: 2px 0; }
     .toast-song::before { content: "♪  "; }
-    .toast-msg  { font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
-    .toast-name { color: var(--accent); font-weight: 800; }
-    .toast-close {
-      position: absolute; top: 12px; right: 16px;
-      color: var(--muted); font-size: 20px; padding: 4px; line-height: 1;
+    .toast-msg  { font-size: 15px; color: var(--muted); line-height: 1.7; text-align: center; }
+    .toast-name { display: block; font-size: 32px; font-weight: 900; color: var(--text); line-height: 1.15; margin: 4px 0; }
+    .toast-amount { display: block; font-size: 36px; font-weight: 900; color: var(--accent); line-height: 1.1; }
+    .toast-ok {
+      width: 100%; background: var(--accent); color: #000;
+      font-size: 18px; font-weight: 800; padding: 16px;
+      border-radius: 12px; border: none; cursor: pointer;
+      transition: opacity .15s;
     }
+    .toast-ok:active { opacity: .8; }
 
     /* ══════════════════════════════════════════════════════════════
        BROWSE SCREEN
@@ -365,10 +377,12 @@
     </div>
   </div>
 
-  <!-- confirmation toast -->
+  <!-- confirmation modal -->
   <div class="toast" id="toast">
-    <button class="toast-close" onclick="dismissToast()">✕</button>
-    <div id="toast-inner"></div>
+    <div class="toast-box">
+      <div id="toast-inner"></div>
+      <button class="toast-ok" onclick="dismissToast()">OK</button>
+    </div>
   </div>
 </div>
 
@@ -862,26 +876,26 @@ function showToast(status, songs, requesterName) {
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
     : 0;
   const needsApproval = status !== 'approved' && S.requireApproval;
-  let msg;
+
+  const songHtml = `<div class="toast-songs">${songs.map(s => `<div class="toast-song">${esc(s.title)}</div>`).join('')}</div>`;
+
+  let msgHtml;
   if (needsApproval) {
-    const nameLabel = `<span class="toast-name">${esc(requesterName)}</span>`;
-    const payPart   = total > 0 ? ` after paying <span class="toast-name">${S.currency}${total.toFixed(2)}</span>` : '';
-    msg = `Get the bartender/staff to approve your request under the name ${nameLabel}${payPart}!`;
+    const payHtml = total > 0
+      ? `<span class="toast-amount">${S.currency}${total.toFixed(2)}</span>`
+      : '';
+    msgHtml = `<div class="toast-msg">Get the bartender/staff to approve your request under the name<span class="toast-name">${esc(requesterName)}</span>${total > 0 ? `after paying${payHtml}` : ''}</div>`;
   } else {
-    msg = 'Your songs are in the queue — sit tight!';
+    msgHtml = `<div class="toast-msg">Your songs are in the queue — sit tight!</div>`;
   }
 
-  const songHtml = songs.map(s => `<div class="toast-song">${esc(s.title)}</div>`).join('');
-  $('toast-inner').innerHTML =
-    `<div class="toast-head">Request submitted!</div>${songHtml}<div class="toast-msg">${msg}</div>`;
-
+  $('toast-inner').innerHTML = `<div class="toast-head">Request submitted!</div>${songHtml}${msgHtml}`;
   $('toast').classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(dismissToast, 8000);
 }
 
 function dismissToast() {
   $('toast').classList.remove('show');
+  clearTimeout(_toastTimer);
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────────
