@@ -61,6 +61,8 @@ class MapEntry:
     bar_name: str
     location: str       # human-readable venue address or city
     artists: list[str]  # sorted, deduplicated artist names from the playlist
+    lat: float | None = None
+    lng: float | None = None
     registered_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
 
@@ -114,7 +116,10 @@ def _load_map_entries() -> dict[str, MapEntry]:
         return {}
     try:
         raw = json.loads(MAP_ENTRIES_FILE.read_text(encoding="utf-8"))
-        return {jid: MapEntry(**entry) for jid, entry in raw.items()}
+        return {
+            jid: MapEntry(**{k: v for k, v in entry.items() if k in MapEntry.__dataclass_fields__})
+            for jid, entry in raw.items()
+        }
     except Exception:
         return {}
 
@@ -172,6 +177,11 @@ async def index():
     return (Path("static") / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/discover", response_class=HTMLResponse)
+async def discover():
+    return HTMLResponse((Path("static") / "discover.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
@@ -215,11 +225,15 @@ async def map_register(body: dict[str, Any]):
         raise HTTPException(400, "jukebar_id required")
 
     existing = _map_entries.get(jukebar_id)
+    lat = body.get("lat")
+    lng = body.get("lng")
     _map_entries[jukebar_id] = MapEntry(
         jukebar_id=jukebar_id,
         bar_name=body.get("bar_name", ""),
         location=body.get("location", ""),
         artists=sorted(body.get("artists", [])),
+        lat=float(lat) if lat is not None else (existing.lat if existing else None),
+        lng=float(lng) if lng is not None else (existing.lng if existing else None),
         registered_at=existing.registered_at if existing else time.time(),
     )
     await _save_map_entries()
@@ -238,6 +252,8 @@ async def map_bars():
             "jukebar_id": e.jukebar_id,
             "bar_name": e.bar_name,
             "location": e.location,
+            "lat": e.lat,
+            "lng": e.lng,
             "artists": e.artists,
             "registered_at": e.registered_at,
             "last_seen": e.last_seen,

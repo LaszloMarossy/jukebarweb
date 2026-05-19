@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JukeBar — Find a bar near you</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeE=" crossorigin=""></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #111;
+  --card:   #1e1e1e;
+  --border: #333;
+  --text:   #fff;
+  --muted:  #888;
+  --accent: #fda185;
+  --live:   #4ade80;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: Helvetica, Arial, sans-serif; }
+
+/* ── Header ── */
+.top-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(17,17,17,.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.top-bar a { color: var(--muted); font-size: 13px; text-decoration: none; }
+.top-bar a:hover { color: var(--text); }
+.top-title { font-size: 17px; font-weight: 800; color: var(--accent); flex: 1; }
+#bar-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ── Map ── */
+#map { position: fixed; inset: 0; top: 44px; z-index: 0; }
+
+/* ── Panel ── */
+#panel {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+  background: var(--card); border-top: 2px solid var(--accent);
+  border-radius: 18px 18px 0 0;
+  padding: 0 0 env(safe-area-inset-bottom);
+  max-height: 65dvh; display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform .3s ease;
+}
+#panel.open { transform: translateY(0); }
+
+.panel-drag {
+  flex-shrink: 0; text-align: center; padding: 10px 0 4px; cursor: pointer;
+}
+.panel-drag::before {
+  content: ""; display: inline-block;
+  width: 36px; height: 4px; border-radius: 2px; background: var(--border);
+}
+
+.panel-head {
+  flex-shrink: 0; padding: 0 16px 10px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.panel-name  { font-size: 22px; font-weight: 800; line-height: 1.2; }
+.panel-meta  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.live-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--live);
+  margin-right: 5px; animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(.75); }
+}
+.panel-close {
+  flex-shrink: 0; background: none; border: none; color: var(--muted);
+  font-size: 22px; cursor: pointer; padding: 2px 4px; line-height: 1;
+}
+
+.bubble-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 0 14px 20px;
+}
+.bubble-wrap {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.bubble {
+  border-radius: 20px; padding: 7px 16px;
+  font-size: 14px; font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Empty state ── */
+#empty {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; color: var(--muted); z-index: 100; pointer-events: none;
+  display: none;
+}
+#empty h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+/* ── Leaflet marker overrides ── */
+.jb-marker {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid #fff; background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  cursor: pointer;
+}
+.jb-marker.live { background: var(--live); border-color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/">← JukeBar</a>
+  <div class="top-title">Find a bar</div>
+  <div id="bar-count"></div>
+</div>
+
+<div id="map"></div>
+
+<div id="empty">
+  <h2>No bars on the map yet</h2>
+  <p>Bars appear here when owners opt in and start a session.</p>
+</div>
+
+<div id="panel">
+  <div class="panel-drag" onclick="closePanel()"></div>
+  <div class="panel-head">
+    <div>
+      <div class="panel-name" id="panel-name"></div>
+      <div class="panel-meta" id="panel-meta"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="bubble-scroll">
+    <div class="bubble-wrap" id="panel-bubbles"></div>
+  </div>
+</div>
+
+<script>
+const PALETTE = [
+  '#e63946','#f4a261','#e9c46a','#2a9d8f','#457b9d',
+  '#6a4c93','#f77f00','#4cc9f0','#c77dff','#06d6a0',
+  '#ff595e','#ffca3a','#8ac926','#1982c4','#ff924c',
+];
+
+function fgFor(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  return (0.2126*r + 0.7152*g + 0.0722*b) > 0.55 ? '#111' : '#fff';
+}
+
+// ── Map init ─────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: false }).setView([30, 10], 3);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 19,
+}).addTo(map);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+function openPanel(bar) {
+  document.getElementById('panel-name').textContent = bar.bar_name || 'Unknown bar';
+
+  const live = bar.is_live;
+  const lastSeen = bar.last_seen
+    ? new Date(bar.last_seen * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+  const loc = bar.location ? ` · ${bar.location}` : '';
+  document.getElementById('panel-meta').innerHTML = live
+    ? `<span class="live-dot"></span>Live now${loc}`
+    : `Last active ${lastSeen}${loc}`;
+
+  const wrap = document.getElementById('panel-bubbles');
+  wrap.innerHTML = (bar.artists || []).map((artist, i) => {
+    const bg = PALETTE[i % PALETTE.length];
+    const fg = fgFor(bg);
+    return `<div class="bubble" style="background:${bg};color:${fg}">${esc(artist)}</div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:14px">No artists listed</div>';
+
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Load bars ─────────────────────────────────────────────────────────────────
+async function loadBars() {
+  const res  = await fetch('/api/map');
+  const data = await res.json();
+  const bars = data.bars || [];
+
+  const mapped = bars.filter(b => b.lat != null && b.lng != null);
+  const count  = mapped.length;
+
+  document.getElementById('bar-count').textContent =
+    count === 0 ? 'No bars yet' : `${count} bar${count === 1 ? '' : 's'} on the map`;
+
+  if (count === 0) {
+    document.getElementById('empty').style.display = 'block';
+    return;
+  }
+
+  const bounds = [];
+  mapped.forEach(bar => {
+    const el = document.createElement('div');
+    el.className = 'jb-marker' + (bar.is_live ? ' live' : '');
+    el.textContent = '♪';
+
+    const marker = L.marker([bar.lat, bar.lng], {
+      icon: L.divIcon({ html: el, className: '', iconSize: [28,28], iconAnchor: [14,14] }),
+    }).addTo(map);
+
+    marker.on('click', () => openPanel(bar));
+    bounds.push([bar.lat, bar.lng]);
+  });
+
+  if (bounds.length === 1) {
+    map.setView(bounds[0], 13);
+  } else if (bounds.length > 1) {
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13 });
+  }
+}
+
+loadBars();
+</script>
+</body>
+</html>
