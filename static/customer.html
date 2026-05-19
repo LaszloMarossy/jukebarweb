@@ -843,20 +843,20 @@ async function submitRequest() {
     renderBasket();
     renderBrowse();
 
-    returnToPlay(status || 'pending', submitted);
+    returnToPlay(status || 'pending', submitted, name);
   } catch {
     btn.disabled = false; btn.textContent = 'Submit →';
     alert('Submission failed — check your connection and try again.');
   }
 }
 
-function returnToPlay(status, songs) {
+function returnToPlay(status, songs, requesterName) {
   showScreen('s-play');
-  showToast(status, songs);
+  showToast(status, songs, requesterName);
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
-function showToast(status, songs) {
+function showToast(status, songs, requesterName) {
   const count = songs.length;
   const total = S.pricePerSong > 0
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
@@ -864,9 +864,9 @@ function showToast(status, songs) {
   const needsApproval = status !== 'approved' && S.requireApproval;
   let msg;
   if (needsApproval) {
-    const barLabel = S.barName ? `<span class="toast-name">JukeBar ${esc(S.barName)}</span>` : 'the bar staff';
-    const payPart  = total > 0 ? ` after paying <span class="toast-name">${S.currency}${total.toFixed(2)}</span>` : '';
-    msg = `Have your playlist approved with staff under ${barLabel}${payPart}.`;
+    const nameLabel = `<span class="toast-name">${esc(requesterName)}</span>`;
+    const payPart   = total > 0 ? ` after paying <span class="toast-name">${S.currency}${total.toFixed(2)}</span>` : '';
+    msg = `Get the bartender/staff to approve your request under the name ${nameLabel}${payPart}!`;
   } else {
     msg = 'Your songs are in the queue — sit tight!';
   }
