@@ -124,51 +124,29 @@
     }
 
     /* ── request card ── */
-    .req-card {
-      background: var(--card); border-radius: 12px;
-      border: 1px solid var(--border); margin-bottom: 8px;
-      overflow: hidden;
-    }
-    .req-card.approved { border-left: 3px solid rgba(74,222,128,.5); }
+    .req-card { background: var(--card); border-radius: 10px; padding: 9px 12px; margin-bottom: 7px; border: 1px solid var(--border); }
+    .req-card.approved { border-left: 3px solid #166534; }
 
-    .req-top { padding: 10px 14px 6px; }
-    .req-row1 { display: flex; align-items: baseline; gap: 8px; }
-    .req-name { font-size: 22px; font-weight: 700; color: var(--text); }
-    .req-time { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+    .req-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .req-name  { font-size: 26px; font-weight: 700; color: var(--text); }
+    .req-price { font-size: 22px; font-weight: 700; color: #a78bfa; white-space: nowrap; }
+    .req-acts  { display: flex; gap: 12px; align-items: center; }
+    .btn-act   { border: none; border-radius: 6px; padding: 8px 20px; font-size: 15px; font-weight: 800; cursor: pointer; transition: opacity .15s; }
+    .btn-act:active { opacity: .7; }
+    .btn-approve { background: #166534; color: #4ade80; padding: 8px 32px; }
+    .btn-jump    { background: #713f12; color: #fde047; }
+    .btn-deny    { background: #7f1d1d; color: #f87171; }
+    .req-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
+    .req-badge.approved { background: #166534; color: #4ade80; }
+    .req-time  { font-size: 10px; color: var(--muted); margin-left: auto; white-space: nowrap; }
 
     .song-rows { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; }
-    .song-row  { display: grid; grid-template-columns: 14ch 10ch 1fr; gap: 6px; font-size: 12px; overflow: hidden; }
+    .song-row  { display: grid; grid-template-columns: 15ch 10ch 1fr; gap: 6px; font-size: 12px; overflow: hidden; }
     .song-col  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .song-artist { color: rgba(255,255,255,.75); }
     .song-album  { color: var(--muted); }
     .song-title  { color: rgba(255,255,255,.5); }
 
-    .req-actions {
-      display: flex; flex-direction: row; gap: 8px;
-      padding: 10px 16px 14px;
-      border-top: 1px solid var(--border);
-    }
-    .btn-approve {
-      flex: 3; background: rgba(74,222,128,.18); color: var(--green);
-      font-weight: 800; font-size: 15px; padding: 10px 6px;
-      border-radius: 10px; border: 1px solid rgba(74,222,128,.3);
-      transition: opacity .15s;
-    }
-    .btn-approve:active { opacity: .7; }
-    .btn-jump {
-      flex: 2; background: rgba(253,161,133,.12); color: var(--accent);
-      font-weight: 700; font-size: 13px; padding: 10px 6px;
-      border-radius: 10px; border: 1px solid rgba(253,161,133,.2);
-      white-space: nowrap; transition: opacity .15s;
-    }
-    .btn-jump:active { opacity: .7; }
-    .btn-deny {
-      flex: 1; background: none; color: var(--muted);
-      font-weight: 600; font-size: 13px; padding: 10px 6px;
-      border-radius: 10px; border: 1px solid var(--border);
-      transition: opacity .15s;
-    }
-    .btn-deny:active { opacity: .7; }
     .btn-disabled { opacity: .35; pointer-events: none; }
 
     .section-gap { margin-top: 28px; }
@@ -255,7 +233,7 @@
       <div class="bar-name" id="bar-name">JukeBar</div>
       <div class="header-role">Bartender</div>
     </div>
-    <div class="refresh-badge" id="refresh-badge"><span style="color:#444;font-size:10px">v2</span></div>
+    <div class="refresh-badge" id="refresh-badge"></div>
   </div>
 
   <div class="now-playing-card">
@@ -275,7 +253,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -364,6 +342,9 @@ async function poll() {
       document.title = `Bartender — ${d.bar_name}`;
     }
 
+    S.pricePerSong  = d.price_per_song  || 0;
+    S.priceForThree = d.price_for_three || 0;
+    S.currency      = d.currency        || '';
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch {}
@@ -409,9 +390,19 @@ function renderRequests(requests) {
 }
 
 function requestCard(r, showActions) {
-  const time = r.created_at
-    ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
-    : '';
+  const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+  const count = (r.song_ids || r.song_details || []).length || 1;
+  const price = S.pricePerSong > 0
+    ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
+    : 0;
+  const priceHtml = price > 0 ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
+  const acts = showActions
+    ? `<span class="req-acts">
+        <button class="btn-act btn-approve" onclick="approve('${esc(r.id)}',false)">✓</button>
+        <button class="btn-act btn-jump"    onclick="approve('${esc(r.id)}',true)">Play next</button>
+        <button class="btn-act btn-deny"    onclick="deny('${esc(r.id)}')">✗</button>
+       </span>`
+    : `<span class="req-badge approved">In queue</span>`;
   const songRows = (r.song_details || []).map(s =>
     `<div class="song-row">
       <span class="song-col song-artist">${esc(s.artist)}</span>
@@ -421,18 +412,14 @@ function requestCard(r, showActions) {
   ).join('') || (r.song_titles || []).map(t =>
     `<div class="song-row"><span class="song-col song-artist" style="grid-column:1/-1">${esc(t)}</span></div>`
   ).join('');
-  const actions = showActions ? `
-<div class="req-actions">
-  <button class="btn-approve" onclick="approve('${esc(r.id)}', false)">Approve</button>
-  <button class="btn-jump"    onclick="approve('${esc(r.id)}', true)">Play Next</button>
-  <button class="btn-deny"    onclick="deny('${esc(r.id)}')">Cancel</button>
-</div>` : '';
-
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
-<div class="req-top">
-  <div class="req-row1"><strong class="req-name">${esc(r.requester_name || 'Guest')}</strong><span class="req-time">${time}</span></div>
+  <div class="req-row1">
+    <span class="req-name">${esc(r.requester_name || 'Guest')}</span>
+    ${priceHtml}${acts}
+    <span class="req-time">${time}</span>
+  </div>
   <div class="song-rows">${songRows}</div>
-</div>${actions}</div>`;
+</div>`;
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────

@@ -471,7 +471,9 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
         for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
         if r.status in ("pending", "approved")
     ]
-    return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing}
+    return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing,
+            "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
+            "currency": bar.currency}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
