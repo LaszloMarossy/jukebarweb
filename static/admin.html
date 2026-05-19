@@ -164,32 +164,31 @@
     .req-song::before { content: "♪  "; color: var(--accent); }
 
     .req-actions {
-      display: flex; gap: 8px;
+      display: flex; flex-direction: row; gap: 8px;
       padding: 10px 16px 14px;
       border-top: 1px solid var(--border);
     }
-    .btn-deny {
-      flex: 1; background: rgba(248,113,113,.12); color: var(--red);
-      font-weight: 700; font-size: 14px; padding: 10px;
-      border-radius: 10px; border: 1px solid rgba(248,113,113,.2);
-      transition: opacity .15s;
-    }
-    .btn-deny:active { opacity: .7; }
     .btn-approve {
-      flex: 2; background: rgba(74,222,128,.12); color: var(--green);
-      font-weight: 700; font-size: 14px; padding: 10px;
-      border-radius: 10px; border: 1px solid rgba(74,222,128,.2);
+      flex: 3; background: rgba(74,222,128,.18); color: var(--green);
+      font-weight: 800; font-size: 15px; padding: 10px 6px;
+      border-radius: 10px; border: 1px solid rgba(74,222,128,.3);
       transition: opacity .15s;
     }
     .btn-approve:active { opacity: .7; }
     .btn-jump {
-      flex: 0 0 auto; background: rgba(253,161,133,.12); color: var(--accent);
-      font-weight: 700; font-size: 14px; padding: 10px 14px;
+      flex: 2; background: rgba(253,161,133,.12); color: var(--accent);
+      font-weight: 700; font-size: 13px; padding: 10px 6px;
       border-radius: 10px; border: 1px solid rgba(253,161,133,.2);
-      transition: opacity .15s;
-      white-space: nowrap;
+      white-space: nowrap; transition: opacity .15s;
     }
     .btn-jump:active { opacity: .7; }
+    .btn-deny {
+      flex: 1; background: none; color: var(--muted);
+      font-weight: 600; font-size: 13px; padding: 10px 6px;
+      border-radius: 10px; border: 1px solid var(--border);
+      transition: opacity .15s;
+    }
+    .btn-deny:active { opacity: .7; }
     .btn-disabled { opacity: .35; pointer-events: none; }
 
     .section-gap { margin-top: 28px; }
@@ -537,9 +536,9 @@ function requestCard(r, showActions) {
   const songs   = (r.song_titles || []).map(t => `<div class="req-song">${esc(t)}</div>`).join('');
   const actions = showActions ? `
 <div class="req-actions">
-  <button class="btn-deny"    onclick="deny('${esc(r.id)}')">Deny</button>
   <button class="btn-approve" onclick="approve('${esc(r.id)}', false)">Approve</button>
-  <button class="btn-jump"    onclick="approve('${esc(r.id)}', true)">↑ Next</button>
+  <button class="btn-jump"    onclick="approve('${esc(r.id)}', true)">Play Next</button>
+  <button class="btn-deny"    onclick="deny('${esc(r.id)}')">Cancel</button>
 </div>` : '';
 
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
