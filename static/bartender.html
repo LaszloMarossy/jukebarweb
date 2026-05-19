@@ -125,31 +125,23 @@
 
     /* ── request card ── */
     .req-card {
-      background: var(--card); border-radius: 14px;
-      border: 1px solid var(--border); margin-bottom: 10px;
+      background: var(--card); border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 8px;
       overflow: hidden;
     }
-    .req-card.approved { border-color: rgba(74,222,128,.2); }
+    .req-card.approved { border-left: 3px solid rgba(74,222,128,.5); }
 
-    .req-body { padding: 14px 16px 10px; }
-    .req-who {
-      font-size: 13px; color: var(--muted); margin-bottom: 8px;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .req-who strong { color: var(--text); font-weight: 600; }
-    .req-badge {
-      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-      padding: 2px 7px; border-radius: 50px;
-    }
-    .req-badge.pending  { background: rgba(253,161,133,.15); color: var(--accent); }
-    .req-badge.approved { background: rgba(74,222,128,.12);  color: var(--green); }
+    .req-top { padding: 10px 14px 6px; }
+    .req-row1 { display: flex; align-items: baseline; gap: 8px; }
+    .req-name { font-size: 22px; font-weight: 700; color: var(--text); }
+    .req-time { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
 
-    .req-songs { display: flex; flex-direction: column; gap: 4px; }
-    .req-song {
-      font-size: 15px; font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .req-song::before { content: "♪  "; color: var(--accent); }
+    .song-rows { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; }
+    .song-row  { display: grid; grid-template-columns: 14ch 10ch 1fr; gap: 6px; font-size: 12px; overflow: hidden; }
+    .song-col  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .song-artist { color: rgba(255,255,255,.75); }
+    .song-album  { color: var(--muted); }
+    .song-title  { color: rgba(255,255,255,.5); }
 
     .req-actions {
       display: flex; flex-direction: row; gap: 8px;
@@ -417,11 +409,19 @@ function renderRequests(requests) {
 }
 
 function requestCard(r, showActions) {
-  const badge    = r.status === 'approved'
-    ? `<span class="req-badge approved">In queue</span>`
-    : `<span class="req-badge pending">Pending</span>`;
-  const songs    = (r.song_titles || []).map(t => `<div class="req-song">${esc(t)}</div>`).join('');
-  const actions  = showActions ? `
+  const time = r.created_at
+    ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+    : '';
+  const songRows = (r.song_details || []).map(s =>
+    `<div class="song-row">
+      <span class="song-col song-artist">${esc(s.artist)}</span>
+      <span class="song-col song-album">${esc(s.album)}</span>
+      <span class="song-col song-title">${esc(s.title)}</span>
+    </div>`
+  ).join('') || (r.song_titles || []).map(t =>
+    `<div class="song-row"><span class="song-col song-artist" style="grid-column:1/-1">${esc(t)}</span></div>`
+  ).join('');
+  const actions = showActions ? `
 <div class="req-actions">
   <button class="btn-approve" onclick="approve('${esc(r.id)}', false)">Approve</button>
   <button class="btn-jump"    onclick="approve('${esc(r.id)}', true)">Play Next</button>
@@ -429,9 +429,9 @@ function requestCard(r, showActions) {
 </div>` : '';
 
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
-<div class="req-body">
-  <div class="req-who">${badge} <strong>${esc(r.requester_name || 'Guest')}</strong></div>
-  <div class="req-songs">${songs}</div>
+<div class="req-top">
+  <div class="req-row1"><strong class="req-name">${esc(r.requester_name || 'Guest')}</strong><span class="req-time">${time}</span></div>
+  <div class="song-rows">${songRows}</div>
 </div>${actions}</div>`;
 }
 

@@ -455,6 +455,14 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "id": r.id,
             "song_ids": r.song_ids,
             "song_titles": r.song_titles,
+            "song_details": [
+                {
+                    "artist": bar.song_index.get(sid, {}).get("artist", ""),
+                    "album":  bar.song_index.get(sid, {}).get("album", ""),
+                    "title":  bar.song_index.get(sid, {}).get("title", ""),
+                }
+                for sid in r.song_ids
+            ],
             "requester_name": r.requester_name,
             "jump": r.jump,
             "status": r.status,
