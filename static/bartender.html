@@ -127,19 +127,19 @@
     .req-card { background: var(--card); border-radius: 10px; padding: 9px 12px; margin-bottom: 7px; border: 1px solid var(--border); }
     .req-card.approved { border-left: 3px solid #166534; }
 
-    .req-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .req-row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .req-name  { font-size: 26px; font-weight: 700; color: var(--text); }
     .req-price { font-size: 22px; font-weight: 700; color: #a78bfa; white-space: nowrap; }
-    .req-acts  { display: flex; gap: 12px; align-items: center; }
+    .req-acts  { display: flex; gap: 8px; align-items: center; }
     .btn-act   { border: none; border-radius: 6px; padding: 8px 20px; font-size: 15px; font-weight: 800; cursor: pointer; transition: opacity .15s; }
     .btn-act:active { opacity: .7; }
-    .btn-approve { background: #166534; color: #4ade80; padding: 8px 32px; }
+    .btn-approve { background: #166534; color: #4ade80; padding: 8px 44px; }
     .btn-jump    { background: #713f12; color: #fde047; }
     .btn-deny    { background: #7f1d1d; color: #f87171; }
     .req-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
     .req-badge.approved { background: #166534; color: #4ade80; }
-    .req-time   { font-size: 10px; color: var(--muted); margin-left: auto; white-space: nowrap; }
-    .req-device { font-size: 11px; color: #666; white-space: nowrap; }
+    .req-time   { font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .req-device { font-size: 11px; color: var(--text); font-weight: 600; white-space: nowrap; margin-left: auto; }
 
     .song-rows { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; }
     .song-row  { display: grid; grid-template-columns: 15ch 10ch 1fr; gap: 6px; font-size: 12px; overflow: hidden; }
@@ -423,9 +423,9 @@ function requestCard(r, showActions) {
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
   <div class="req-row1">
     <span class="req-name">${esc(r.requester_name || 'Guest')}</span>
-    ${devId ? `<span class="req-device">(${esc(devId)})</span>` : ''}
     ${priceHtml}${acts}
-    <span class="req-time">${time}</span>
+    ${devId ? `<span class="req-device">(${esc(devId)})</span>` : ''}
+    ${time ? `<span class="req-time">${time}</span>` : ''}
   </div>
   <div class="song-rows">${songRows}</div>
 </div>`;
