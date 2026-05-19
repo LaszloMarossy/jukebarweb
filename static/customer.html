@@ -141,6 +141,7 @@
     .toast-song { font-size: 14px; color: var(--accent); padding: 2px 0; }
     .toast-song::before { content: "♪  "; }
     .toast-msg  { font-size: 14px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+    .toast-name { color: var(--accent); font-weight: 800; }
     .toast-close {
       position: absolute; top: 12px; right: 16px;
       color: var(--muted); font-size: 20px; padding: 4px; line-height: 1;
@@ -248,6 +249,7 @@
     .basket-artist { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .basket-rm { color: var(--error); font-size: 22px; flex-shrink: 0; line-height: 1; }
 
+    .basket-total { font-size: 15px; font-weight: 800; color: #a78bfa; text-align: right; padding: 4px 0 8px; }
     .basket-footer { display: flex; gap: 8px; margin-top: 10px; }
     .basket-name {
       flex: 1; background: var(--card2); border: 1px solid var(--border);
@@ -413,6 +415,7 @@
   <!-- basket -->
   <div class="basket" id="basket">
     <div class="basket-songs" id="basket-songs"></div>
+    <div class="basket-total" id="basket-total"></div>
     <div class="basket-footer">
       <input class="basket-name" id="requester-name" type="text" placeholder="Your name" maxlength="40">
       <button class="basket-submit" id="submit-btn" onclick="submitRequest()">Submit →</button>
@@ -776,6 +779,13 @@ function removeFromBasket(i) {
   renderBasket();
 }
 
+function basketTotal() {
+  const count = S.selected.length;
+  if (!count || S.pricePerSong <= 0) return 0;
+  if (count === 3 && S.priceForThree > 0) return S.priceForThree;
+  return S.pricePerSong * count;
+}
+
 function renderBasket() {
   const basket = $('basket');
   if (!S.selected.length) { basket.classList.remove('show'); return; }
@@ -788,6 +798,8 @@ function renderBasket() {
   </div>
   <button class="basket-rm" onclick="removeFromBasket(${i})">✕</button>
 </div>`).join('');
+  const total = basketTotal();
+  $('basket-total').textContent = total > 0 ? `Total: ${S.currency}${total.toFixed(2)}` : '';
   basket.classList.add('show');
 }
 
@@ -845,11 +857,19 @@ function returnToPlay(status, songs) {
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function showToast(status, songs) {
-  const msg = status === 'approved'
-    ? 'Your songs are in the queue — sit tight!'
-    : S.requireApproval
-      ? 'Get with the bartender to approve your request!'
-      : 'Your songs are in the queue — sit tight!';
+  const count = songs.length;
+  const total = S.pricePerSong > 0
+    ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
+    : 0;
+  const needsApproval = status !== 'approved' && S.requireApproval;
+  let msg;
+  if (needsApproval) {
+    const barLabel = S.barName ? `<span class="toast-name">JukeBar ${esc(S.barName)}</span>` : 'the bar staff';
+    const payPart  = total > 0 ? ` after paying <span class="toast-name">${S.currency}${total.toFixed(2)}</span>` : '';
+    msg = `Have your playlist approved with staff under ${barLabel}${payPart}.`;
+  } else {
+    msg = 'Your songs are in the queue — sit tight!';
+  }
 
   const songHtml = songs.map(s => `<div class="toast-song">${esc(s.title)}</div>`).join('');
   $('toast-inner').innerHTML =
@@ -857,7 +877,7 @@ function showToast(status, songs) {
 
   $('toast').classList.add('show');
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(dismissToast, 6000);
+  _toastTimer = setTimeout(dismissToast, 8000);
 }
 
 function dismissToast() {
