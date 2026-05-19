@@ -71,6 +71,7 @@ class SongRequest:
     song_ids: list[str]
     song_titles: list[str]
     requester_name: str
+    customer_id: str
     jump: bool
     status: str  # "pending" | "approved" | "denied" | "played"
     created_at: float = field(default_factory=time.time)
@@ -418,6 +419,7 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
         song_ids=song_ids,
         song_titles=body.get("song_titles", []),
         requester_name=body.get("requester_name", ""),
+        customer_id=body.get("customer_id", ""),
         jump=body.get("jump", False),
         status="pending" if bar.require_approval else "approved",
     )
@@ -464,6 +466,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
                 for sid in r.song_ids
             ],
             "requester_name": r.requester_name,
+            "customer_id": r.customer_id,
             "jump": r.jump,
             "status": r.status,
             "created_at": r.created_at,

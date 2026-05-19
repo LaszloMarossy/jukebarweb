@@ -427,9 +427,19 @@ const ALPHA      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 const TITLE_COLS = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
 
 // ── State ──────────────────────────────────────────────────────────────────
+function getCustomerId() {
+  let id = localStorage.getItem('jb_customer_id');
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 10).toUpperCase();
+    localStorage.setItem('jb_customer_id', id);
+  }
+  return id;
+}
+
 const S = {
   jukebarId:       '',
   session:         '',
+  customerId:      getCustomerId(),
   requireApproval: true,
   pricePerSong:    0,
   priceForThree:   0,
@@ -798,6 +808,7 @@ async function submitRequest() {
         song_ids:       S.selected.map(s => s.id),
         song_titles:    S.selected.map(s => s.title),
         requester_name: name,
+        customer_id:    S.customerId,
         jump:           false,
       }),
     });

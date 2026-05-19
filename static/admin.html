@@ -150,7 +150,8 @@
     .btn-deny    { background: #7f1d1d; color: #f87171; }
     .req-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
     .req-badge.approved { background: #166534; color: #4ade80; }
-    .req-time  { font-size: 10px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+    .req-time   { font-size: 10px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+    .req-device { font-size: 11px; color: #666; white-space: nowrap; }
 
     .song-rows { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; }
     .song-row  { display: grid; grid-template-columns: 15ch 10ch 1fr; gap: 6px; font-size: 12px; overflow: hidden; }
@@ -435,7 +436,7 @@ async function poll() {
 
     if (d.bar_name && !S.barName) {
       S.barName = d.bar_name;
-      $('bar-name').textContent = d.bar_name;
+      $('bar-name').textContent = `JukeBar ${d.bar_name}`;
       document.title = `Admin — ${d.bar_name}`;
     }
 
@@ -502,8 +503,15 @@ function renderRequests(requests) {
   }
 }
 
+function deviceLabel(id) {
+  if (!id) return '';
+  if (id === 'HOST') return 'HOST';
+  return id.slice(0, 6);
+}
+
 function requestCard(r, showActions) {
   const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+  const devId = deviceLabel(r.customer_id);
   const count = (r.song_ids || r.song_details || []).length || 1;
   const price = S.pricePerSong > 0
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
@@ -528,6 +536,7 @@ function requestCard(r, showActions) {
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
   <div class="req-row1">
     <span class="req-name">${esc(r.requester_name || 'Guest')}</span>
+    ${devId ? `<span class="req-device">(${esc(devId)})</span>` : ''}
     ${priceHtml}${acts}
     <span class="req-time">${time}</span>
   </div>
