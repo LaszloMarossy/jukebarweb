@@ -314,6 +314,24 @@ async def host_nowplaying(body: dict[str, Any]):
     return {"ok": True}
 
 
+@app.post("/api/host/unregister")
+async def host_unregister(body: dict[str, Any]):
+    """
+    Called by iOS when End Session is triggered.
+    Deletes the BarSession immediately so stale admin/bartender URLs get 404.
+    Idempotent — returns 200 even if the bar is already gone.
+    """
+    jukebar_id = body.get("jukebar_id", "")
+    session    = body.get("session", "")
+    bar = _bars.get(jukebar_id)
+    if bar is None:
+        return {"ok": True}
+    if bar.session != session:
+        raise HTTPException(403, "Invalid session")
+    del _bars[jukebar_id]
+    return {"ok": True}
+
+
 @app.post("/api/host/sync")
 async def host_sync(body: dict[str, Any]):
     """
