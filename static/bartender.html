@@ -309,7 +309,7 @@ async function verifyPin() {
       $('pin-input').focus();
       return;
     }
-    if (res.status === 404) return showError('Bar offline', 'The JukeBar is not reachable right now.');
+    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and scan the fresh QR code.');
     if (!res.ok) throw new Error(res.status);
 
     // Cache so they don't have to re-enter on refresh (cleared when tab closes)
@@ -333,7 +333,7 @@ async function poll() {
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
     if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
-    if (res.status === 404) return showError('Bar offline', 'The JukeBar is not reachable right now. Try again in a moment.');
+    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and scan the fresh QR code.');
     if (!res.ok) return;
     const d = await res.json();
 
