@@ -127,12 +127,6 @@
     }
     .play-req-btn:active { opacity: .8; }
 
-    .session-banner {
-      display: none; background: #92400e; color: #fef3c7;
-      font-size: 13px; text-align: center; padding: 8px 16px; line-height: 1.4;
-    }
-    .session-banner.show { display: block; }
-
     /* ══════════════════════════════════════════════════════════════
        TOAST (confirmation popup on play screen)
     ══════════════════════════════════════════════════════════════ */
@@ -363,8 +357,6 @@
     <div class="play-bar-name" id="play-bar-name">JukeBar</div>
   </div>
 
-  <div class="session-banner" id="session-banner">This link has expired — please scan the current QR code at the bar to request songs.</div>
-
   <div class="play-body">
     <div class="play-art" id="play-art">
       <div class="play-art-ph" id="play-art-ph">
@@ -581,8 +573,7 @@ async function fetchDisplay() {
     if (!res.ok) return;
     const d = await res.json();
 
-    const banner = $('session-banner');
-    if (banner) banner.classList.toggle('show', d.session_valid === false);
+    if (d.session_valid === false) return showError('Link expired', 'Please scan the current QR code at the bar to continue.');
 
     const song = d.now_playing || null;
 
