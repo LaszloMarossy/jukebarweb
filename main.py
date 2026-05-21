@@ -77,6 +77,7 @@ class SongRequest:
     jump: bool
     status: str  # "pending" | "approved" | "denied" | "played"
     created_at: float = field(default_factory=time.time)
+    approved_at: float = 0.0
 
 
 @dataclass
@@ -439,6 +440,36 @@ async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
     return {"now_playing": bar.now_playing}
 
 
+@app.get("/api/bar/{jukebar_id}/display")
+async def bar_display(jukebar_id: str):
+    """Session-agnostic kiosk endpoint: now-playing + approved requests. No session required."""
+    bar = _get_bar(jukebar_id)
+    _touch(bar)
+    approved = [
+        {
+            "id": r.id,
+            "song_ids": r.song_ids,
+            "song_titles": r.song_titles,
+            "song_details": [
+                {
+                    "artist": bar.song_index.get(sid, {}).get("artist", ""),
+                    "album":  bar.song_index.get(sid, {}).get("album", ""),
+                    "title":  bar.song_index.get(sid, {}).get("title", ""),
+                }
+                for sid in r.song_ids
+            ],
+            "requester_name": r.requester_name,
+            "jump": r.jump,
+            "status": r.status,
+            "created_at": r.created_at,
+            "approved_at": r.approved_at,
+        }
+        for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
+        if r.status in ("approved", "approved_jump")
+    ]
+    return {"now_playing": bar.now_playing, "requests": approved}
+
+
 @app.post("/api/bar/{jukebar_id}/request")
 async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
@@ -504,9 +535,10 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "jump": r.jump,
             "status": r.status,
             "created_at": r.created_at,
+            "approved_at": r.approved_at,
         }
         for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
-        if r.status in ("pending", "approved")
+        if r.status in ("pending", "approved", "approved_jump")
     ]
     return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing,
             "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
@@ -523,6 +555,7 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
     jump = body.get("jump", req.jump)
     req.status = "approved"
     req.jump = jump
+    req.approved_at = time.time()
     bar.pending_actions.append({
         "type": "approve",
         "request_id": rid,

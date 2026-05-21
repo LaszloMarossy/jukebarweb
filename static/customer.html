@@ -490,7 +490,7 @@ async function boot() {
       d = JSON.parse(cached);
     } else {
       const res = await fetch(`/api/bar/${S.jukebarId}/catalog?s=${enc(S.session)}`);
-      if (res.status === 403) return showError('Link expired', 'This session has expired. Ask the bartender to scan a new QR code.');
+      if (res.status === 403) { showScreen('s-play'); fetchDisplay(); setInterval(fetchDisplay, 5_000); return; }
       if (res.status === 404) return showError('Bar offline', 'This JukeBar is not reachable right now. Try again in a moment.');
       if (!res.ok)            return showError('Error', 'Could not load the playlist. Check your connection and try again.');
       d = await res.json();
@@ -512,10 +512,8 @@ async function boot() {
     renderBrowse();
     showScreen('s-play');
 
-    fetchNowPlaying();
-    fetchUpNext();
-    setInterval(fetchNowPlaying, 5_000);
-    setInterval(fetchUpNext, 10_000);
+    fetchDisplay();
+    setInterval(fetchDisplay, 5_000);
   } catch {
     showError('Network error', 'Check your connection and try again.');
   }
@@ -568,13 +566,14 @@ function colorize(el, text) {
   }
 }
 
-// ── Now playing ─────────────────────────────────────────────────────────────
-async function fetchNowPlaying() {
+// ── Display (now-playing + up-next, session-agnostic) ────────────────────────
+async function fetchDisplay() {
   try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
+    const res = await fetch(`/api/bar/${S.jukebarId}/display`);
     if (!res.ok) return;
-    const { now_playing } = await res.json();
-    const song = now_playing || null;
+    const d = await res.json();
+
+    const song = d.now_playing || null;
 
     // Browse header (small)
     $('now-playing').innerHTML = song
@@ -604,19 +603,19 @@ async function fetchNowPlaying() {
          <div class="play-np-title">${esc(song.title || '')}</div>
          ${song.album ? `<div class="play-np-album">${esc(song.album)}</div>` : ''}`
       : `<div class="play-np-idle">Nothing playing right now</div>`;
-  } catch {}
-}
 
-// ── Up Next ───────────────────────────────────────────────────────────────────
-async function fetchUpNext() {
-  try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
-    if (!res.ok) return;
-    const d = await res.json();
-    const approved = (d.requests || []).filter(r => r.status === 'approved');
+    // Up Next
+    const approved = (d.requests || [])
+      .sort((a, b) => {
+        const aj = a.status === 'approved_jump' || a.jump === true;
+        const bj = b.status === 'approved_jump' || b.jump === true;
+        if (aj !== bj) return aj ? -1 : 1;
+        const at = new Date((a.approved_at || a.created_at) * 1000).getTime();
+        const bt = new Date((b.approved_at || b.created_at) * 1000).getTime();
+        return aj ? bt - at : at - bt;
+      });
     S.upNext = approved;
 
-    // Play screen up-next list
     const unEl = $('play-upnext');
     if (approved.length) {
       const items = approved.flatMap(r => {
@@ -631,7 +630,6 @@ async function fetchUpNext() {
       unEl.innerHTML = `<div class="play-un-label">Up Next</div><div class="play-un-item" style="color:var(--muted);opacity:.5">Shuffling…</div>`;
     }
 
-    // Browse letters screen
     if (S.nav.level === 'letters' && $('s-browse').classList.contains('active')) renderLetters();
   } catch {}
 }
@@ -815,7 +813,7 @@ function renderBasket() {
   <button class="basket-rm" onclick="removeFromBasket(${i})">✕</button>
 </div>`).join('');
   const total = basketTotal();
-  $('basket-total').textContent = total > 0 ? `Total: ${S.currency}${total.toFixed(2)}` : '';
+  $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
 }
 
@@ -884,7 +882,7 @@ function showToast(status, songs, requesterName) {
   let msgHtml;
   if (needsApproval) {
     const payHtml = total > 0
-      ? `<span class="toast-amount">${S.currency}${total.toFixed(2)}</span>`
+      ? `<span class="toast-amount">${S.currency} ${total.toFixed(2)}</span>`
       : '';
     msgHtml = `<div class="toast-msg">Get the bartender/staff to approve your request under the name<span class="toast-name">${esc(requesterName)}</span>${total > 0 ? `after paying${payHtml}` : ''}</div>`;
   } else {

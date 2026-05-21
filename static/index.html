@@ -317,12 +317,12 @@
   </svg>
   <div>
     <h1 id="site-title">JukeBar</h1>
-    <div class="tagline">Give your bar a music character!</div>
+    <div class="tagline">A Jukebox to match your bar's music character!</div>
   </div>
 </header>
 
 <nav>
-  <a href="/discover" style="color:var(--coral);font-weight:bold">🗺 Find a bar</a>
+  <a href="/discover" style="color:var(--coral);font-weight:bold">🗺 JukeBars on a map</a>
   <a href="#overview">Overview</a>
   <a href="#how-it-works">How it works</a>
   <a href="#setup">Setup guide</a>
@@ -340,17 +340,14 @@
 
     <div class="hero">
       <div class="hero-text">
-        <p><strong>A jukebox for your bar, pub, party, or family gathering — iPhone plays, any mobile requests and approves.</strong> JukeBar plays your own music: playlists from your Apple Music app, including your own MP3s, purchased tracks, and Apple Music library songs.</p>
-        <p>Works offline, online, or in mixed mode — tailored to your situation. No subscriptions required.</p>
+        <p><strong>A jukebox for your bar, pub, party, or family gathering — iOS plays, any mobile device requests and approves.</strong> JukeBar plays your own music: playlists from your Apple Music app, including your own MP3s, purchased tracks, and Apple Music library songs (obtaining the required music licensing remains the venue's responsibility).</p>
         <div class="badge-row">
-          <span class="badge hi">Works offline / online / mixed</span>
-          <span class="badge hi">No subscriptions</span>
-          <span class="badge">Your Apple Music playlists</span>
-          <span class="badge">Own MP3s · Purchased · Streaming</span>
-          <span class="badge">iPhone · iPad</span>
+          <span class="badge hi">Works offline / online in standalone / remote-only / mixed modes</span>
+          <span class="badge hi">No subscriptions required</span>
+          <span class="badge">Plays Apple Music playlists on iPhone/iPad - your own MP3s · Purchased · Streaming</span>
         </div>
         <div style="margin-top:20px">
-          <a href="/discover" style="display:inline-block;background:var(--coral);color:#111;font-weight:800;font-size:1rem;padding:12px 28px;border-radius:10px;text-decoration:none">🗺 Find a JukeBar near you →</a>
+          <a href="/discover" style="display:inline-block;background:var(--coral);color:#111;font-weight:800;font-size:1rem;padding:12px 28px;border-radius:10px;text-decoration:none">🗺 Find participating JukeBars on a map →</a>
         </div>
       </div>
     </div>
@@ -358,33 +355,52 @@
     <div class="feature-grid" style="margin-top:24px;">
       <div class="feature-card">
         <div class="icon">🎵</div>
-        <div class="title">Plays your music</div>
-        <p>Uses playlists from your Apple Music app — your own MP3s, purchased tracks, or Apple Music streaming titles. One device runs everything.</p>
+        <div class="title">iOS device plays your music</div>
+        <p>playlists from your Apple Music app — your own MP3s, purchased tracks, or Apple Music streaming titles. One device runs everything.</p>
+        <p><strong>if</strong> configured so, customers can directly request <strong>songs from your playlist</strong> on the iOS device. </p>
       </div>
       <div class="feature-card">
         <div class="icon">📱</div>
         <div class="title">Any mobile can request</div>
-        <p>Customers scan a QR code and browse the full catalog on their own phone. No app to install — works in any mobile browser.</p>
+        <p>In mixed or remote-only modes, customers can scan a QR code and browse/search the full catalog as well as submit requests on their own mobile devices via their browser.</p>
       </div>
       <div class="feature-card">
         <div class="icon">🌐</div>
-        <div class="title">Four play modes</div>
-        <p>Standalone (no network), shared WiFi, Personal Hotspot, or full internet mode — pick what suits your venue and situation.</p>
+        <div class="title">Three interaction modes:</div>
+        <ul>
+          <li>Standalone (requests made on the host — no network; auto-accept requests)</li>
+          <li>Remote only (admin and customers connect to host via network using their own mobile devices)</li>
+          <li>Mixed (allows operation both on the host, and via own devices)</li>
+        </ul>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🌐</div>
+        <div class="title">Three network modes (how the admin and customers connect to the host, using their own mobile devices):</div>
+        <ul>
+          <li>No network needed (standalone mode; no internet required; requests auto-approved)</li>
+          <li>Shared WiFi (mixed and remote-only modes; all devices must be on)</li>
+          <li>hotspot by host (mixed and remote-only modes; remote devices connect to host hotspot; no internet required)</li>
+        </ul>
       </div>
       <div class="feature-card">
         <div class="icon">✅</div>
-        <div class="title">Bartender approval</div>
-        <p>Bartenders approve or deny requests from any browser. Approved songs play next, with optional pricing per request.</p>
+        <div class="title">Auto or Bartender approval of requests</div>
+        <p>Bartenders/admin approves or denies requests from a connected mobile device browser. Approved songs play in order of approval, or up next.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">✅</div>
+        <div class="title">Payment for requests (optional)</div>
+        <p>A configured price can be presented to requesters per song or per 3 songs (discount), which the bartender can collect before approving the requests (all payment processing, licensing fees, and taxes remain the responsibility of the venue). </p>
       </div>
       <div class="feature-card">
         <div class="icon">📊</div>
         <div class="title">Session reports</div>
-        <p>Every session is archived to a CSV file — request history, songs, prices, timestamps. Shareable via AirDrop or email.</p>
+        <p>Every session is archived to a CSV file — request history, songs, prices, timestamps — which can be downloaded for record keeping and analysis, shareable via AirDrop or email.</p>
       </div>
       <div class="feature-card">
         <div class="icon">🗺</div>
         <div class="title">Community discovery</div>
-        <p>Optionally publish your bar name and playlist bands on the JukeBar map so music-loving guests can find you before they arrive.</p>
+        <p>Optionally publish your bar name and the bands you play on your JukeBar on a map so music-loving guests can find the bars that match their music taste in a given location. (valuable if/when usage is widespread)</p>
       </div>
     </div>
   </section>
@@ -392,34 +408,41 @@
   <!-- ── How it works ───────────────────────────────────────────────────── -->
   <section id="how-it-works">
     <h2>How it works</h2>
-    <p>Three people, three simple flows.</p>
+    <p>Three roles, three simple flows.</p>
 
     <div class="role-grid">
       <div class="role-card">
         <div class="role-label">Bar owner / admin</div>
         <ol>
-          <li>Open JukeBar, run through the one-time setup wizard</li>
-          <li>Pick an Apple Music playlist, set prices and PIN</li>
-          <li>Choose network mode (WiFi or Personal Hotspot)</li>
+          <li>Download and open JukeBar, run through the one-time setup wizard</li>
+          <li>Pick an Apple Music playlist on your device, set prices (if any) and an admin/bartender PIN</li>
+          <li>Choose an operation and network mode (WiFi/hotspot/Internet for standalone, remote-only, or mixed modes)</li>
+          <li>Let the device play random picks on your playlist; approve/deny requests from customers (after payment, if any)</li>
           <li>Long-press the title to access admin controls — playback, catalog refresh, reports</li>
+          <li>Enjoy the music you like, and people who like your music!</li>
+          <li>The admin role can also perform the bartender steps (below)</li>
         </ol>
       </div>
       <div class="role-card customer">
         <div class="role-label">Customer</div>
         <ol>
-          <li>Join the bar's WiFi network</li>
-          <li>Scan the QR code shown on the kiosk screen</li>
-          <li>Browse artists and albums, pick up to 3 songs</li>
-          <li>Enter your name and submit — the bartender handles the rest</li>
+          <li>In standalone mode, make your requests right on the device
+          <li>In other modes, scan QR code to join the bar's WiFi network, hotspot, or just be on the Internet</li>
+          <li>Scan QR code shown on the kiosk screen to request songs on the playlist</li>
+          <li>Browse artists and albums, pick up to 3 songs at a time</li>
+          <li>Enter a requester name and submit for bartender approval</li>
+          <li>Get with the bartender to pay for your request under the requester name (if not in auto-approve mode)</li>
+          <li>Enjoy hearing your music with friends; see upcoming approved tunes</li>
+          <li>(Online payment option for requests is under consideration and development)</li>
         </ol>
       </div>
       <div class="role-card bartender">
         <div class="role-label">Bartender</div>
         <ol>
           <li>Open the bartender URL shown in admin settings on any browser</li>
-          <li>Enter your name and the bar PIN to pair</li>
-          <li>Approve or deny incoming requests</li>
-          <li>Approved songs play immediately after the current song</li>
+          <li>Enter your name and the bar PIN (set during app setup) to pair</li>
+          <li>Approve or deny incoming requests (after taking specified payment, if any)</li>
+          <li>Approved songs play in order of approval, or immediately after the current song (if 'Play Next' is chosen)</li>
         </ol>
       </div>
     </div>
@@ -440,19 +463,19 @@
       <li>
         <div class="step-body">
           <strong>Pick a playlist</strong>
-          <p>Choose the Apple Music playlist you want to use as the jukebox source. All songs in the playlist must be downloaded to the device — streaming is not supported.</p>
+          <p>Choose the Apple Music playlist you want to use as the jukebox source. Songs must be in your Apple Music library — either downloaded to the device (plays offline) or available as Apple Music catalog tracks (streams when internet is present). JukeBar's QR/request system works entirely on the local network and never requires internet..</p>
         </div>
       </li>
       <li>
         <div class="step-body">
           <strong>Enter bar details</strong>
-          <p>Bar name (shown on the kiosk screen and in the customer web app), admin email (for your records), currency symbol, per-song price, and 3-song bundle price.</p>
+          <p>Bar name (shown on the kiosk screen and in the customer web app, next to the logo), currency symbol, per-song price, and 3-song bundle price.</p>
         </div>
       </li>
       <li>
         <div class="step-body">
           <strong>Set a PIN</strong>
-          <p>4–6 digit PIN that unlocks the admin panel and lets bartenders pair. Leave blank to keep the existing PIN on subsequent setups.</p>
+          <p>4–6 digit PIN that unlocks the admin panel and lets bartenders pair, so they can approve requests. Leave blank to keep the existing PIN on subsequent setups.</p>
         </div>
       </li>
       <li>
