@@ -557,3 +557,11 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: 
         "request_id": rid,
     })
     return {"ok": True}
+
+
+@app.post("/api/bar/{jukebar_id}/stop")
+async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
+    """Queue a stop_session action — iOS picks it up on the next sync and rotates the session."""
+    bar = _customer_bar(jukebar_id, s)
+    bar.pending_actions.append({"type": "stop_session"})
+    return {"ok": True}

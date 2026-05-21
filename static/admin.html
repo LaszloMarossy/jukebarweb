@@ -121,6 +121,7 @@
       border: 1px solid var(--border); transition: opacity .15s;
     }
     .btn-control:active { opacity: .6; }
+    .btn-stop { background: #2a1a1a; border-color: #5a2020; color: #f87171; }
 
     /* ── section title ── */
     .section-title {
@@ -309,6 +310,7 @@
       <button class="btn-control" onclick="sendControl('prev')" title="Previous">⏮</button>
       <button class="btn-control" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">▶︎</button>
       <button class="btn-control" onclick="sendControl('next')" title="Next">⏭</button>
+      <button class="btn-control btn-stop" onclick="stopSession()" title="Stop for the time being">⏹</button>
     </div>
   </div>
 
@@ -481,6 +483,14 @@ function togglePlayPause() {
   sendControl(S.isPlaying ? 'pause' : 'play');
   S.isPlaying = !S.isPlaying;
   $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
+}
+
+async function stopSession() {
+  if (!confirm('Stop for the time being?\n\nMusic will pause and a new QR code will be generated. Customers with the old QR can no longer request songs.')) return;
+  try {
+    await fetch(`/api/bar/${S.jukebarId}/stop?s=${enc(S.session)}`, { method: 'POST' });
+    renderNowPlaying(null);
+  } catch {}
 }
 
 // ── Render requests ────────────────────────────────────────────────────────
