@@ -310,7 +310,7 @@
       <button class="btn-control" onclick="sendControl('prev')" title="Previous">⏮</button>
       <button class="btn-control" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">▶︎</button>
       <button class="btn-control" onclick="sendControl('next')" title="Next">⏭</button>
-      <button class="btn-control btn-stop" onclick="stopSession()" title="Stop for the time being">⏹</button>
+      <button class="btn-control btn-stop" onclick="stopSession()" title="End Session">⏹</button>
     </div>
   </div>
 
@@ -486,7 +486,7 @@ function togglePlayPause() {
 }
 
 async function stopSession() {
-  if (!confirm('Stop for the time being?\n\nMusic will pause and a new QR code will be generated. Customers with the old QR can no longer request songs.')) return;
+  if (!confirm('End Session?\n\nMusic will pause and the host will return to the setup wizard.')) return;
   try {
     await fetch(`/api/bar/${S.jukebarId}/stop?s=${enc(S.session)}`, { method: 'POST' });
     renderNowPlaying(null);
