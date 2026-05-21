@@ -127,6 +127,12 @@
     }
     .play-req-btn:active { opacity: .8; }
 
+    .session-banner {
+      display: none; background: #92400e; color: #fef3c7;
+      font-size: 13px; text-align: center; padding: 8px 16px; line-height: 1.4;
+    }
+    .session-banner.show { display: block; }
+
     /* ══════════════════════════════════════════════════════════════
        TOAST (confirmation popup on play screen)
     ══════════════════════════════════════════════════════════════ */
@@ -357,6 +363,8 @@
     <div class="play-bar-name" id="play-bar-name">JukeBar</div>
   </div>
 
+  <div class="session-banner" id="session-banner">This link has expired — please scan the current QR code at the bar to request songs.</div>
+
   <div class="play-body">
     <div class="play-art" id="play-art">
       <div class="play-art-ph" id="play-art-ph">
@@ -569,9 +577,12 @@ function colorize(el, text) {
 // ── Display (now-playing + up-next, session-agnostic) ────────────────────────
 async function fetchDisplay() {
   try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/display`);
+    const res = await fetch(`/api/bar/${S.jukebarId}/display?s=${enc(S.session)}`);
     if (!res.ok) return;
     const d = await res.json();
+
+    const banner = $('session-banner');
+    if (banner) banner.classList.toggle('show', d.session_valid === false);
 
     const song = d.now_playing || null;
 
@@ -847,6 +858,7 @@ async function submitRequest() {
         jump:           false,
       }),
     });
+    if (res.status === 403) { btn.disabled = false; btn.textContent = 'Submit →'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
     if (!res.ok) throw new Error(res.status);
     const { status } = await res.json();
     const submitted = [...S.selected];

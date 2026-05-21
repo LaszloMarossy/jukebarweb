@@ -441,10 +441,11 @@ async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
 
 
 @app.get("/api/bar/{jukebar_id}/display")
-async def bar_display(jukebar_id: str):
+async def bar_display(jukebar_id: str, s: str = Query(None)):
     """Session-agnostic kiosk endpoint: now-playing + approved requests. No session required."""
     bar = _get_bar(jukebar_id)
     _touch(bar)
+    session_valid = s is None or bar.session == s
     approved = [
         {
             "id": r.id,
@@ -467,7 +468,7 @@ async def bar_display(jukebar_id: str):
         for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
         if r.status in ("approved", "approved_jump")
     ]
-    return {"now_playing": bar.now_playing, "requests": approved}
+    return {"now_playing": bar.now_playing, "requests": approved, "session_valid": session_valid}
 
 
 @app.post("/api/bar/{jukebar_id}/request")
