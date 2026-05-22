@@ -41,6 +41,8 @@ from fastapi.staticfiles import StaticFiles
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 MAP_ENTRIES_FILE = DATA_DIR / "map_entries.json"
 
+_USE_GCS = bool(os.environ.get("GCS_BUCKET"))
+
 BAR_TIMEOUT_SECONDS  = 300    # bar shown as offline on the map after 5 min without a sync
 BAR_CLEANUP_INACTIVE = 7200   # last_seen must be this old (2 h) before cleanup considers it
 BAR_CLEANUP_MIN_AGE  = 1800   # session must also be at least this old (30 min) to be swept
@@ -113,10 +115,17 @@ _bars: dict[str, BarSession] = {}        # in-memory only
 # ---------------------------------------------------------------------------
 
 def _load_map_entries() -> dict[str, MapEntry]:
-    if not MAP_ENTRIES_FILE.exists():
-        return {}
     try:
-        raw = json.loads(MAP_ENTRIES_FILE.read_text(encoding="utf-8"))
+        if _USE_GCS:
+            import gcs_store
+            raw_text = gcs_store.read("map_entries.json")
+        else:
+            if not MAP_ENTRIES_FILE.exists():
+                return {}
+            raw_text = MAP_ENTRIES_FILE.read_text(encoding="utf-8")
+        if not raw_text:
+            return {}
+        raw = json.loads(raw_text)
         result = {}
         for jid, entry in raw.items():
             fields = {k: v for k, v in entry.items() if k in MapEntry.__dataclass_fields__}
@@ -134,11 +143,13 @@ def _load_map_entries() -> dict[str, MapEntry]:
 
 
 def _write_map_entries_sync() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    MAP_ENTRIES_FILE.write_text(
-        json.dumps({jid: asdict(e) for jid, e in _map_entries.items()}, indent=2),
-        encoding="utf-8",
-    )
+    content = json.dumps({jid: asdict(e) for jid, e in _map_entries.items()}, indent=2)
+    if _USE_GCS:
+        import gcs_store
+        gcs_store.write("map_entries.json", content)
+    else:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        MAP_ENTRIES_FILE.write_text(content, encoding="utf-8")
 
 
 async def _save_map_entries() -> None:
