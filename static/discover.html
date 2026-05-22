@@ -91,7 +91,10 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   flex: 1; overflow-y: auto;
   padding: 0 14px 20px;
 }
-.playlist-section + .playlist-section { margin-top: 14px; }
+.playlist-section + .playlist-section {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
 .playlist-line { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 .playlist-line-note { font-weight: 400; color: var(--muted); }
 .bubble-wrap {
@@ -112,6 +115,17 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   border-radius: 14px; padding: 24px 32px;
 }
 #empty h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+/* ── Leaflet tooltip ── */
+.jb-tooltip {
+  background: rgba(30,30,30,.95); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px;
+  color: var(--text); font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px; line-height: 1.4; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  white-space: nowrap;
+}
+.jb-tooltip::before { display: none; }
+.jb-tooltip strong { color: var(--accent); }
 
 /* ── Leaflet marker overrides ── */
 .jb-marker {
@@ -266,6 +280,13 @@ async function loadBars() {
     const marker = L.marker([bar.lat, bar.lng], {
       icon: L.divIcon({ html: el, className: '', iconSize: [28,28], iconAnchor: [14,14] }),
     }).addTo(map);
+
+    const tooltipHtml = bar.location
+      ? `<strong>${esc(bar.bar_name)}</strong><br>${esc(bar.location)}`
+      : `<strong>${esc(bar.bar_name)}</strong>`;
+    marker.bindTooltip(tooltipHtml, {
+      direction: 'top', offset: [0, -16], className: 'jb-tooltip', sticky: false,
+    });
 
     marker.on('click', () => openPanel(bar));
     bounds.push([bar.lat, bar.lng]);
