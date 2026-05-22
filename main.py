@@ -234,6 +234,7 @@ async def map_register(body: dict[str, Any]):
         raise HTTPException(400, "jukebar_id required")
 
     playlist_name = body.get("playlist_name") or "Playlist"
+    playlist_note = body.get("playlist_note", "")
     new_artists   = sorted(body.get("artists", []))
     now           = time.time()
     existing      = _map_entries.get(jukebar_id)
@@ -243,11 +244,13 @@ async def map_register(body: dict[str, Any]):
     for p in playlists:
         if p["name"] == playlist_name:
             p["artists"]    = new_artists
+            p["note"]       = playlist_note
             p["updated_at"] = now
             updated = True
             break
     if not updated:
-        playlists.append({"name": playlist_name, "artists": new_artists, "updated_at": now})
+        playlists.append({"name": playlist_name, "note": playlist_note,
+                          "artists": new_artists, "updated_at": now})
 
     # keep the 3 most recently updated
     playlists.sort(key=lambda p: p["updated_at"], reverse=True)

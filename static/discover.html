@@ -93,7 +93,10 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 .playlist-section + .playlist-section { margin-top: 14px; }
 .playlist-label {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--muted); margin-bottom: 8px;
+  letter-spacing: .08em; color: var(--muted); margin-bottom: 4px;
+}
+.playlist-note {
+  font-size: 12px; color: var(--accent); margin-bottom: 8px; font-style: italic;
 }
 .bubble-wrap {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -213,8 +216,9 @@ function openPanel(bar) {
   } else {
     let ci = 0;
     wrap.innerHTML = playlists.map(pl => {
-      const label = playlists.length > 1
-        ? `<div class="playlist-label">${esc(pl.name)}</div>` : '';
+      const note  = pl.note ? `<div class="playlist-note">${esc(pl.note)}</div>` : '';
+      const label = playlists.length > 1 || pl.note
+        ? `<div class="playlist-label">${esc(pl.name)}</div>${note}` : '';
       const bubbles = (pl.artists || []).map(artist => {
         const bg = PALETTE[ci % PALETTE.length]; ci++;
         return `<div class="bubble" style="background:${bg};color:${fgFor(bg)}">${esc(artist)}</div>`;
