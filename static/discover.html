@@ -94,6 +94,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   text-align: center; color: var(--muted); z-index: 100; pointer-events: none;
   display: none;
+  background: rgba(30,30,30,.88); border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px 32px;
 }
 #empty h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
 
@@ -119,8 +121,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div id="map"></div>
 
 <div id="empty">
-  <h2>No bars on the map yet</h2>
-  <p>Bars appear here when owners opt in and start a session.</p>
+  <h2>No JukeBars registered yet</h2>
+  <p>Bars appear here when owners opt in to the community map.</p>
 </div>
 
 <div id="panel">
@@ -204,6 +206,12 @@ async function loadBars() {
 
   if (count === 0) {
     document.getElementById('empty').style.display = 'block';
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => map.setView([pos.coords.latitude, pos.coords.longitude], 13),
+        () => {}
+      );
+    }
     return;
   }
 
