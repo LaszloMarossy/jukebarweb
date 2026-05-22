@@ -271,6 +271,16 @@ async def map_register(body: dict[str, Any]):
     return {"ok": True}
 
 
+@app.post("/api/map/unregister")
+async def map_unregister(body: dict[str, Any]):
+    """Called by iOS when listOnMap is turned off. Wipes all playlist data for this bar."""
+    jukebar_id = body.get("jukebar_id", "")
+    if jukebar_id and jukebar_id in _map_entries:
+        del _map_entries[jukebar_id]
+        await _save_map_entries()
+    return {"ok": True}
+
+
 @app.get("/api/map")
 async def map_bars():
     """
