@@ -138,8 +138,8 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
       <line x1="36" y1="36" x2="19.03" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
     </svg>
     <div>
-      <div class="brand-name">JukeBars</div>
-      <div class="brand-sub">Find a bar near you</div>
+      <div class="brand-name" id="brand-name">JukeBars</div>
+      <div class="brand-sub">Find JukeBars near you and see what bands they play!</div>
     </div>
   </a>
   <div id="bar-count"></div>
@@ -264,6 +264,20 @@ async function loadBars() {
 }
 
 loadBars();
+
+(function() {
+  const COLORS = ["#fda185","#fbbe84","#ffc24a","#dc7955","#e8406a","#111111"];
+  const el = document.getElementById('brand-name');
+  let html = '', last = '';
+  for (const ch of el.textContent) {
+    if (ch === ' ') { html += ' '; continue; }
+    const pool  = COLORS.filter(c => c !== last);
+    const color = pool[Math.floor(Math.random() * pool.length)];
+    last = color;
+    html += `<span style="color:${color}">${ch}</span>`;
+  }
+  el.innerHTML = html;
+})();
 </script>
 </body>
 </html>
