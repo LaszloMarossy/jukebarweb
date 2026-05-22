@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JukeBar — Find a bar near you</title>
+<title>JukeBars — Find a bar near you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -26,16 +29,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
   background: rgba(17,17,17,.92); backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
-  padding: 10px 16px;
+  padding: 8px 16px;
   display: flex; align-items: center; gap: 12px;
 }
-.top-bar a { color: var(--muted); font-size: 13px; text-decoration: none; }
-.top-bar a:hover { color: var(--text); }
-.top-title { font-size: 17px; font-weight: 800; color: var(--accent); flex: 1; }
+.brand-link {
+  display: flex; align-items: center; gap: 8px;
+  text-decoration: none; flex: 1;
+}
+.brand-link:hover { opacity: .85; }
+.brand-name {
+  font-family: 'Bubblegum Sans', cursive;
+  font-size: 22px; color: var(--accent); line-height: 1;
+}
+.brand-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 #bar-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 /* ── Map ── */
-#map { position: fixed; inset: 0; top: 44px; z-index: 0; }
+#map { position: fixed; inset: 0; top: 54px; z-index: 0; }
 
 /* ── Panel ── */
 #panel {
@@ -113,8 +123,25 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <body>
 
 <div class="top-bar">
-  <a href="/">← JukeBar</a>
-  <div class="top-title">Find a bar</div>
+  <a href="/" class="brand-link">
+    <svg width="30" height="30" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#dc7955" stroke-width="1.5"/>
+      <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+      <circle cx="36" cy="36" r="24" fill="#fda185"/>
+      <line x1="36" y1="36" x2="36"    y2="12"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="52.97" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="60"    y2="36"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="52.97" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="36"    y2="60"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="19.03" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="12"    y2="36"    stroke="white" stroke-width="0.8" opacity="0.6"/>
+      <line x1="36" y1="36" x2="19.03" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    </svg>
+    <div>
+      <div class="brand-name">JukeBars</div>
+      <div class="brand-sub">Find a bar near you</div>
+    </div>
+  </a>
   <div id="bar-count"></div>
 </div>
 
