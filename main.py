@@ -55,12 +55,12 @@ CLEANUP_INTERVAL     = 300    # sweep runs every 5 minutes
 class MapEntry:
     """
     Lightweight directory record — any connection mode, persisted to disk.
-    Stores artist names only, not the full song catalog.
+    Stores up to 3 playlists (name + artist list), kept by most-recently-updated order.
     """
     jukebar_id: str
     bar_name: str
     location: str       # human-readable venue address or city
-    artists: list[str]  # sorted, deduplicated artist names from the playlist
+    playlists: list[dict] = field(default_factory=list)  # [{name, artists, updated_at}]
     lat: float | None = None
     lng: float | None = None
     registered_at: float = field(default_factory=time.time)
@@ -117,10 +117,18 @@ def _load_map_entries() -> dict[str, MapEntry]:
         return {}
     try:
         raw = json.loads(MAP_ENTRIES_FILE.read_text(encoding="utf-8"))
-        return {
-            jid: MapEntry(**{k: v for k, v in entry.items() if k in MapEntry.__dataclass_fields__})
-            for jid, entry in raw.items()
-        }
+        result = {}
+        for jid, entry in raw.items():
+            fields = {k: v for k, v in entry.items() if k in MapEntry.__dataclass_fields__}
+            # migrate old flat artists list to playlists format
+            if "artists" in entry and not fields.get("playlists"):
+                fields["playlists"] = [{
+                    "name": "Playlist",
+                    "artists": entry["artists"],
+                    "updated_at": entry.get("last_seen", time.time()),
+                }]
+            result[jid] = MapEntry(**fields)
+        return result
     except Exception:
         return {}
 
@@ -218,24 +226,43 @@ def _touch(bar: BarSession) -> None:
 async def map_register(body: dict[str, Any]):
     """
     Called by iOS at setup time regardless of connection mode.
-    Stores only artist names — not full song data.
+    Keeps up to 3 playlists per bar (by playlist_name); same name refreshes, new name appends.
     Persists to disk immediately so entries survive Render restarts.
     """
     jukebar_id = body.get("jukebar_id", "")
     if not jukebar_id:
         raise HTTPException(400, "jukebar_id required")
 
-    existing = _map_entries.get(jukebar_id)
+    playlist_name = body.get("playlist_name") or "Playlist"
+    new_artists   = sorted(body.get("artists", []))
+    now           = time.time()
+    existing      = _map_entries.get(jukebar_id)
+
+    playlists = list(existing.playlists) if existing else []
+    updated = False
+    for p in playlists:
+        if p["name"] == playlist_name:
+            p["artists"]    = new_artists
+            p["updated_at"] = now
+            updated = True
+            break
+    if not updated:
+        playlists.append({"name": playlist_name, "artists": new_artists, "updated_at": now})
+
+    # keep the 3 most recently updated
+    playlists.sort(key=lambda p: p["updated_at"], reverse=True)
+    playlists = playlists[:3]
+
     lat = body.get("lat")
     lng = body.get("lng")
     _map_entries[jukebar_id] = MapEntry(
         jukebar_id=jukebar_id,
         bar_name=body.get("bar_name", ""),
         location=body.get("location", ""),
-        artists=sorted(body.get("artists", [])),
+        playlists=playlists,
         lat=float(lat) if lat is not None else (existing.lat if existing else None),
         lng=float(lng) if lng is not None else (existing.lng if existing else None),
-        registered_at=existing.registered_at if existing else time.time(),
+        registered_at=existing.registered_at if existing else now,
     )
     await _save_map_entries()
     return {"ok": True}
@@ -255,7 +282,7 @@ async def map_bars():
             "location": e.location,
             "lat": e.lat,
             "lng": e.lng,
-            "artists": e.artists,
+            "playlists": e.playlists,
             "registered_at": e.registered_at,
             "last_seen": e.last_seen,
             "is_live": e.last_seen >= cutoff and e.jukebar_id in _bars,
