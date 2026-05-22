@@ -258,7 +258,7 @@ async def map_register(body: dict[str, Any]):
     playlist_name         = body.get("playlist_name") or "Playlist"
     playlist_display_name = body.get("playlist_display_name") or playlist_name
     playlist_note         = body.get("playlist_note", "")
-    new_artists           = sorted(body.get("artists", []))
+    new_artists           = sorted(body.get("artists", []), key=str.casefold)
     now           = time.time()
     existing      = _map_entries.get(jukebar_id)
 
