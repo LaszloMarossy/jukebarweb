@@ -144,12 +144,17 @@ def _load_map_entries() -> dict[str, MapEntry]:
 
 def _write_map_entries_sync() -> None:
     content = json.dumps({jid: asdict(e) for jid, e in _map_entries.items()}, indent=2)
-    if _USE_GCS:
-        import gcs_store
-        gcs_store.write("map_entries.json", content)
-    else:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        MAP_ENTRIES_FILE.write_text(content, encoding="utf-8")
+    try:
+        if _USE_GCS:
+            import gcs_store
+            gcs_store.write("map_entries.json", content)
+            print(f"[map] wrote {len(_map_entries)} entries to GCS")
+        else:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            MAP_ENTRIES_FILE.write_text(content, encoding="utf-8")
+            print(f"[map] wrote {len(_map_entries)} entries to {MAP_ENTRIES_FILE}")
+    except Exception as e:
+        print(f"[map] ERROR writing map entries: {e}")
 
 
 async def _save_map_entries() -> None:
@@ -179,7 +184,13 @@ async def _cleanup_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _map_entries
+    print(f"[startup] DATA_DIR={DATA_DIR} USE_GCS={_USE_GCS}")
+    print(f"[startup] map file path: {MAP_ENTRIES_FILE}")
+    print(f"[startup] map file exists: {MAP_ENTRIES_FILE.exists()}")
+    if MAP_ENTRIES_FILE.exists():
+        print(f"[startup] map file size: {MAP_ENTRIES_FILE.stat().st_size} bytes")
     _map_entries = _load_map_entries()
+    print(f"[startup] loaded {len(_map_entries)} map entries: {list(_map_entries.keys())}")
     asyncio.create_task(_cleanup_loop())
     yield
 
