@@ -68,10 +68,11 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 
 .panel-head {
   flex-shrink: 0; padding: 0 16px 10px;
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.panel-name  { font-size: 22px; font-weight: 800; line-height: 1.2; }
-.panel-meta  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.panel-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.panel-name  { font-size: 20px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-meta  { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .live-dot {
   display: inline-block; width: 8px; height: 8px;
   border-radius: 50%; background: var(--live);
@@ -91,13 +92,8 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   padding: 0 14px 20px;
 }
 .playlist-section + .playlist-section { margin-top: 14px; }
-.playlist-label {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--muted); margin-bottom: 4px;
-}
-.playlist-note {
-  font-size: 12px; color: var(--accent); margin-bottom: 8px; font-style: italic;
-}
+.playlist-line { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.playlist-line-note { font-weight: 400; color: var(--muted); }
 .bubble-wrap {
   display: flex; flex-wrap: wrap; gap: 8px;
 }
@@ -163,7 +159,7 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 <div id="panel">
   <div class="panel-drag" onclick="closePanel()"></div>
   <div class="panel-head">
-    <div>
+    <div class="panel-title-row">
       <div class="panel-name" id="panel-name"></div>
       <div class="panel-meta" id="panel-meta"></div>
     </div>
@@ -212,18 +208,18 @@ function openPanel(bar) {
   const wrap = document.getElementById('panel-bubbles');
   const playlists = bar.playlists || [];
   if (playlists.length === 0) {
-    wrap.innerHTML = '<div style="color:var(--muted);font-size:14px">No artists listed</div>';
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:14px">No playlists listed</div>';
   } else {
     let ci = 0;
     wrap.innerHTML = playlists.map(pl => {
-      const note  = pl.note ? `<div class="playlist-note">${esc(pl.note)}</div>` : '';
-      const label = playlists.length > 1 || pl.note
-        ? `<div class="playlist-label">${esc(pl.name)}</div>${note}` : '';
+      const displayName = pl.display_name || pl.name;
+      const notePart = pl.note ? ` <span class="playlist-line-note">(${esc(pl.note)})</span>` : '';
+      const line = `<div class="playlist-line">${esc(displayName)}${notePart}</div>`;
       const bubbles = (pl.artists || []).map(artist => {
         const bg = PALETTE[ci % PALETTE.length]; ci++;
         return `<div class="bubble" style="background:${bg};color:${fgFor(bg)}">${esc(artist)}</div>`;
       }).join('');
-      return `<div class="playlist-section">${label}<div class="bubble-wrap">${bubbles}</div></div>`;
+      return `<div class="playlist-section">${line}<div class="bubble-wrap">${bubbles}</div></div>`;
     }).join('');
   }
 
