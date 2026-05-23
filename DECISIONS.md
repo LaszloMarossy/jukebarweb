@@ -1,0 +1,85 @@
+# jukebarweb — Architecture Decisions Log
+
+jukebarweb is the shared cloud relay backend for the JukeBar product family. It runs on Render (free tier) and is the only internet-facing component. All client apps (iOS JukeBar, Android SpotOnJukeBar) share it unchanged.
+
+> SPEC is implicit — see the docstring at the top of `main.py` for the full API surface. This file captures decisions and the session log.
+
+---
+
+## Client apps that use this relay
+
+| App | Platform | Playback source | Status |
+|---|---|---|---|
+| JukeBar | iOS (Swift/SwiftUI) | Apple Music / MusicKit | Active |
+| SpotOnJukeBar | Android (Kotlin/Compose) | Spotify + local MP3s | In development |
+
+Both clients speak the same relay API. No relay code changes are needed for SpotOnJukeBar — it is a drop-in second client.
+
+---
+
+## Decision: Render free tier — memory-only BarSessions, GCS-persisted MapEntries
+
+`BarSession` objects (catalog, requests, pending actions) are held in memory only — iOS re-registers within 5 s of any restart so memory-only is safe. `MapEntry` records (discover map) are persisted to GCS so they survive Render cold starts and instance recycling. Falls back to local disk when `GCS_BUCKET` env var is absent (local dev).
+
+---
+
+## Decision: Single relay serves all connection modes
+
+The relay has no concept of "which client app" is connected. Both JukeBar (iOS) and SpotOnJukeBar (Android) register via `POST /api/host/register` with the same fields. The relay is client-agnostic.
+
+---
+
+## Decision: Map / discover layer is always-on, relay sessions are opt-in
+
+`POST /api/map/register` is called by all bars regardless of connection mode (WiFi, hotspot, internet, local). The discover map shows all registered bars. `POST /api/host/register` is only called in internet mode and creates a live `BarSession` for relay traffic.
+
+---
+
+## Decision: Cleanup intervals
+
+- `BAR_TIMEOUT_SECONDS = 300` — bar shown as offline on the map after 5 min without a sync
+- `BAR_CLEANUP_INACTIVE = 7200` — BarSession eligible for cleanup after 2 h without sync
+- `BAR_CLEANUP_MIN_AGE = 1800` — session must also be at least 30 min old before sweep
+- `CLEANUP_INTERVAL = 300` — sweep runs every 5 min
+
+---
+
+## Session log
+
+---
+
+### 2026-05-23 — SpotOnJukeBar Android project created; relay confirmed as shared backend
+
+**Context:** Decision made to build an Android sibling app (SpotOnJukeBar) using Spotify + local MP3 files as the playback engine. Apple Music / MusicKit are iOS-only; Android has no equivalent SDK.
+
+**Key decisions made (documented in SpotOnJukeBar/DECISIONS.md):**
+- Spotify Android SDK as primary shuffle engine (streaming, requires Premium)
+- ExoPlayer for local MP3 file playback
+- Coordinator layer manages handoff between the two players at track boundaries
+- Spotify app stays in permanent warm-pause state in background — no cold-start overhead per handoff
+- Development on Spotify Personal Premium; switch to Soundtrack by Spotify for commercial bar use
+
+**Impact on jukebarweb:** None. The relay API is identical for both clients. SpotOnJukeBar will call the same endpoints (`/api/host/register`, `/api/host/sync`, `/api/map/register`, `/api/bar/{id}/*`) with no changes needed server-side.
+
+**SpotOnJukeBar project location:** `/Users/laszlo/dev/giffy/spotonjukebar`
+**GitHub:** https://github.com/LaszloMarossy/spotonjukebar
+
+---
+
+### 2026-05-23 — iOS bug fix: "Starting up" overlay stuck in internet/local mode
+
+**iOS JukeBar bug (fixed in commit 502e7e3):** After completing setup in internet-only or local mode, `beginSetup()` set `showAdminAfterSetup = true` before `isServerReady` was true. KioskView's overlay waited forever because no local Swifter server starts in those modes.
+
+**Fix:** Set `isServerReady = true` before `showAdminAfterSetup = true` for modes that don't use the local server.
+
+**Impact on jukebarweb:** None.
+
+---
+
+### 2026-05-23 — playlistNote and playlistDisplayName added to map registration
+
+**iOS JukeBar change (commit 502e7e3):** Two new optional fields added to `BarConfig` and `registerOnMap()`:
+- `playlist_note` — DJ's short note (e.g. "every Thursday night!")
+- `playlist_display_name` — human-friendly name override for the playlist
+
+**jukebarweb change required:** `POST /api/map/register` already accepts and stores these fields via the `playlists` array (`note`, `display_name` keys). The `map_register` endpoint was already updated in a previous session to handle per-playlist metadata. No further server changes needed.
