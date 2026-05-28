@@ -415,6 +415,10 @@ async function startMain() {
   showScreen('s-main');
   S.pollTimer = setInterval(poll, 5000);
   setInterval(fetchNowPlaying, 5000);
+  // Immediately refresh when the tab becomes visible again (wakes from sleep/background)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { fetchNowPlaying(); poll(); }
+  });
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
