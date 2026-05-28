@@ -468,10 +468,11 @@ function renderNowPlaying(song, isPlayingFlag) {
   $('now-playing').innerHTML = song
     ? `<div class="np-track">${esc(song.title || '')}</div><div class="np-artist">${esc(song.artist || '')}</div>`
     : `<div class="np-idle">Nothing playing</div>`;
-  // Play/pause button state is admin intent — set once on initial load, then only
-  // changed by togglePlayPause(). Polls never override an admin command.
-  if (!S.playStateReady) {
-    S.isPlaying = (isPlayingFlag !== undefined) ? (!!song && isPlayingFlag) : !!song;
+  // Lock play state only once we receive a real song. If the initial polls return
+  // "nothing playing" (registration race), keep trying so we get the correct state
+  // when the first song push arrives. togglePlayPause() also sets playStateReady.
+  if (!S.playStateReady && song) {
+    S.isPlaying = (isPlayingFlag !== undefined) ? !!isPlayingFlag : true;
     $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
     S.playStateReady = true;
   }
@@ -492,6 +493,7 @@ function togglePlayPause() {
   sendControl(S.isPlaying ? 'pause' : 'play');
   S.isPlaying = !S.isPlaying;
   $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
+  S.playStateReady = true; // admin has acted — button is now intent-only
 }
 
 async function stopSession() {
