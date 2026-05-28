@@ -98,7 +98,8 @@ class BarSession:
     price_per_song: float = 0.0
     price_for_three: float = 0.0
     currency: str = ""
-    now_playing: dict | None = None    # full song dict pushed by iOS on song change
+    now_playing: dict | None = None    # full song dict pushed by host on song change
+    is_playing: bool = True            # pushed by host on play/pause; inferred True by default for iOS compat
     created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
@@ -376,6 +377,8 @@ async def host_nowplaying(body: dict[str, Any]):
     _validate_session(bar, session)
     _touch(bar)
     bar.now_playing = body.get("now_playing")  # full song dict or null
+    if "is_playing" in body:
+        bar.is_playing = bool(body["is_playing"])
     return {"ok": True}
 
 
@@ -501,7 +504,7 @@ async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body
 @app.get("/api/bar/{jukebar_id}/nowplaying")
 async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
-    return {"now_playing": bar.now_playing}
+    return {"now_playing": bar.now_playing, "is_playing": bar.is_playing}
 
 
 @app.get("/api/bar/{jukebar_id}/display")
@@ -657,6 +660,12 @@ async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), bod
     if action not in ("play", "pause", "next", "prev"):
         raise HTTPException(400, "action must be play, pause, next, or prev")
     bar.pending_actions.append({"type": "control", "action": action})
+    # Optimistically update is_playing so fetchNowPlaying reflects the new state
+    # immediately — before Android picks up the action on its next sync cycle.
+    if action == "pause":
+        bar.is_playing = False
+    elif action == "play":
+        bar.is_playing = True
     return {"ok": True}
 
 

@@ -345,7 +345,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '' };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '' };
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -455,17 +455,22 @@ async function fetchNowPlaying() {
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
     if (!res.ok) return;
-    const { now_playing } = await res.json();
-    renderNowPlaying(now_playing);
+    const data = await res.json();
+    renderNowPlaying(data.now_playing, data.is_playing);
   } catch {}
 }
 
-function renderNowPlaying(song) {
+function renderNowPlaying(song, isPlayingFlag) {
   $('now-playing').innerHTML = song
     ? `<div class="np-track">${esc(song.title || '')}</div><div class="np-artist">${esc(song.artist || '')}</div>`
     : `<div class="np-idle">Nothing playing</div>`;
-  S.isPlaying = !!song;
-  $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
+  // Play/pause button state is admin intent — set once on initial load, then only
+  // changed by togglePlayPause(). Polls never override an admin command.
+  if (!S.playStateReady) {
+    S.isPlaying = (isPlayingFlag !== undefined) ? (!!song && isPlayingFlag) : !!song;
+    $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
+    S.playStateReady = true;
+  }
 }
 
 // ── Player controls ──────────────────────────────────────────────────────────
