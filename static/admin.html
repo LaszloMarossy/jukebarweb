@@ -307,9 +307,9 @@
     <div class="np-label">Now Playing</div>
     <div id="now-playing"><div class="np-idle">Nothing playing</div></div>
     <div class="player-controls">
-      <button class="btn-control" onclick="sendControl('prev')" title="Previous">⏮</button>
+      <button class="btn-control" onclick="skipTrack('prev')" title="Previous">⏮</button>
       <button class="btn-control" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">▶︎</button>
-      <button class="btn-control" onclick="sendControl('next')" title="Next">⏭</button>
+      <button class="btn-control" onclick="skipTrack('next')" title="Next">⏭</button>
       <button class="btn-control btn-stop" onclick="stopSession()" title="End Session">⏹</button>
     </div>
   </div>
@@ -493,7 +493,15 @@ function togglePlayPause() {
   sendControl(S.isPlaying ? 'pause' : 'play');
   S.isPlaying = !S.isPlaying;
   $('btn-play-pause').textContent = S.isPlaying ? '⏸' : '▶︎';
-  S.playStateReady = true; // admin has acted — button is now intent-only
+  S.playStateReady = true;
+}
+
+function skipTrack(action) {
+  sendControl(action);
+  // Skip always results in a playing track — show Pause immediately.
+  S.isPlaying = true;
+  $('btn-play-pause').textContent = '⏸';
+  S.playStateReady = true;
 }
 
 async function stopSession() {
