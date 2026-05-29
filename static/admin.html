@@ -424,11 +424,35 @@ async function startMain() {
 }
 
 async function acquireWakeLock() {
-  if (!('wakeLock' in navigator)) return;
+  if ('wakeLock' in navigator) {
+    try {
+      if (S.wakeLock) { try { await S.wakeLock.release(); } catch (_) {} }
+      S.wakeLock = await navigator.wakeLock.request('screen');
+      // Auto-reacquire: browser releases the lock when the page becomes hidden.
+      S.wakeLock.addEventListener('release', () => { S.wakeLock = null; if (!document.hidden) acquireWakeLock(); });
+      return;
+    } catch (_) {}
+  }
+  // Fallback for iOS Safari < 16.4 and browsers without Wake Lock support:
+  // play a silent 1-sample audio buffer every 10 s — keeps iOS audio session active
+  // which prevents the OS from sleeping the screen during foreground use.
+  if (_audioKeepAlive) return;
   try {
-    S.wakeLock = await navigator.wakeLock.request('screen');
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    _audioKeepAlive = new AC();
+    (function tick() {
+      if (!_audioKeepAlive) return;
+      const buf = _audioKeepAlive.createBuffer(1, 1, 22050);
+      const src = _audioKeepAlive.createBufferSource();
+      src.buffer = buf;
+      src.connect(_audioKeepAlive.destination);
+      src.start(0);
+      src.onended = () => setTimeout(tick, 10000);
+    })();
   } catch (_) {}
 }
+let _audioKeepAlive = null;
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name) {
