@@ -403,11 +403,12 @@ async def host_unregister(body: dict[str, Any]):
 @app.post("/api/host/sync")
 async def host_sync(body: dict[str, Any]):
     """
-    Called by iOS every 5 s — replaces separate poll + update calls.
+    Called by Android every 5 s.
 
-    iOS sends:
-      now_playing_id    — persistent song ID of the currently playing track (or null)
-      played_request_ids — request IDs whose last song just started playing
+    Android sends:
+      played_request_ids   — request IDs whose song just became currentSong
+      approved_request_ids — request IDs approved by the Android bartender screen
+                             (server sets these to "approved" so kiosk Up Next shows them)
 
     Server returns:
       requests — new customer requests since last sync (status == "pending")
@@ -418,6 +419,11 @@ async def host_sync(body: dict[str, Any]):
     bar = _get_bar(jukebar_id)
     _validate_session(bar, session)
     _touch(bar)
+
+    for rid in body.get("approved_request_ids", []):
+        if rid in bar.requests and bar.requests[rid].status == "pending":
+            bar.requests[rid].status = "approved"
+            bar.requests[rid].approved_at = time.time()
 
     for rid in body.get("played_request_ids", []):
         if rid in bar.requests:
