@@ -76,6 +76,18 @@ The relay has no concept of "which client app" is connected. Both JukeBar (iOS) 
 
 ---
 
+### 2026-06-01 — approved_request_ids sync field; Android map pins
+
+**Context:** SpotOnJukeBar Android app wired up the relay sync loop.
+
+**`approved_request_ids` field added to `/api/host/sync`:**
+Previously only `played_request_ids` was sent. Android sends `approved_request_ids` as a separate list so the server can set request status to `"approved"` (with `approved_at` timestamp) immediately when the bartender approves, before the song actually starts playing. This keeps the admin HTML "Up Next" section populated. The server processes `approved_request_ids` in `host_sync` by setting `status = "approved"` for any pending request whose ID appears in the list.
+
+**Android map pins:**
+iOS already sent `lat`/`lng` from `CLLocationManager`. Android was sending only a text `location` string, so entries had `lat=None` and were filtered out by `discover.html` (`b.lat != null && b.lng != null`). Fixed: Android now sends `lat`/`lng` via `LocationManager.getLastKnownLocation()`. No server-side change needed — the endpoint already accepted and stored coordinates.
+
+---
+
 ### 2026-05-23 — playlistNote and playlistDisplayName added to map registration
 
 **iOS JukeBar change (commit 502e7e3):** Two new optional fields added to `BarConfig` and `registerOnMap()`:
