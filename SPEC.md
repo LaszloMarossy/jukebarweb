@@ -92,24 +92,58 @@ they haven't heard → can play it directly on Apple Music or Spotify.
 
 ---
 
-### Architecture: Background Render Worker
+### Architecture: Platform-Neutral Render Worker + Per-Platform Resolution
 
-- `POST /api/map/register` stores raw `[{artist, song_count}]` immediately, returns fast.
-- Background worker iterates registered bars, calls Last.fm, builds profiles, writes to GCS.
-- Discover map and iOS app read only from GCS — Last.fm is never hit at request time.
-- Worker runs on a schedule (Render cron) or as a persistent background process.
+**Render does only what is platform-agnostic:**
+- Receives `[{artist, song_count}]` on `POST /api/map/register`
+- Background worker calls Last.fm `artist.getSimilar` per artist (weighted by song count)
+- Aggregates → ranked list of recommended artist *names* (plain strings, no music platform IDs)
+- Writes to GCS: `map/{jukebar_id}/recommendation.json` — just artist names
+- Also writes `map/{jukebar_id}/profile.json` — genre breakdown for the map pie chart
+- Render never touches Apple Music or Spotify — no platform credentials needed server-side
+
+**Per-platform resolution happens on-device (background task after session start):**
+
+| Platform | App | Resolution |
+|----------|-----|------------|
+| iOS | JukeBar (Apple Music) | Downloads artist list from GCS → MusicKit catalog search → builds playable queue |
+| Android | spotonjukebar (Spotify) | Downloads artist list from GCS → Spotify Android SDK search → builds Spotify playlist |
+
+On next restart, if resolved track IDs are already cached on-device (or pushed back to GCS),
+the search step is skipped and the playlist loads directly.
+
+**Data flow:**
+```
+Render worker:
+  Last.fm similar artists → [{artist_name}] → GCS (platform-neutral)
+
+iOS background task:
+  GCS artist list → MusicKit search → Apple Music track IDs → playable queue
+
+Android background task:
+  GCS artist list → Spotify SDK search → Spotify track URIs → Spotify playlist
+```
 
 ---
 
-### iOS changes required
-- `POST /api/map/register` payload: change `artists: [String]` → `artists: [{name: String, song_count: Int}]`
-- New session-start UI: "Play own playlist" vs "Play recommended playlist" toggle
-- MusicKit search to resolve Last.fm-recommended artist names to playable Apple Music tracks
+### Client changes required
+
+**iOS (JukeBar):**
+- `POST /api/map/register` payload: `artists: [String]` → `artists: [{name: String, song_count: Int}]`
+- On session start: check GCS for available recommended playlist for this bar
+- If available: offer "Play own playlist" vs "Play recommended playlist" toggle
+- Background task: resolve artist names via MusicKit, build ApplicationMusicPlayer queue
+
+**Android (spotonjukebar):**
+- Same `POST /api/map/register` change
+- Background task: resolve artist names via Spotify Android SDK search
+- Build and queue a Spotify playlist from the results
 
 ---
 
 ### Dependencies
-- Last.fm API key (free)
-- `pylast` Python library (Last.fm client)
-- MusicKit (iOS, existing) or Spotify iOS SDK for track lookup
-- No Spotify Web API dependency (genre/recommendations deprecated for new apps Nov 2024)
+- Last.fm API key (free) — server-side only
+- `pylast` Python library
+- MusicKit (iOS, existing) — on-device only
+- Spotify Android SDK (existing in spotonjukebar) — on-device only
+- No Spotify Web API or Apple Music server-side credentials needed
