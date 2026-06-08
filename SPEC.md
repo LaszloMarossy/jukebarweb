@@ -1,74 +1,115 @@
 # JukeBar Web — Spec
 
-## Planned: Playlist Genre Profiling & Spotify-Based Recommendations
+## Playlist Genre Profiling, Map Visualisation & Recommended Playlist
 
-### Context
-The map/discover page shows registered JukeBars with their artist bubbles. A future enhancement
-is to derive a genre profile from the bar's playlist and use it to surface recommendations or
-characterise the bar's music identity on the discover page.
+> Note: Spotify deprecated genre tags and recommendations for new apps in Nov 2024.
+> **Last.fm API** is used instead — free, stable, no user auth required.
 
-### The Programmatic Approach (raw playlist data → Spotify API)
+---
 
-Given a list of `[Band Name, Number of Songs]` from the bar's Apple Music playlist:
+### Data source: Last.fm API
 
-**Step 1 — Map Artists to Genres**
-Feed band names into Spotify's artist search/lookup API (via `spotipy`).
-Spotify stores specific genre tags per artist (e.g. Radiohead → `['alternative rock', 'art rock', 'melancholia']`).
+Two endpoints cover everything needed:
 
-**Step 2 — Weight the Profile**
-Multiply each genre's count by the number of songs that band contributes to the playlist.
-If Band A has 10 songs and Band B has 2 songs, Band A's genres carry 5× the weight.
-Result: a weighted dictionary representing the playlist's true genre identity.
+- `artist.getTopTags` — community-voted genre tags for any artist, weighted by tag count
+- `artist.getSimilar` — similar artists ranked by similarity score
 
-**Step 3 — Generate Recommendations**
-Pass the top 3 weighted genres or top 5 most frequent artists as "seeds" into Spotify's
-recommendations API endpoint. Returns a fresh list of mathematically similar tracks
-the bar hasn't played yet.
+No user login required. Free API key from last.fm/api/account/create.
 
-### Architecture: Background Render Job
+Fallback for obscure artists not in Last.fm: LLM (Claude/GPT) classification by artist name.
 
-The profiling runs as a **Render background worker** (or cron job), not inline with requests:
+---
 
-- On each `POST /api/map/register`, the bar's `artists[]` and song counts are stored as-is.
-- The background job works through registered bars at a leisurely pace, calling the Spotify API
-  to build the weighted genre profile for each bar's playlist.
-- The resulting profile (top genres, style tags, mood descriptors) is written to GCS
-  (e.g. `map/{jukebar_id}/profile.json`).
-- The discover map reads only from GCS — it never touches the Spotify API.
-  All enrichment happens exclusively in the background worker.
+### Pipeline 1 — Genre Profile & Map Pie Chart
 
-This keeps registration fast, avoids Spotify rate-limit pressure, and means the map enriches
-itself gradually over time as bars register and the worker runs.
+**Input:** `[{artist, song_count}]` from the bar's Apple Music playlist
+(iOS app change needed: send song counts alongside artist names in `POST /api/map/register`)
 
-### Visual Output on the Map
+**Step 1 — Tag each artist**
+Call `artist.getTopTags` for each band. Returns tags like `["heavy metal", "thrash metal", "hard rock"]`
+with a community weight per tag.
 
-**Genre colour palette** — each top-level genre gets a fixed colour, e.g.:
-- Heavy metal → black
-- Punk → red
-- Electronic / EDM → cyan
-- Jazz → gold
-- Classical → ivory
-- Hip-hop → orange
-- Folk / Acoustic → green
-- Pop → pink
-- (full palette TBD)
+**Step 2 — Weight by song count**
+Multiply tag weights by the band's song count in the playlist.
+Result: a weighted dictionary of the bar's true genre identity.
 
-**Band bubbles** — artist tags in the slide-up panel are coloured by their primary genre,
-using the same palette.
+**Step 3 — Map to top-level genre palette**
+Collapse Last.fm's micro-tags into our fixed colour-coded top-level genres:
 
-**Map marker = pie chart** — the map pin for each bar is rendered as a small pie/donut chart
-showing the proportional genre mix of that bar's playlist (e.g. 60% metal / 25% punk / 15% rock).
-At a glance, a user browsing the map can see what kind of place each bar is before opening the panel.
+| Genre | Colour | Example Last.fm tags |
+|-------|--------|----------------------|
+| Heavy metal | Black | heavy metal, thrash metal, death metal, doom metal |
+| Punk | Red | punk, hardcore punk, post-punk, emo |
+| Electronic / EDM | Cyan | electronic, techno, house, drum and bass, ambient |
+| Jazz | Gold | jazz, bebop, fusion, jazz blues |
+| Classical | Ivory | classical, baroque, orchestral, opera |
+| Hip-hop | Orange | hip-hop, rap, trap, r&b |
+| Folk / Acoustic | Green | folk, acoustic, singer-songwriter, country |
+| Rock | Blue | rock, alternative rock, indie rock, grunge |
+| Pop | Pink | pop, synth-pop, dream pop, indie pop |
+| World / Other | Brown | world music, reggae, latin, flamenco |
 
-Implementation note: pie chart markers can be rendered as SVG data URIs used as Leaflet
-`DivIcon`s — no canvas or extra library needed.
+**Step 4 — Store to GCS**
+Write `map/{jukebar_id}/profile.json`: weighted top-level genre breakdown.
+The background Render worker does this — never inline with requests.
 
-### Integration Points
-- The iOS app already sends `artists[]` in `POST /api/map/register` — this is the seed data.
-- Song-count weighting requires the iOS app to send `[{artist, song_count}]` instead of just `artists[]` (small change).
-- Recommendations could be surfaced in the admin panel as a "you might also want to add" list.
+**Visual output on the map:**
+- Map marker = SVG pie/donut chart (Leaflet DivIcon, no extra library) showing genre mix
+- Band bubbles in the slide-up panel coloured by primary genre
+- Glanceable at city level: dark clusters = metal bars, cyan = electronic, etc.
+
+---
+
+### Pipeline 2 — Recommended Playlist Construction
+
+**Input:** same playlist artist list
+
+**Step 1 — Find similar artists**
+Call `artist.getSimilar` for each band in the playlist, weighted by song count.
+Aggregate and rank similar artists across the whole playlist.
+Filter out artists already in the playlist → ranked list of recommended new artists.
+
+**Step 2 — Look up on Apple Music / Spotify**
+For each recommended artist, search Apple Music (MusicKit) or Spotify to find actual
+playable tracks. Build a concrete recommended playlist of real songs.
+
+**Step 3 — Surface the recommended playlist**
+
+Two use cases:
+
+**A) JukeBar — Recommended Playlist Mode**
+In the JukeBar iOS app, offer the bar owner a choice at session start:
+- *Play your own playlist* (current behaviour)
+- *Play the recommended playlist* (Last.fm-derived, looked up on Apple Music)
+
+In recommended mode, the jukebox rotates from the constructed playlist.
+Customers can still browse and request from it. Everything else (approval, QR, bartender) works identically.
+
+**B) TuneTaster — Personal Discovery App**
+TuneTaster (separate app, in planning) uses the same pipeline for personal use:
+a user feeds in their favourite artists → gets a recommended playlist of similar music
+they haven't heard → can play it directly on Apple Music or Spotify.
+
+---
+
+### Architecture: Background Render Worker
+
+- `POST /api/map/register` stores raw `[{artist, song_count}]` immediately, returns fast.
+- Background worker iterates registered bars, calls Last.fm, builds profiles, writes to GCS.
+- Discover map and iOS app read only from GCS — Last.fm is never hit at request time.
+- Worker runs on a schedule (Render cron) or as a persistent background process.
+
+---
+
+### iOS changes required
+- `POST /api/map/register` payload: change `artists: [String]` → `artists: [{name: String, song_count: Int}]`
+- New session-start UI: "Play own playlist" vs "Play recommended playlist" toggle
+- MusicKit search to resolve Last.fm-recommended artist names to playable Apple Music tracks
+
+---
 
 ### Dependencies
-- `spotipy` Python library
-- Spotify Developer app credentials (client_id, client_secret)
-- Bar owner opt-in (Spotify data lookup is based on their playlist's artist names, no Spotify account required from the bar)
+- Last.fm API key (free)
+- `pylast` Python library (Last.fm client)
+- MusicKit (iOS, existing) or Spotify iOS SDK for track lookup
+- No Spotify Web API dependency (genre/recommendations deprecated for new apps Nov 2024)
