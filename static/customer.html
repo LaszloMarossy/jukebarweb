@@ -133,8 +133,9 @@
     .toast {
       position: fixed; inset: 0; z-index: 50;
       background: rgba(0,0,0,.82);
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
       padding: 24px;
+      overflow-y: auto;
       opacity: 0; pointer-events: none; transition: opacity .25s ease;
     }
     .toast.show { opacity: 1; pointer-events: auto; }
@@ -143,6 +144,7 @@
       border-radius: 18px; padding: 28px 24px 24px;
       width: 100%; max-width: 400px;
       display: flex; flex-direction: column; gap: 14px;
+      margin: auto;
     }
     .toast-head { font-size: 20px; font-weight: 800; color: var(--text); text-align: center; }
     .toast-songs { display: flex; flex-direction: column; gap: 4px; }
@@ -274,6 +276,40 @@
       font-size: 15px; padding: 11px 18px; border-radius: 10px; white-space: nowrap;
     }
     .basket-submit:disabled { opacity: .45; pointer-events: none; }
+    .basket-pay {
+      background: #a78bfa; color: #000; font-weight: 800;
+      font-size: 15px; padding: 11px 18px; border-radius: 10px; white-space: nowrap;
+    }
+    .basket-pay:disabled { opacity: .45; pointer-events: none; }
+
+    /* ══════════════════════════════════════════════════════════════
+       PAY ONLINE OVERLAY
+    ══════════════════════════════════════════════════════════════ */
+    #pay-overlay {
+      position: fixed; inset: 0; z-index: 80;
+      background: var(--bg); display: none; flex-direction: column;
+      overflow-y: auto;
+    }
+    #pay-overlay.open { display: flex; }
+    .pay-header { padding: 20px 20px 12px; border-bottom: 1px solid var(--border); }
+    .pay-header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+    .pay-back  { font-size: 22px; color: var(--muted); flex-shrink: 0; line-height: 1; }
+    .pay-title  { font-size: 20px; font-weight: 800; flex: 1; }
+    .pay-amount { font-size: 32px; font-weight: 900; color: #a78bfa; }
+    .pay-songs  { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    .pay-song   { font-size: 14px; color: var(--muted); padding: 3px 0; }
+    .pay-song::before { content: "♪  "; color: var(--accent); }
+    .pay-element-wrap { padding: 20px; flex: 1; }
+    #payment-element  { min-height: 100px; }
+    .pay-error { color: var(--error); font-size: 14px; padding: 0 20px 10px; display: none; }
+    .pay-error.show { display: block; }
+    .pay-confirm-btn {
+      margin: 0 20px 32px;
+      width: calc(100% - 40px); background: #a78bfa; color: #000;
+      font-size: 18px; font-weight: 800; padding: 16px;
+      border-radius: 12px; border: none; cursor: pointer;
+    }
+    .pay-confirm-btn:disabled { opacity: .45; pointer-events: none; }
 
     /* ══════════════════════════════════════════════════════════════
        LANDSCAPE  —  browse screen
@@ -434,9 +470,27 @@
     <div class="basket-total" id="basket-total"></div>
     <div class="basket-footer">
       <input class="basket-name" id="requester-name" type="text" placeholder="Your name" maxlength="40">
-      <button class="basket-submit" id="submit-btn" onclick="submitRequest()">Submit →</button>
+      <button class="basket-pay" id="rb-pay-btn" onclick="reqPayOnline()" style="display:none">💳 Pay Online</button>
+      <button class="basket-submit" id="submit-btn" onclick="submitRequest()">Submit to Bartender</button>
     </div>
   </div>
+</div>
+
+<!-- ── PAY ONLINE OVERLAY ───────────────────────────────────────────────── -->
+<div id="pay-overlay">
+  <div class="pay-header">
+    <div class="pay-header-top">
+      <button class="pay-back" onclick="closePayOverlay()">←</button>
+      <div class="pay-title">💳 Pay Online</div>
+    </div>
+    <div class="pay-amount" id="pay-amount-label"></div>
+  </div>
+  <div class="pay-songs" id="pay-songs"></div>
+  <div class="pay-element-wrap">
+    <div id="payment-element"></div>
+  </div>
+  <div class="pay-error" id="pay-error"></div>
+  <button class="pay-confirm-btn" id="pay-confirm-btn" onclick="confirmStripePayment()" disabled>Pay →</button>
 </div>
 
 <script>
@@ -463,6 +517,7 @@ const S = {
   pricePerSong:    0,
   priceForThree:   0,
   currency:        '',
+  stripeKey:       '',
   catalog:         [],
   songById:        {},
   tree:            [],   // [{artist, albums:[{album,songs:[...]}]}]
@@ -500,6 +555,7 @@ async function boot() {
     S.pricePerSong    = d.price_per_song  || 0;
     S.priceForThree   = d.price_for_three || 0;
     S.currency        = d.currency        || '';
+    S.stripeKey       = d.stripe_publishable_key || '';
     S.catalog         = d.catalog         || [];
 
     const barName = d.bar_name || 'JukeBar';
@@ -817,6 +873,7 @@ function renderBasket() {
   const total = basketTotal();
   $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
+  $('rb-pay-btn').style.display = (S.stripeKey && total > 0) ? '' : 'none';
 }
 
 // ── Request flow ───────────────────────────────────────────────────────────────
@@ -849,20 +906,20 @@ async function submitRequest() {
         jump:           false,
       }),
     });
-    if (res.status === 403) { btn.disabled = false; btn.textContent = 'Submit →'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
+    if (res.status === 403) { btn.disabled = false; btn.textContent = 'Submit to Bartender'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
     if (!res.ok) throw new Error(res.status);
     const { status } = await res.json();
     const submitted = [...S.selected];
 
     S.selected = [];
     S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
-    btn.disabled = false; btn.textContent = 'Submit →';
+    btn.disabled = false; btn.textContent = 'Submit to Bartender';
     renderBasket();
     renderBrowse();
 
     returnToPlay(status || 'pending', submitted, name);
   } catch {
-    btn.disabled = false; btn.textContent = 'Submit →';
+    btn.disabled = false; btn.textContent = 'Submit to Bartender';
     alert('Submission failed — check your connection and try again.');
   }
 }
@@ -921,6 +978,148 @@ function $(id)    { return document.getElementById(id); }
 function enc(s)   { return encodeURIComponent(s); }
 function esc(str) { return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Stripe ────────────────────────────────────────────────────────────────────
+let _stripe = null;
+let _stripeElements = null;
+
+function loadStripeJs() {
+  return new Promise((resolve, reject) => {
+    if (window.Stripe) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://js.stripe.com/v3/';
+    s.onload  = resolve;
+    s.onerror = () => reject(new Error('Stripe.js failed to load'));
+    document.head.appendChild(s);
+  });
+}
+
+async function reqPayOnline() {
+  if (!S.selected.length) return;
+  const nameEl = $('requester-name');
+  const name   = (nameEl.value || '').trim();
+  if (!name) {
+    nameEl.classList.add('missing');
+    nameEl.focus();
+    nameEl.addEventListener('input', () => nameEl.classList.remove('missing'), { once: true });
+    return;
+  }
+  localStorage.setItem('jb_name', name);
+
+  const btn   = $('rb-pay-btn');
+  btn.disabled = true;
+  const total  = basketTotal();
+
+  $('pay-amount-label').textContent = `${S.currency} ${total.toFixed(2)}`;
+  $('pay-songs').innerHTML = S.selected.map(s => `<div class="pay-song">${esc(s.title)}</div>`).join('');
+  $('pay-error').textContent = ''; $('pay-error').classList.remove('show');
+  $('pay-confirm-btn').disabled = true; $('pay-confirm-btn').textContent = 'Loading…';
+  $('pay-overlay').classList.add('open');
+
+  try {
+    await loadStripeJs();
+    const res = await fetch(`/api/bar/${S.jukebarId}/create-payment-intent?s=${enc(S.session)}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ song_ids: S.selected.map(s => s.id), song_titles: S.selected.map(s => s.title), customer_name: name }),
+    });
+    if (res.status === 403) { closePayOverlay(); showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
+    if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+    const data = await res.json();
+    const { client_secret, payment_intent_id: piId } = data;
+    if (data.currency && data.currency.toUpperCase() !== S.currency.toUpperCase()) {
+      throw new Error(`Server currency mismatch: host is using ${data.currency.toUpperCase()} but page loaded with ${S.currency}. Please reload and try again.`);
+    }
+
+    if (!_stripe) _stripe = Stripe(S.stripeKey);
+    _stripeElements = _stripe.elements({ clientSecret: client_secret, appearance: {
+      theme: 'night',
+      variables: { colorPrimary: '#a78bfa', colorBackground: '#1e1e1e', colorText: '#f0ece8' },
+    }});
+    const el = _stripeElements.create('payment');
+    $('payment-element').innerHTML = '';
+    el.mount('#payment-element');
+    el.on('ready', () => {
+      $('pay-confirm-btn').disabled = false;
+      $('pay-confirm-btn').textContent = `Pay ${S.currency} ${total.toFixed(2)} →`;
+    });
+
+    sessionStorage.setItem('jb_pending_payment', JSON.stringify({
+      payment_intent_id: piId,
+      song_ids:          S.selected.map(s => s.id),
+      customer_name:     name,
+      customer_id:       S.customerId,
+    }));
+  } catch (e) {
+    showPayError(e.message || 'Could not start payment — check your connection.');
+    $('pay-confirm-btn').disabled = true; $('pay-confirm-btn').textContent = 'Pay →';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function confirmStripePayment() {
+  if (!_stripeElements) return;
+  const btn = $('pay-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Processing…';
+  $('pay-error').classList.remove('show');
+
+  const returnUrl = window.location.href.split('?')[0] + '?s=' + enc(S.session);
+  const { error, paymentIntent } = await _stripe.confirmPayment({
+    elements: _stripeElements,
+    confirmParams: { return_url: returnUrl },
+    redirect: 'if_required',
+  });
+
+  if (error) {
+    showPayError(error.message || 'Payment failed — please try again.');
+    btn.disabled = false; btn.textContent = 'Retry →';
+    return;
+  }
+  if (paymentIntent?.status === 'succeeded') await finishPaidRequest(paymentIntent.id);
+}
+
+async function finishPaidRequest(piId) {
+  const pending = JSON.parse(sessionStorage.getItem('jb_pending_payment') || 'null');
+  if (!pending) return;
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/payment-confirmed?s=${enc(S.session)}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ...pending, payment_intent_id: piId }),
+    });
+    if (!res.ok) throw new Error(res.status);
+    sessionStorage.removeItem('jb_pending_payment');
+    closePayOverlay();
+    const submitted = [...S.selected];
+    const name = pending.customer_name;
+    S.selected = [];
+    S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
+    renderBasket(); renderBrowse();
+    showScreen('s-play');
+    showToast('approved', submitted, name);
+  } catch {
+    showPayError('Payment taken but request failed — show this screen to the bartender.');
+  }
+}
+
+function showPayError(msg) { $('pay-error').textContent = msg; $('pay-error').classList.add('show'); }
+
+function closePayOverlay() {
+  $('pay-overlay').classList.remove('open');
+  _stripeElements = null;
+  $('payment-element').innerHTML = '';
+}
+
+async function handleStripeReturn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('redirect_status') !== 'succeeded') return;
+  const piId    = params.get('payment_intent');
+  const pending = JSON.parse(sessionStorage.getItem('jb_pending_payment') || 'null');
+  if (!piId || !pending) return;
+  S.session = new URLSearchParams(location.search).get('s') || '';
+  S.jukebarId = location.pathname.split('/').filter(Boolean).pop() || '';
+  history.replaceState(null, '', window.location.pathname + '?s=' + enc(S.session));
+  await finishPaidRequest(piId);
+}
+
 // ── Start ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const inp = $('search');
@@ -929,6 +1128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBrowse();
   });
   inp.addEventListener('search', () => renderBrowse());
+  handleStripeReturn();
   boot();
 });
 </script>

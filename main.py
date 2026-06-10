@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # ---------------------------------------------------------------------------
@@ -80,6 +80,7 @@ class SongRequest:
     status: str  # "pending" | "approved" | "denied" | "played"
     created_at: float = field(default_factory=time.time)
     approved_at: float = 0.0
+    paid: bool = False
 
 
 @dataclass
@@ -98,6 +99,8 @@ class BarSession:
     price_per_song: float = 0.0
     price_for_three: float = 0.0
     currency: str = ""
+    stripe_publishable_key: str = ""
+    stripe_secret_key: str = ""
     now_playing: dict | None = None    # full song dict pushed by host on song change
     is_playing: bool = True            # pushed by host on play/pause; inferred True by default for iOS compat
     created_at: float = field(default_factory=time.time)
@@ -217,6 +220,14 @@ async def discover():
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/.well-known/apple-developer-merchantid-domain-association")
+async def apple_pay_domain_verification():
+    p = Path("static/.well-known/apple-developer-merchantid-domain-association")
+    if not p.exists():
+        raise HTTPException(404, "Apple Pay domain verification file not configured")
+    return FileResponse(p, media_type="application/octet-stream")
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +367,8 @@ async def host_register(body: dict[str, Any]):
         price_per_song=body.get("price_per_song", 0.0),
         price_for_three=body.get("price_for_three", 0.0),
         currency=body.get("currency", ""),
+        stripe_publishable_key=body.get("stripe_publishable_key", ""),
+        stripe_secret_key=body.get("stripe_secret_key", ""),
         now_playing=body.get("now_playing"),
         pin_hash=body.get("pin_hash", ""),
     )
@@ -484,9 +497,10 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "bar_name":        bar.bar_name,
             "catalog":         bar.catalog,
             "require_approval": bar.require_approval,
-            "price_per_song":  bar.price_per_song,
-            "price_for_three": bar.price_for_three,
-            "currency":        bar.currency,
+            "price_per_song":        bar.price_per_song,
+            "price_for_three":       bar.price_for_three,
+            "currency":              bar.currency,
+            "stripe_publishable_key": bar.stripe_publishable_key,
         },
         headers={"Cache-Control": "max-age=300, private"},
     )
@@ -585,6 +599,117 @@ async def bar_request_status(jukebar_id: str, request_id: str, s: str = Query(..
 
 
 # ---------------------------------------------------------------------------
+# Stripe payment endpoints (internet mode)
+# ---------------------------------------------------------------------------
+
+_STRIPE_ZERO_DECIMAL = {
+    "bif","clp","djf","gnf","jpy","kmf","krw","mga","pyg","rwf","ugx","vnd","vuv","xaf","xof","xpf"
+}
+
+def _to_stripe_amount(price: float, currency: str) -> int:
+    if currency.lower() in _STRIPE_ZERO_DECIMAL:
+        return int(price)
+    return int(round(price * 100))
+
+
+@app.post("/api/bar/{jukebar_id}/create-payment-intent")
+async def bar_create_payment_intent(
+    jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...
+):
+    import httpx
+    bar = _customer_bar(jukebar_id, s)
+    if not bar.stripe_secret_key:
+        raise HTTPException(400, "Stripe not configured")
+    song_ids: list[str] = body.get("song_ids", [])
+    if not song_ids:
+        raise HTTPException(400, "song_ids required")
+    pps = bar.price_per_song
+    p3  = bar.price_for_three
+    if pps <= 0:
+        raise HTTPException(400, "No price configured")
+    price    = p3 if (len(song_ids) == 3 and p3 > 0) else pps * len(song_ids)
+    currency = bar.currency.lower()
+    if not currency:
+        raise HTTPException(400, "Stripe currency not set")
+    amount = _to_stripe_amount(price, currency)
+
+    song_titles   = body.get("song_titles", song_ids)
+    customer_name = body.get("customer_name", "") or "Anonymous"
+    song_list     = ", ".join(song_titles)
+    date_str      = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    description   = f"JukeBar {bar.bar_name} jukebox request for {song_list} made under name {customer_name} at {date_str}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://api.stripe.com/v1/payment_intents",
+            data={"amount": amount, "currency": currency, "automatic_payment_methods[enabled]": "true",
+                  "description": description},
+            auth=(bar.stripe_secret_key, ""),
+            timeout=15.0,
+        )
+    if resp.status_code not in range(200, 300):
+        try:
+            msg = resp.json()["error"]["message"]
+        except Exception:
+            msg = f"Stripe error {resp.status_code}"
+        raise HTTPException(502, msg)
+    pi = resp.json()
+    return {"client_secret": pi["client_secret"], "payment_intent_id": pi["id"], "currency": currency, "amount": amount}
+
+
+@app.post("/api/bar/{jukebar_id}/payment-confirmed")
+async def bar_payment_confirmed(
+    jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...
+):
+    import httpx
+    bar = _customer_bar(jukebar_id, s)
+    if not bar.stripe_secret_key:
+        raise HTTPException(400, "Stripe not configured")
+    pi_id = body.get("payment_intent_id", "")
+    if not pi_id:
+        raise HTTPException(400, "payment_intent_id required")
+    song_ids: list[str] = body.get("song_ids", [])
+    if not song_ids:
+        raise HTTPException(400, "song_ids required")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.stripe.com/v1/payment_intents/{pi_id}",
+            auth=(bar.stripe_secret_key, ""),
+            timeout=15.0,
+        )
+    if resp.status_code not in range(200, 300):
+        raise HTTPException(502, f"Stripe verify error {resp.status_code}")
+    pi_status = resp.json().get("status", "")
+    if pi_status != "succeeded":
+        raise HTTPException(402, f"Payment not completed (status={pi_status})")
+
+    rid           = str(uuid.uuid4())
+    customer_name = body.get("customer_name", "Anonymous")
+    customer_id   = body.get("customer_id", "")
+    song_titles   = [bar.song_index.get(sid, {}).get("title", "") for sid in song_ids]
+    req = SongRequest(
+        id=rid,
+        song_ids=song_ids,
+        song_titles=song_titles,
+        requester_name=customer_name,
+        customer_id=customer_id,
+        jump=False,
+        status="approved",
+        approved_at=time.time(),
+        paid=True,
+    )
+    bar.requests[rid] = req
+    bar.pending_actions.append({
+        "type": "approve",
+        "request_id": rid,
+        "song_ids": song_ids,
+        "jump": False,
+    })
+    return {"request_id": rid, "status": "approved"}
+
+
+# ---------------------------------------------------------------------------
 # Bartender endpoints (internet mode)
 # ---------------------------------------------------------------------------
 
@@ -608,6 +733,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "customer_id": r.customer_id,
             "jump": r.jump,
             "status": r.status,
+            "paid": r.paid,
             "created_at": r.created_at,
             "approved_at": r.approved_at,
         }

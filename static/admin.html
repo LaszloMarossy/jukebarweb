@@ -79,21 +79,22 @@
     /* ── header ── */
     .header {
       display: flex; align-items: center; gap: 10px;
-      padding: 16px 0 12px; border-bottom: 1px solid var(--border);
+      padding: 12px 0 10px; border-bottom: 1px solid var(--border);
       position: sticky; top: 0; background: var(--bg); z-index: 10;
     }
     .header svg { flex-shrink: 0; }
     .header-info { flex: 1; min-width: 0; }
     .bar-name {
       font-family: 'Bubblegum Sans', cursive;
-      font-size: clamp(18px, 4dvh, 32px); line-height: 1.1;
-    }
-    .header-role {
-      font-size: 11px; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: var(--accent); margin-top: 1px;
+      font-size: clamp(14px, 3.2dvh, 20px); line-height: 1.2;
     }
     .refresh-badge {
-      font-size: 11px; color: var(--muted); white-space: nowrap;
+      font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 2px;
+    }
+    .logout-btn {
+      background: none; border: 1px solid rgba(255,255,255,.18); color: var(--muted);
+      font-size: 12px; font-weight: 600; padding: 6px 12px;
+      border-radius: 8px; white-space: nowrap; flex-shrink: 0;
     }
 
     /* ── now playing ── */
@@ -297,10 +298,10 @@
       <circle cx="36" cy="36" r="4" fill="#ffffff"/>
     </svg>
     <div class="header-info">
-      <div class="bar-name" id="bar-name">JukeBar</div>
-      <div class="header-role">Admin</div>
+      <div class="bar-name" id="bar-name">JukeBar Admin Dashboard</div>
+      <div class="refresh-badge" id="refresh-badge"></div>
     </div>
-    <div class="refresh-badge" id="refresh-badge"></div>
+    <button class="logout-btn" onclick="logout()">Log out</button>
   </div>
 
   <div class="now-playing-card">
@@ -346,6 +347,31 @@
 
 <script>
 const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null };
+
+function colorize(el, text) {
+  const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
+  if (!el) return;
+  el.innerHTML = '';
+  let last = '';
+  for (const ch of text) {
+    if (ch === ' ') { el.appendChild(document.createTextNode(' ')); continue; }
+    const pool = cols.filter(c => c !== last);
+    const col  = pool[Math.floor(Math.random() * pool.length)];
+    last = col;
+    const s = document.createElement('span');
+    s.style.color = col; s.textContent = ch;
+    el.appendChild(s);
+  }
+}
+
+function logout() {
+  if (S.pollTimer) clearInterval(S.pollTimer);
+  sessionStorage.removeItem(`jb_auth_${S.jukebarId}_${S.session}`);
+  showScreen('s-pin');
+  $('pin-input').value = '';
+  $('pin-err').textContent = '';
+  $('pin-btn').disabled = true;
+}
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -413,6 +439,9 @@ async function verifyPin() {
 async function startMain() {
   await Promise.all([poll(), fetchNowPlaying(), loadReports()]);
   showScreen('s-main');
+  const titleEl = $('bar-name');
+  colorize(titleEl, 'JukeBar');
+  titleEl.appendChild(document.createTextNode(' Admin Dashboard'));
   S.pollTimer = setInterval(poll, 5000);
   setInterval(fetchNowPlaying, 5000);
   acquireWakeLock();
@@ -475,8 +504,7 @@ async function poll() {
 
     if (d.bar_name && !S.barName) {
       S.barName = d.bar_name;
-      $('bar-name').textContent = `JukeBar ${d.bar_name}`;
-      document.title = `Admin — ${d.bar_name}`;
+      document.title = `JukeBar Admin — ${d.bar_name}`;
     }
 
     S.pricePerSong  = d.price_per_song  || 0;
@@ -548,7 +576,14 @@ async function stopSession() {
 // ── Render requests ────────────────────────────────────────────────────────
 function renderRequests(requests) {
   const pending  = requests.filter(r => r.status === 'pending');
-  const approved = requests.filter(r => r.status === 'approved');
+  const approved = requests
+    .filter(r => r.status === 'approved' || r.status === 'approved_jump')
+    .sort((a, b) => {
+      const aJ = a.status === 'approved_jump', bJ = b.status === 'approved_jump';
+      if (aJ !== bJ) return bJ - aJ;
+      const at = a.approved_at || a.created_at || 0, bt = b.approved_at || b.created_at || 0;
+      return at < bt ? -1 : at > bt ? 1 : 0;
+    });
 
   if (pending.length) {
     $('pending-list').innerHTML = pending.map(r => requestCard(r, true)).join('');
@@ -595,9 +630,10 @@ function requestCard(r, showActions) {
   ).join('') || (r.song_titles || []).map(t =>
     `<div class="song-row"><span class="song-col song-artist" style="grid-column:1/-1">${esc(t)}</span></div>`
   ).join('');
+  const ccBadge = r.paid ? ' <span title="Paid by card">💳</span>' : '';
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
   <div class="req-row1">
-    <span class="req-name">${esc(r.requester_name || 'Guest')}</span>
+    <span class="req-name">${esc(r.requester_name || 'Guest')}${ccBadge}</span>
     ${priceHtml}${acts}
     ${devId ? `<span class="req-device">(${esc(devId)})</span>` : ''}
     ${time ? `<span class="req-time">${time}</span>` : ''}
