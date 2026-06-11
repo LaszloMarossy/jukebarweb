@@ -107,6 +107,7 @@ class BarSession:
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
+    up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
 
 
@@ -442,6 +443,9 @@ async def host_sync(body: dict[str, Any]):
         if rid in bar.requests:
             bar.requests[rid].status = "played"
 
+    if "up_next" in body:
+        bar.up_next_queue = body["up_next"]
+
     new_requests = [
         {
             "id": r.id,
@@ -534,29 +538,29 @@ async def bar_display(jukebar_id: str, s: str = Query(None)):
     bar = _get_bar(jukebar_id)
     _touch(bar)
     session_valid = s is None or bar.session == s
-    approved = [
+    up_next = [
         {
-            "id": r.id,
-            "song_ids": r.song_ids,
-            "song_titles": r.song_titles,
-            "song_details": [
+            "id":             item.get("request_id", ""),
+            "song_ids":       item.get("song_ids", []),
+            "song_titles":    [bar.song_index.get(sid, {}).get("title", "") for sid in item.get("song_ids", [])],
+            "song_details":   [
                 {
                     "artist": bar.song_index.get(sid, {}).get("artist", ""),
                     "album":  bar.song_index.get(sid, {}).get("album", ""),
                     "title":  bar.song_index.get(sid, {}).get("title", ""),
                 }
-                for sid in r.song_ids
+                for sid in item.get("song_ids", [])
             ],
-            "requester_name": r.requester_name,
-            "jump": r.jump,
-            "status": r.status,
-            "created_at": r.created_at,
-            "approved_at": r.approved_at,
+            "requester_name": item.get("requester_name", ""),
+            "jump":           item.get("jump", False),
+            "status":         "approved_jump" if item.get("jump") else "approved",
+            "approved_at":    item.get("approved_at", 0),
+            "created_at":     item.get("approved_at", 0),
+            "paid":           item.get("paid", False),
         }
-        for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
-        if r.status in ("approved", "approved_jump")
+        for item in bar.up_next_queue
     ]
-    return {"now_playing": bar.now_playing, "requests": approved, "session_valid": session_valid}
+    return {"now_playing": bar.now_playing, "requests": up_next, "session_valid": session_valid}
 
 
 @app.post("/api/bar/{jukebar_id}/request")
