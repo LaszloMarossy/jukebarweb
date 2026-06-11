@@ -164,7 +164,9 @@
     /* ══════════════════════════════════════════════════════════════
        BROWSE SCREEN
     ══════════════════════════════════════════════════════════════ */
-    #s-browse { padding-bottom: 0; }
+    /* Portrait: fixed-height scroll container so top-bar stays sticky and basket
+       is reachable by scrolling without covering the catalog */
+    #s-browse { height: 100dvh; overflow-y: auto; }
 
     /* sticky header */
     .top-bar {
@@ -173,7 +175,8 @@
     }
     .bar-header  { padding: 0 14px; min-height: clamp(80px, 20dvh, 180px); display: flex; align-items: center; gap: 10px; }
     .browse-logo { flex-shrink: 0; cursor: pointer; display: flex; }
-    .browse-logo svg { width: clamp(44px, 13dvh, 100px); height: clamp(44px, 13dvh, 100px); }
+    .browse-logo svg { width: clamp(44px, 13dvh, 100px); height: clamp(44px, 13dvh, 100px); animation: spin 8s linear infinite; }
+    .play-logo svg  { animation: spin 8s linear infinite; }
     .bar-info    { flex: 1; min-width: 0; }
     .bar-name    { font-family: 'Bubblegum Sans', cursive; font-size: clamp(22px, 5dvh, 48px); line-height: 1.2; cursor: pointer; }
     .now-playing { font-size: clamp(13px, 2.2dvh, 22px); color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -244,12 +247,11 @@
        BASKET (fixed bottom panel, slides up)
     ══════════════════════════════════════════════════════════════ */
     .basket {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+      display: none;
       background: #111; border-top: 2px solid var(--accent);
       padding: 12px 16px 28px;
-      transform: translateY(100%); transition: transform .28s ease;
     }
-    .basket.show { transform: translateY(0); }
+    .basket.show { display: block; }
 
     .basket-songs { margin-bottom: 10px; }
     .basket-row {
@@ -322,7 +324,14 @@
       .breadcrumb { padding: 4px 14px; min-height: 24px; }
       .search-wrap { padding: 4px 14px 5px; }
       .search-box { padding: 6px 12px; }
-      .basket { padding: 8px 14px 10px; }
+      /* Restore fixed-bottom basket for landscape (no page scroll in landscape) */
+      .basket {
+        display: block;
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+        transform: translateY(100%); transition: transform .28s ease;
+        padding: 8px 14px 10px;
+      }
+      .basket.show { transform: translateY(0); }
       .basket-songs { margin-bottom: 6px; }
       .basket-row { padding: 4px 0; }
       .basket-footer { margin-top: 6px; }
@@ -373,20 +382,27 @@
 <!-- ── PLAY (landing) ────────────────────────────────────────────────────── -->
 <div id="s-play" class="screen">
   <div class="play-header">
-    <a href="/" title="JukeBar home">
+    <a href="/" title="JukeBar home" class="play-logo">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="clamp(44px,11dvh,80px)" height="clamp(44px,11dvh,80px)" style="width:clamp(44px,11dvh,80px);height:clamp(44px,11dvh,80px)">
-        <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+        <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#fbbe84" stroke-width="1"/>
         <circle cx="36" cy="36" r="29" fill="#ffffff"/>
         <circle cx="36" cy="36" r="24" fill="#fda185"/>
         <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="58.2" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="58.2" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="45.2" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="26.8" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="13.8" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="13.8" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="36" y1="36" x2="26.8" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <circle cx="36" cy="36" r="4" fill="#ffffff"/>
       </svg>
     </a>
@@ -430,18 +446,25 @@
     <div class="bar-header">
       <div class="browse-logo" onclick="location.href='/'" title="JukeBar home">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
-          <circle cx="36" cy="36" r="34" fill="#fbbe84"/>
+          <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#fbbe84" stroke-width="1"/>
           <circle cx="36" cy="36" r="29" fill="#ffffff"/>
           <circle cx="36" cy="36" r="24" fill="#fda185"/>
           <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="45.2" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="53" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="58.2" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="58.2" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="53" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="45.2" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="26.8" y2="58.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="19" y2="53" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="13.8" y2="45.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="13.8" y2="26.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <line x1="36" y1="36" x2="19" y2="19" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="36" y1="36" x2="26.8" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
           <circle cx="36" cy="36" r="4" fill="#ffffff"/>
         </svg>
       </div>
@@ -462,7 +485,7 @@
     </div>
   </div>
 
-  <div class="catalog" id="catalog" style="padding-bottom:180px"></div>
+  <div class="catalog" id="catalog"></div>
 
   <!-- basket -->
   <div class="basket" id="basket">
@@ -874,6 +897,7 @@ function renderBasket() {
   $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
   $('rb-pay-btn').style.display = (S.stripeKey && total > 0) ? '' : 'none';
+  basket.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ── Request flow ───────────────────────────────────────────────────────────────
