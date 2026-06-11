@@ -449,9 +449,10 @@ async def host_sync(body: dict[str, Any]):
             "song_titles": r.song_titles,
             "requester_name": r.requester_name,
             "jump": r.jump,
+            "paid": r.paid,
         }
         for r in bar.requests.values()
-        if r.status == "pending"
+        if r.status == "pending" or (r.paid and r.status == "approved")
     ]
 
     actions = list(bar.pending_actions)
@@ -700,12 +701,6 @@ async def bar_payment_confirmed(
         paid=True,
     )
     bar.requests[rid] = req
-    bar.pending_actions.append({
-        "type": "approve",
-        "request_id": rid,
-        "song_ids": song_ids,
-        "jump": False,
-    })
     return {"request_id": rid, "status": "approved"}
 
 
