@@ -168,12 +168,12 @@
        is reachable by scrolling without covering the catalog */
     #s-browse { height: 100dvh; overflow-y: auto; }
 
-    /* sticky header */
+    /* sticky header — only the logo/title row is fixed */
     .top-bar {
       position: sticky; top: 0; z-index: 10;
-      background: #111; border-bottom: 1px solid var(--border);
+      background: #111;
     }
-    .bar-header  { padding: 0 14px; min-height: clamp(80px, 20dvh, 180px); display: flex; align-items: center; gap: 10px; }
+    .bar-header  { padding: 0 14px; min-height: clamp(80px, 20dvh, 180px); display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
     .browse-logo { flex-shrink: 0; cursor: pointer; display: flex; }
     .browse-logo svg { width: clamp(44px, 13dvh, 100px); height: clamp(44px, 13dvh, 100px); animation: spin 8s linear infinite; }
     .play-logo svg  { animation: spin 8s linear infinite; }
@@ -473,15 +473,16 @@
         <div class="now-playing" id="now-playing">—</div>
       </div>
     </div>
-    <div class="breadcrumb" id="breadcrumb"></div>
-    <div class="search-wrap">
-      <div class="search-box">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input id="search" type="search" placeholder="Search songs or artists…" autocomplete="off" autocorrect="off">
-        <button class="clear-btn" id="clear-btn" onclick="clearSearch()">✕</button>
-      </div>
+  </div>
+
+  <div class="breadcrumb" id="breadcrumb"></div>
+  <div class="search-wrap">
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input id="search" type="search" placeholder="Search songs or artists…" autocomplete="off" autocorrect="off">
+      <button class="clear-btn" id="clear-btn" onclick="clearSearch()">✕</button>
     </div>
   </div>
 
@@ -573,7 +574,9 @@ async function boot() {
       if (res.status === 404) return showError('Bar offline', 'This JukeBar is not reachable right now. Try again in a moment.');
       if (!res.ok)            return showError('Error', 'Could not load the playlist. Check your connection and try again.');
       d = await res.json();
-      try { sessionStorage.setItem(cacheKey, JSON.stringify(d)); } catch {}
+      // Don't cache payment settings — they're refreshed live via fetchDisplay()
+      const toCache = Object.assign({}, d, { bartender_enabled: undefined, stripe_publishable_key: undefined });
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(toCache)); } catch {}
     }
     S.requireApproval  = d.require_approval  !== false;
     S.bartenderEnabled = d.bartender_enabled !== false;
@@ -655,6 +658,15 @@ async function fetchDisplay() {
     const d = await res.json();
 
     if (d.session_valid === false) return showError('Link expired', 'Please scan the current QR code at the bar to continue.');
+
+    // Live payment settings — pushed from host on every propagateBarDetails()
+    if ('bartender_enabled' in d) {
+      const changed = S.bartenderEnabled !== (d.bartender_enabled !== false)
+                   || S.stripeKey !== (d.stripe_publishable_key || '');
+      S.bartenderEnabled = d.bartender_enabled !== false;
+      S.stripeKey        = d.stripe_publishable_key || '';
+      if (changed && $('basket')?.classList.contains('show')) renderBasket();
+    }
 
     const song = d.now_playing || null;
 

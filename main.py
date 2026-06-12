@@ -94,12 +94,13 @@ class BarSession:
     session: str          # playlist_id from iOS — rotates on every app restart
     bar_name: str
     require_approval: bool
-    bartender_enabled: bool = True  # false = hide Submit to Bartender on customer page
     catalog: list[dict]        # full song objects for /api/bar/{id}/catalog
+    bartender_enabled: bool = True  # false = hide Submit to Bartender on customer page
     song_index: dict = field(default_factory=dict)  # id → song dict, built at register time
     price_per_song: float = 0.0
     price_for_three: float = 0.0
     currency: str = ""
+    stripe_enabled: bool = False       # false = send empty key to customer (even if key is stored)
     stripe_publishable_key: str = ""
     stripe_secret_key: str = ""
     now_playing: dict | None = None    # full song dict pushed by host on song change
@@ -359,6 +360,7 @@ async def host_register(body: dict[str, Any]):
         raise HTTPException(400, "jukebar_id and session required")
 
     catalog = body.get("catalog", [])
+    pk = body.get("stripe_publishable_key", "")
     _bars[jukebar_id] = BarSession(
         jukebar_id=jukebar_id,
         session=session,
@@ -370,7 +372,8 @@ async def host_register(body: dict[str, Any]):
         price_per_song=body.get("price_per_song", 0.0),
         price_for_three=body.get("price_for_three", 0.0),
         currency=body.get("currency", ""),
-        stripe_publishable_key=body.get("stripe_publishable_key", ""),
+        stripe_enabled=bool(pk),
+        stripe_publishable_key=pk,
         stripe_secret_key=body.get("stripe_secret_key", ""),
         now_playing=body.get("now_playing"),
         pin_hash=body.get("pin_hash", ""),
@@ -505,12 +508,13 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "catalog":                bar.catalog,
             "require_approval":       bar.require_approval,
             "bartender_enabled":      bar.bartender_enabled,
+            "stripe_enabled":         bar.stripe_enabled,
             "price_per_song":         bar.price_per_song,
             "price_for_three":        bar.price_for_three,
             "currency":               bar.currency,
-            "stripe_publishable_key": bar.stripe_publishable_key,
+            "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
         },
-        headers={"Cache-Control": "max-age=300, private"},
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -563,7 +567,13 @@ async def bar_display(jukebar_id: str, s: str = Query(None)):
         }
         for item in bar.up_next_queue
     ]
-    return {"now_playing": bar.now_playing, "requests": up_next, "session_valid": session_valid}
+    return {
+        "now_playing":            bar.now_playing,
+        "requests":               up_next,
+        "session_valid":          session_valid,
+        "bartender_enabled":      bar.bartender_enabled,
+        "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
+    }
 
 
 @app.post("/api/bar/{jukebar_id}/request")
@@ -823,4 +833,22 @@ async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
     """Queue a stop_session action — iOS picks it up on the next sync and rotates the session."""
     bar = _customer_bar(jukebar_id, s)
     bar.pending_actions.append({"type": "stop_session"})
+    return {"ok": True}
+
+
+@app.post("/api/bar/{jukebar_id}/settings")
+async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+    """
+    Admin-only: queue a payment-settings change for the host to pick up on the next sync.
+    Does NOT update BarSession directly — the host is the source of truth. Once the host
+    applies the action (within ~5 s) it re-registers, which updates the BarSession
+    and radiates the new config to all connected UIs.
+    """
+    bar = _customer_bar(jukebar_id, s)
+    action: dict[str, Any] = {"type": "settings_update"}
+    if "bartender_enabled" in body:
+        action["bartender_enabled"] = bool(body["bartender_enabled"])
+    if "stripe_enabled" in body:
+        action["stripe_enabled"] = bool(body["stripe_enabled"])
+    bar.pending_actions.append(action)
     return {"ok": True}
