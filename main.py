@@ -850,5 +850,7 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: di
         action["bartender_enabled"] = bool(body["bartender_enabled"])
     if "stripe_enabled" in body:
         action["stripe_enabled"] = bool(body["stripe_enabled"])
+    if "require_approval" in body:
+        action["require_approval"] = bool(body["require_approval"])
     bar.pending_actions.append(action)
     return {"ok": True}
