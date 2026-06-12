@@ -372,7 +372,7 @@ async def host_register(body: dict[str, Any]):
         price_per_song=body.get("price_per_song", 0.0),
         price_for_three=body.get("price_for_three", 0.0),
         currency=body.get("currency", ""),
-        stripe_enabled=bool(pk),
+        stripe_enabled=body.get("stripe_enabled", bool(pk)),
         stripe_publishable_key=pk,
         stripe_secret_key=body.get("stripe_secret_key", ""),
         now_playing=body.get("now_playing"),
@@ -839,18 +839,23 @@ async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
 @app.post("/api/bar/{jukebar_id}/settings")
 async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
-    Admin-only: queue a payment-settings change for the host to pick up on the next sync.
-    Does NOT update BarSession directly — the host is the source of truth. Once the host
-    applies the action (within ~5 s) it re-registers, which updates the BarSession
-    and radiates the new config to all connected UIs.
+    Admin-only: queue a payment-settings change for the host to pick up on the next sync,
+    and optimistically apply it to the BarSession so subsequent catalog/display reads
+    reflect the new value immediately (without waiting for the host to re-register).
     """
     bar = _customer_bar(jukebar_id, s)
     action: dict[str, Any] = {"type": "settings_update"}
     if "bartender_enabled" in body:
-        action["bartender_enabled"] = bool(body["bartender_enabled"])
+        v = bool(body["bartender_enabled"])
+        action["bartender_enabled"] = v
+        bar.bartender_enabled = v
     if "stripe_enabled" in body:
-        action["stripe_enabled"] = bool(body["stripe_enabled"])
+        v = bool(body["stripe_enabled"])
+        action["stripe_enabled"] = v
+        bar.stripe_enabled = v
     if "require_approval" in body:
-        action["require_approval"] = bool(body["require_approval"])
+        v = bool(body["require_approval"])
+        action["require_approval"] = v
+        bar.require_approval = v
     bar.pending_actions.append(action)
     return {"ok": True}

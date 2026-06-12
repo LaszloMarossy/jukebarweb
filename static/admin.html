@@ -178,7 +178,7 @@
     }
     .pay-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 0; border-top: 1px solid var(--border);
+      padding: 10px 0; border-top: 1px solid var(--border);
     }
     .pay-row:first-of-type { border-top: none; }
     .pay-label { font-size: 14px; color: var(--text); }
@@ -382,11 +382,11 @@
         <div class="toggle-track" id="tog-stripe" onclick="togglePayment('stripe')"><div class="toggle-thumb"></div></div>
       </div>
       <div class="pay-row">
-        <span class="pay-label">Bartender</span>
+        <span class="pay-label">Pay to bartender</span>
         <div class="toggle-track" id="tog-bartender" onclick="togglePayment('bartender')"><div class="toggle-thumb"></div></div>
       </div>
       <div class="pay-row">
-        <span class="pay-label">Auto-approval</span>
+        <span class="pay-label">Auto (free requests)</span>
         <div class="toggle-track" id="tog-autoapproval" onclick="toggleAutoApproval()"><div class="toggle-thumb"></div></div>
       </div>
       <div class="pay-warning" id="pay-warning">Both off — all requests auto-accepted for free</div>
@@ -568,7 +568,7 @@ async function postSetting(body) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (res.ok) setTimeout(loadPaymentState, 7000);
+  if (res.ok) setTimeout(loadPaymentState, 12000);
   return res.ok;
 }
 
