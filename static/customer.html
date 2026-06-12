@@ -536,11 +536,12 @@ const S = {
   jukebarId:       '',
   session:         '',
   customerId:      getCustomerId(),
-  requireApproval: true,
-  pricePerSong:    0,
-  priceForThree:   0,
-  currency:        '',
-  stripeKey:       '',
+  requireApproval:  true,
+  bartenderEnabled: true,
+  pricePerSong:     0,
+  priceForThree:    0,
+  currency:         '',
+  stripeKey:        '',
   catalog:         [],
   songById:        {},
   tree:            [],   // [{artist, albums:[{album,songs:[...]}]}]
@@ -574,11 +575,12 @@ async function boot() {
       d = await res.json();
       try { sessionStorage.setItem(cacheKey, JSON.stringify(d)); } catch {}
     }
-    S.requireApproval = d.require_approval !== false;
-    S.pricePerSong    = d.price_per_song  || 0;
-    S.priceForThree   = d.price_for_three || 0;
-    S.currency        = d.currency        || '';
-    S.stripeKey       = d.stripe_publishable_key || '';
+    S.requireApproval  = d.require_approval  !== false;
+    S.bartenderEnabled = d.bartender_enabled !== false;
+    S.pricePerSong     = d.price_per_song  || 0;
+    S.priceForThree    = d.price_for_three || 0;
+    S.currency         = d.currency        || '';
+    S.stripeKey        = d.stripe_publishable_key || '';
     S.catalog         = d.catalog         || [];
 
     const barName = d.bar_name || 'JukeBar';
@@ -896,7 +898,8 @@ function renderBasket() {
   const total = basketTotal();
   $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
-  $('rb-pay-btn').style.display = (S.stripeKey && total > 0) ? '' : 'none';
+  $('rb-pay-btn').style.display    = (S.stripeKey && total > 0) ? '' : 'none';
+  $('submit-btn').style.display    = S.bartenderEnabled ? '' : 'none';
   basket.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
