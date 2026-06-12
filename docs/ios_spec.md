@@ -60,8 +60,7 @@ Documents/
 ├── config.json              ← permanent; editable from admin UI
 │     { jukebar_id, bar_name,
 │       price_per_song, price_for_three, currency,
-│       pin_hash, auto_accept_minutes,
-│       report_retention_days, created_at }
+│       pin_hash, report_retention_days, created_at }
 │
 ├── reports/
 │   └── {BarName}_{YYYY-MM-DD_HH-mm}.csv
@@ -325,7 +324,7 @@ Both the customer web app and the host KioskView share the grapefruitplayer bran
 
 ## Deferred / Out of Scope
 
-- `auto_accept_minutes` — field stored in config, timer logic not yet implemented
+- `auto_accept_minutes` — removed; auto-accept is now a mode (`requireApproval = false`), not a timer; a timed fallback makes no sense when payments are involved
 - mDNS/Bonjour — bartenders could discover server by name without typing IP; deferred
 - HTTPS — HTTP is fine on a private LAN
 - Kiosk mode (`UIAccessibility.requestGuidedAccessSession()`) — not yet wired up
