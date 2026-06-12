@@ -94,6 +94,7 @@ class BarSession:
     session: str          # playlist_id from iOS — rotates on every app restart
     bar_name: str
     require_approval: bool
+    bartender_enabled: bool = True  # false = hide Submit to Bartender on customer page
     catalog: list[dict]        # full song objects for /api/bar/{id}/catalog
     song_index: dict = field(default_factory=dict)  # id → song dict, built at register time
     price_per_song: float = 0.0
@@ -363,6 +364,7 @@ async def host_register(body: dict[str, Any]):
         session=session,
         bar_name=body.get("bar_name", ""),
         require_approval=body.get("require_approval", True),
+        bartender_enabled=body.get("bartender_enabled", True),
         catalog=catalog,
         song_index={s["id"]: s for s in catalog if "id" in s},
         price_per_song=body.get("price_per_song", 0.0),
@@ -499,12 +501,13 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
     return JSONResponse(
         {
-            "bar_name":        bar.bar_name,
-            "catalog":         bar.catalog,
-            "require_approval": bar.require_approval,
-            "price_per_song":        bar.price_per_song,
-            "price_for_three":       bar.price_for_three,
-            "currency":              bar.currency,
+            "bar_name":               bar.bar_name,
+            "catalog":                bar.catalog,
+            "require_approval":       bar.require_approval,
+            "bartender_enabled":      bar.bartender_enabled,
+            "price_per_song":         bar.price_per_song,
+            "price_for_three":        bar.price_for_three,
+            "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key,
         },
         headers={"Cache-Control": "max-age=300, private"},
