@@ -754,7 +754,8 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
     ]
     return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing,
             "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
-            "currency": bar.currency}
+            "currency": bar.currency, "require_approval": bar.require_approval,
+            "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
