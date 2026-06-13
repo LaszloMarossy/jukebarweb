@@ -107,8 +107,11 @@
       font-size: 10px; font-weight: 700; letter-spacing: 2px;
       text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
     }
-    .np-track { font-size: 17px; font-weight: 700; color: var(--accent); }
-    .np-artist { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .np-row { display: flex; align-items: center; gap: 12px; }
+    .np-art { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; flex-shrink: 0; display: none; }
+    .np-info { flex: 1; min-width: 0; }
+    .np-track { font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .np-artist { font-size: 13px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .np-idle { font-size: 14px; color: var(--muted); }
 
     /* ── player controls ── */
@@ -338,7 +341,10 @@
 
   <div class="now-playing-card">
     <div class="np-label">Now Playing</div>
-    <div id="now-playing"><div class="np-idle">Nothing playing</div></div>
+    <div class="np-row">
+      <img id="np-art" class="np-art" alt="Album art">
+      <div id="now-playing" class="np-info"><div class="np-idle">Nothing playing</div></div>
+    </div>
     <div class="player-controls">
       <button class="btn-control btn-prev" onclick="skipTrack('prev')" title="Previous">⏮&#xFE0E;</button>
       <button class="btn-control btn-pp" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">▶&#xFE0E;</button>
@@ -631,6 +637,10 @@ function renderNowPlaying(song, isPlayingFlag) {
   $('now-playing').innerHTML = song
     ? `<div class="np-track">${esc(song.title || '')}</div><div class="np-artist">${esc(song.artist || '')}</div>`
     : `<div class="np-idle">Nothing playing</div>`;
+  const art = $('np-art');
+  const dataUrl = song?.artwork_data_url;
+  if (dataUrl) { art.src = dataUrl; art.style.display = 'block'; }
+  else          { art.style.display = 'none'; art.src = ''; }
   // Lock play state only once we receive a real song. If the initial polls return
   // "nothing playing" (registration race), keep trying so we get the correct state
   // when the first song push arrives. togglePlayPause() also sets playStateReady.
