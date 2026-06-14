@@ -714,11 +714,12 @@ async function fetchDisplay() {
     const unEl = $('play-upnext');
     if (approved.length) {
       const items = approved.flatMap(r => {
+        const nameHtml = r.requester_name ? `<span style="color:#fde047;font-weight:700">${esc(r.requester_name.slice(0, 8))}</span>: ` : '';
         const details = r.song_details || [];
         if (details.length) {
-          return details.map(s => `<div class="play-un-item">${esc(s.artist)} — ${esc(s.album)} — ${esc(s.title)}</div>`);
+          return details.map(s => `<div class="play-un-item">${nameHtml}${esc(s.artist)} — ${esc(s.album)} — ${esc(s.title)}</div>`);
         }
-        return (r.song_titles || []).map(t => `<div class="play-un-item">${esc(t)}</div>`);
+        return (r.song_titles || []).map(t => `<div class="play-un-item">${nameHtml}${esc(t)}</div>`);
       }).slice(0, 6).join('');
       unEl.innerHTML = `<div class="play-un-label">Up Next</div>${items}`;
     } else {
@@ -781,9 +782,10 @@ function renderLetters() {
   const upNextHtml = S.upNext.length
     ? `<div class="section-title" style="margin-top:4px">UP NEXT</div>` +
       S.upNext.flatMap(r => {
+        const nameHtml = r.requester_name ? `<span style="color:#fde047;font-weight:700">${esc(r.requester_name.slice(0, 8))}</span>: ` : '';
         const details = r.song_details || [];
-        if (details.length) return details.map(s => `${esc(s.artist)} — ${esc(s.album)} — ${esc(s.title)}`);
-        return r.song_titles || [];
+        if (details.length) return details.map(s => `${nameHtml}${esc(s.artist)} — ${esc(s.album)} — ${esc(s.title)}`);
+        return (r.song_titles || []).map(t => `${nameHtml}${esc(t)}`);
       }).slice(0, 4)
         .map(t => `<div style="font-size:14px;padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--accent)">▸ </span>${t}</div>`)
         .join('') + '<div style="margin-bottom:12px"></div>'
