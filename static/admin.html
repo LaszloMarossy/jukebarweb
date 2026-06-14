@@ -121,14 +121,16 @@
     }
     .btn-control {
       flex: 1; border: none; border-radius: 12px;
-      font-size: 26px; padding: 14px 6px; cursor: pointer;
-      transition: opacity .15s; line-height: 1;
+      font-size: 26px; padding: 0 6px; cursor: pointer;
+      transition: opacity .15s; color: #000;
+      height: 56px; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
     }
     .btn-control:active { opacity: .6; }
-    .btn-prev, .btn-next { background: #ffc24a; color: #000; }
-    .btn-pp             { background: #fbbe84; color: #000; }
-    .btn-pp.playing     { background: #fda185; }
-    .btn-stop           { background: #dc7955; color: #000; }
+    .btn-prev, .btn-next { background: #ffc24a; }
+    .btn-pp             { background: #fbbe84; font-size: 38px; }
+    .btn-pp.playing     { background: #fda185; font-size: 20px; letter-spacing: -5px; }
+    .btn-stop           { background: #dc7955; }
 
     /* ── section title ── */
     .section-title {
@@ -347,9 +349,9 @@
     </div>
     <div class="player-controls">
       <button class="btn-control btn-prev" onclick="skipTrack('prev')" title="Previous">⏮&#xFE0E;</button>
-      <button class="btn-control btn-pp" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">▶&#xFE0E;</button>
+      <button class="btn-control btn-pp" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">►</button>
       <button class="btn-control btn-next" onclick="skipTrack('next')" title="Next">⏭&#xFE0E;</button>
-      <button class="btn-control btn-stop" onclick="stopSession()" title="End Session">⏹&#xFE0E;</button>
+      <button class="btn-control btn-stop" onclick="stopSession()" title="End Session">■</button>
     </div>
   </div>
 
@@ -646,7 +648,7 @@ function renderNowPlaying(song, isPlayingFlag) {
   // when the first song push arrives. togglePlayPause() also sets playStateReady.
   if (!S.playStateReady && song) {
     S.isPlaying = (isPlayingFlag !== undefined) ? !!isPlayingFlag : true;
-    $('btn-play-pause').textContent = S.isPlaying ? '⏸︎' : '▶︎';
+    $('btn-play-pause').textContent = S.isPlaying ? '▮▮' : '►';
     $('btn-play-pause').classList.toggle('playing', S.isPlaying);
     S.playStateReady = true;
   }
@@ -666,7 +668,7 @@ async function sendControl(action) {
 function togglePlayPause() {
   sendControl(S.isPlaying ? 'pause' : 'play');
   S.isPlaying = !S.isPlaying;
-  $('btn-play-pause').textContent = S.isPlaying ? '⏸︎' : '▶︎';
+  $('btn-play-pause').textContent = S.isPlaying ? '▮▮' : '►';
   $('btn-play-pause').classList.toggle('playing', S.isPlaying);
   S.playStateReady = true;
 }
@@ -675,7 +677,7 @@ function skipTrack(action) {
   sendControl(action);
   // Skip always results in a playing track — show Pause immediately.
   S.isPlaying = true;
-  $('btn-play-pause').textContent = '⏸︎';
+  $('btn-play-pause').textContent = '▮▮';
   $('btn-play-pause').classList.add('playing');
   S.playStateReady = true;
 }
