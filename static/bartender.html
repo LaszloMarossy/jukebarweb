@@ -88,10 +88,7 @@
       font-family: 'Bubblegum Sans', cursive;
       font-size: clamp(18px, 4dvh, 32px); line-height: 1.1;
     }
-    .header-role {
-      font-size: 11px; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: var(--accent); margin-top: 1px;
-    }
+    .header-role { display: none; }
     .refresh-badge {
       font-size: 11px; color: var(--muted); white-space: nowrap;
     }
@@ -329,8 +326,27 @@
 const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '', stripeEnabled: false, bartenderEnabled: false, autoFree: false };
 let currentTab = 'requests';
 
+function colorize(el, text) {
+  const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
+  if (!el) return;
+  el.innerHTML = '';
+  let last = '';
+  for (const ch of text) {
+    if (ch === ' ') { el.appendChild(document.createTextNode(' ')); continue; }
+    const pool = cols.filter(c => c !== last);
+    const col  = pool[Math.floor(Math.random() * pool.length)];
+    last = col;
+    const s = document.createElement('span');
+    s.style.color = col; s.textContent = ch;
+    el.appendChild(s);
+  }
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
+  colorize($('bar-name'), 'JukeBar');
+  $('bar-name').appendChild(document.createTextNode('Tender'));
+
   const parts = location.pathname.split('/').filter(Boolean);
   S.jukebarId = parts[parts.length - 1];
   S.session   = new URLSearchParams(location.search).get('s') || '';
@@ -412,7 +428,8 @@ async function poll() {
 
     if (d.bar_name && !S.barName) {
       S.barName = d.bar_name;
-      $('bar-name').textContent = `JukeBar ${d.bar_name}`;
+      colorize($('bar-name'), 'JukeBar');
+      $('bar-name').appendChild(document.createTextNode('Tender' + (d.bar_name ? ' ' + d.bar_name : '')));
       document.title = `Bartender — ${d.bar_name}`;
     }
 
