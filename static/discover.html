@@ -334,6 +334,48 @@ const GENRE_COLORS = {
   'other':               '#666666',
 };
 
+// pie-category → hex  (broader than GENRE_COLORS; matches tag_map.json pie values)
+const PIE_COLORS = {
+  'indie / alternative':    '#5b8db8',
+  'rock':                   '#e63946',
+  'metal':                  '#2b2d42',
+  'post-punk / darkwave':   '#6a4c93',
+  'electronic / dance':     '#4cc9f0',
+  'folk / acoustic':        '#3aad6f',
+  'country':                '#d4a373',
+  'punk / hardcore':        '#f77f00',
+  'psychedelic':            '#c77dff',
+  'ambient / experimental': '#06d6a0',
+  'hip-hop':                '#f4a261',
+  'jazz':                   '#e9c46a',
+  'classical':              '#c8b280',
+  'r&b / soul / funk':      '#dc7955',
+  'new wave':               '#00b4d8',
+  'shoegaze / dream pop':   '#b5a4dc',
+  'trip-hop / downtempo':   '#4a6fa5',
+  'pop':                    '#e8406a',
+  'world / reggae':         '#38b000',
+  'ska':                    '#c8d600',
+  'rockabilly / garage':    '#ff924c',
+  'industrial':             '#6b7280',
+  'easy listening':         '#f0a0b8',
+  'other':                  '#555555',
+};
+
+function pieCSSGradient(combined_pie) {
+  if (!combined_pie) return null;
+  const entries = Object.entries(combined_pie).filter(([, v]) => v > 0);
+  if (!entries.length) return null;
+  let pos = 0;
+  const stops = entries.map(([genre, frac]) => {
+    const color = PIE_COLORS[genre] || '#666';
+    const start = (pos * 100).toFixed(1);
+    pos += frac;
+    return `${color} ${start}% ${(pos * 100).toFixed(1)}%`;
+  });
+  return `conic-gradient(${stops.join(', ')})`;
+}
+
 function genreHexFor(artistName, bar) {
   if (!profilingOn) return null;
   const colors = bar.profiling && bar.profiling.artist_colors;
@@ -450,12 +492,23 @@ async function loadBars() {
 
   const bounds = [];
   mapped.forEach(bar => {
+    const pieGrad = profilingOn && bar.profiling && pieCSSGradient(bar.profiling.combined_pie);
+    const size = pieGrad ? 52 : 28;
+    const half = size / 2;
+
     const el = document.createElement('div');
     el.className = 'jb-marker' + (bar.is_live ? ' live' : '');
-    el.textContent = '♪';
+    el.style.width  = size + 'px';
+    el.style.height = size + 'px';
+    if (pieGrad) {
+      el.style.background   = pieGrad;
+      el.style.borderColor  = bar.is_live ? '#4ade80' : '#fff';
+    } else {
+      el.textContent = '♪';
+    }
 
     const marker = L.marker([bar.lat, bar.lng], {
-      icon: L.divIcon({ html: el, className: '', iconSize: [28,28], iconAnchor: [14,14] }),
+      icon: L.divIcon({ html: el, className: '', iconSize: [size, size], iconAnchor: [half, half] }),
     });
     clusterGroup.addLayer(marker);
 
