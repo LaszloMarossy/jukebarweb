@@ -197,11 +197,151 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 </div>
 
 <script>
+// Set from /api/map response. When true, use genre colors; grey for unprofiled artists.
+let profilingOn = false;
+
+// Rotating palette used when profiling is off
 const PALETTE = [
   '#e63946','#f4a261','#e9c46a','#2a9d8f','#457b9d',
   '#6a4c93','#f77f00','#4cc9f0','#c77dff','#06d6a0',
   '#ff595e','#ffca3a','#8ac926','#1982c4','#ff924c',
 ];
+
+// band_color string → hex  (matches values in tag_map.json)
+const GENRE_COLORS = {
+  // indie / alternative (blues)
+  'indie':               '#5b8db8',
+  'indie pop':           '#6fa3cc',
+  'alternative':         '#4a7aa0',
+  'grunge':              '#4a6d82',
+  'noise rock':          '#3d5f6e',
+  'math rock':           '#4a7a8a',
+  'chillwave':           '#7aafc0',
+  'kiwi':                '#4db89a',
+  // rock (reds)
+  'rock':                '#e63946',
+  'classic rock':        '#d4293a',
+  'progressive':         '#b82030',
+  'post-rock':           '#c4384a',
+  'glam':                '#e8557a',
+  'rock n roll':         '#e84050',
+  // metal (near-black)
+  'heavy metal':         '#2b2d42',
+  'metal':               '#333344',
+  'black metal':         '#111827',
+  'death metal':         '#1f2937',
+  'thrash metal':        '#1a2035',
+  'doom metal':          '#2e3152',
+  'gothic metal':        '#3b1a4a',
+  'grindcore':           '#0d0d0d',
+  // post-punk / darkwave (purples)
+  'post-punk':           '#6a4c93',
+  'darkwave':            '#4a2c7e',
+  'lo-fi':               '#7060a0',
+  'gothic rock':         '#5a1a6e',
+  'ebm':                 '#3a1a5e',
+  // electronic / dance (cyans)
+  'electro / electronica':'#4cc9f0',
+  'house':               '#22b4e8',
+  'techno':              '#0090cc',
+  'drum & bass':         '#0076aa',
+  'dubstep':             '#5ce1e6',
+  'trance':              '#33ccff',
+  'idm / glitch':        '#66d9e8',
+  'synthpop':            '#00bfff',
+  'synthwave':           '#b366ff',
+  'dance / club':        '#44c8f0',
+  'electropop':          '#55d4e8',
+  // folk / acoustic (earthy greens)
+  'folk':                '#3aad6f',
+  'folktronica':         '#5a9e7a',
+  // country (warm tan)
+  'country':             '#d4a373',
+  // punk / hardcore (oranges)
+  'punk rock':           '#f77f00',
+  'hardcore':            '#e06a00',
+  'post-hardcore':       '#c85a00',
+  'emo':                 '#d45500',
+  'pop punk':            '#ff924c',
+  'melodic hardcore':    '#e07020',
+  // psychedelic (violets)
+  'psychedelic':         '#c77dff',
+  'space / atmospheric': '#9966cc',
+  // ambient / experimental (teals)
+  'ambient':             '#06d6a0',
+  'experimental':        '#00b890',
+  'dark ambient':        '#0a8060',
+  'avant-garde':         '#20c090',
+  'noise':               '#008060',
+  'new age':             '#40e0c0',
+  'drone / ambient rock':'#30c0a0',
+  'minimal':             '#50d0b0',
+  // hip-hop (ambers)
+  'hip-hop':             '#f4a261',
+  'trap':                '#e8904a',
+  'gangsta rap':         '#d07830',
+  'conscious hip-hop':   '#f0aa70',
+  'underground hip-hop': '#d88040',
+  // jazz (golds)
+  'jazz':                '#e9c46a',
+  'jazz fusion':         '#f0c050',
+  'smooth jazz':         '#ddb850',
+  'acid jazz':           '#f2c860',
+  'bebop':               '#e0b840',
+  'big band / swing':    '#d4a830',
+  'nu jazz':             '#f4ce80',
+  // classical (warm cream)
+  'classical':           '#c8b280',
+  // r&b / soul / funk (terracotta)
+  'soul':                '#dc7955',
+  'funk':                '#e88040',
+  'r&b':                 '#d06040',
+  'motown':              '#c85030',
+  'neo soul':            '#e89060',
+  'blues':               '#4a7ab0',
+  // new wave (electric blue)
+  'new wave':            '#00b4d8',
+  // shoegaze / dream pop (lavender)
+  'shoegaze / dream pop':'#b5a4dc',
+  'slowcore':            '#8a78b8',
+  'noise pop':           '#c0b0e8',
+  // trip-hop / downtempo (slate blue)
+  'trip-hop':            '#4a6fa5',
+  'chillout':            '#5a80b8',
+  'downtempo':           '#3a5f95',
+  // pop (pink/rose)
+  'pop':                 '#e8406a',
+  'disco':               '#ff69b4',
+  'twee':                '#ff8fab',
+  'power pop':           '#f06080',
+  'easy listening':      '#f0a0b8',
+  'japanese':            '#ff7eb3',
+  'korean':              '#ff9ec8',
+  // world / reggae (greens)
+  'reggae':              '#38b000',
+  'dub':                 '#2a9030',
+  'latin':               '#ff6b35',
+  'african':             '#e8a020',
+  'world music':         '#50b050',
+  'brazilian':           '#009c3b',
+  // ska (yellow-green)
+  'ska':                 '#c8d600',
+  // rockabilly / garage (amber)
+  'rockabilly/garage':   '#ff924c',
+  // industrial (steel)
+  'industrial':          '#6b7280',
+  // fallback
+  'other':               '#666666',
+};
+
+function genreHexFor(artistName, bar) {
+  if (!profilingOn) return null;
+  const colors = bar.profiling && bar.profiling.artist_colors;
+  if (!colors) return null;
+  const bandColor = colors[artistName];
+  if (!bandColor) return null;
+  return GENRE_COLORS[bandColor] || null;
+}
 
 function fgFor(hex) {
   const r = parseInt(hex.slice(1,3),16)/255;
@@ -258,8 +398,16 @@ function openPanel(bar) {
       const notePart = pl.note ? ` <span class="playlist-line-note">(${esc(pl.note)})</span>` : '';
       const line = `<div class="playlist-line">${esc(displayName)}${notePart}</div>`;
       const bubbles = (pl.artists || []).map(artist => {
-        const bg = PALETTE[ci % PALETTE.length]; ci++;
-        return `<div class="bubble" style="background:${bg};color:${fgFor(bg)}">${esc(artist)}</div>`;
+        const genre = genreHexFor(artist, bar);
+        let bg, fg;
+        if (genre) {
+          bg = genre; fg = fgFor(bg);
+        } else if (profilingOn) {
+          bg = '#c8c8c8'; fg = '#333';   // profiling on but artist not yet profiled
+        } else {
+          bg = PALETTE[ci % PALETTE.length]; fg = fgFor(bg); ci++;
+        }
+        return `<div class="bubble" style="background:${bg};color:${fg}">${esc(artist)}</div>`;
       }).join('');
       return `<div class="playlist-section">${line}<div class="bubble-wrap">${bubbles}</div></div>`;
     }).join('');
@@ -281,6 +429,7 @@ async function loadBars() {
   const res  = await fetch('/api/map');
   const data = await res.json();
   const bars = data.bars || [];
+  profilingOn = data.profiling_on || false;
 
   const mapped = bars.filter(b => b.lat != null && b.lng != null);
   const count  = mapped.length;

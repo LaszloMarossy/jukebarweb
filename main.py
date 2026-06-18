@@ -48,6 +48,9 @@ BAR_CLEANUP_INACTIVE = 7200   # last_seen must be this old (2 h) before cleanup 
 BAR_CLEANUP_MIN_AGE  = 1800   # session must also be at least this old (30 min) to be swept
 CLEANUP_INTERVAL     = 300    # sweep runs every 5 minutes
 
+PROFILING_ON      = os.environ.get("PROFILING_ON", "false").lower() == "true"
+PROFILE_CACHE_TTL = 300.0   # seconds between GCS profile re-reads
+
 
 # ---------------------------------------------------------------------------
 # Data models
@@ -115,6 +118,8 @@ class BarSession:
 
 _map_entries: dict[str, MapEntry] = {}   # persisted to disk
 _bars: dict[str, BarSession] = {}        # in-memory only
+_bar_profiles: dict[str, dict] = {}     # bar_id → profile.json contents; refreshed from GCS every PROFILE_CACHE_TTL s
+_profiles_loaded_at: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +173,29 @@ async def _save_map_entries() -> None:
     await asyncio.to_thread(_write_map_entries_sync)
 
 
+def _load_bar_profiles_sync() -> None:
+    global _bar_profiles, _profiles_loaded_at
+    if not _USE_GCS:
+        return
+    import gcs_store
+    new_profiles = {}
+    for bar_id in _map_entries:
+        raw = gcs_store.read(f"map/{bar_id}/profile.json")
+        if raw:
+            try:
+                new_profiles[bar_id] = json.loads(raw)
+            except Exception:
+                pass
+    _bar_profiles = new_profiles
+    _profiles_loaded_at = time.time()
+    print(f"[profiles] loaded {len(_bar_profiles)} bar profile(s) from GCS")
+
+
+async def _maybe_refresh_profiles() -> None:
+    if time.time() - _profiles_loaded_at > PROFILE_CACHE_TTL:
+        await asyncio.to_thread(_load_bar_profiles_sync)
+
+
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
@@ -198,6 +226,7 @@ async def lifespan(app: FastAPI):
         print(f"[startup] map file size: {MAP_ENTRIES_FILE.stat().st_size} bytes")
     _map_entries = _load_map_entries()
     print(f"[startup] loaded {len(_map_entries)} map entries: {list(_map_entries.keys())}")
+    _load_bar_profiles_sync()
     asyncio.create_task(_cleanup_loop())
     yield
 
@@ -297,6 +326,7 @@ async def map_register(body: dict[str, Any]):
 
     lat = body.get("lat")
     lng = body.get("lng")
+
     _map_entries[jukebar_id] = MapEntry(
         jukebar_id=jukebar_id,
         bar_name=body.get("bar_name", ""),
@@ -323,25 +353,41 @@ async def map_unregister(body: dict[str, Any]):
 @app.get("/api/map")
 async def map_bars():
     """
-    All registered bars with their artist lists.
+    All registered bars with their playlists and genre profiling data.
     is_live=true only for internet-mode bars that have polled within 5 minutes.
+    profiling_on=true means discover.html should use genre colors.
     """
+    await _maybe_refresh_profiles()
     cutoff = time.time() - BAR_TIMEOUT_SECONDS
-    result = [
-        {
-            "jukebar_id": e.jukebar_id,
-            "bar_name": e.bar_name,
-            "location": e.location,
-            "lat": e.lat,
-            "lng": e.lng,
-            "playlists": e.playlists,
+    result = []
+    for e in _map_entries.values():
+        raw_profile = _bar_profiles.get(e.jukebar_id)
+        profiling = None
+        if raw_profile:
+            artist_colors: dict[str, str] = {}
+            for pl_data in raw_profile.get("playlists", {}).values():
+                for a in pl_data.get("artists", []):
+                    name = a.get("name")
+                    color = a.get("band_color")
+                    if name and color:
+                        artist_colors[name] = color
+            profiling = {
+                "combined_pie":  raw_profile.get("combined_pie", {}),
+                "artist_colors": artist_colors,
+            }
+        result.append({
+            "jukebar_id":    e.jukebar_id,
+            "bar_name":      e.bar_name,
+            "location":      e.location,
+            "lat":           e.lat,
+            "lng":           e.lng,
+            "playlists":     e.playlists,
             "registered_at": e.registered_at,
-            "last_seen": e.last_seen,
-            "is_live": e.last_seen >= cutoff and e.jukebar_id in _bars,
-        }
-        for e in _map_entries.values()
-    ]
-    return {"bars": result}
+            "last_seen":     e.last_seen,
+            "is_live":       e.last_seen >= cutoff and e.jukebar_id in _bars,
+            "profiling":     profiling,
+        })
+    return {"bars": result, "profiling_on": PROFILING_ON}
 
 
 # ---------------------------------------------------------------------------

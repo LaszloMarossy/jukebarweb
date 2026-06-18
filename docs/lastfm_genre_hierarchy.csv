@@ -1,0 +1,328 @@
+top_level,fine_genre,lastfm_tag,notes,piechart category,band color
+Rock,Classic Rock,rock,,Rock,Classic Rock
+Rock,Classic Rock,classic rock,,Rock,Classic Rock
+Rock,Classic Rock,hard rock,,Rock,Classic Rock
+Rock,Classic Rock,blues rock,,R&B / Soul / Funk,blues
+Rock,Classic Rock,rock n roll,alias,Rock,Classic Rock
+Rock,Classic Rock,Rock and Roll,alias,Rock,Classic Rock
+Rock,Classic Rock,soft rock,,Rock,Classic Rock
+Rock,Classic Rock,pop rock,,Pop,Pop
+Rock,Classic Rock,glam rock,,Rock,glam
+Rock,Classic Rock,rockabilly,,rockabilly/Garage,rockabilly/Garage
+Rock,Indie / Alternative,indie rock,,Indie / Alternative,indie
+Rock,Indie / Alternative,indie,broad tag - appears everywhere,Indie / Alternative,indie
+Rock,Indie / Alternative,alternative rock,,Indie / Alternative,alternative
+Rock,Indie / Alternative,alternative,broad tag - appears everywhere,Indie / Alternative,alternative
+Rock,Indie / Alternative,britpop,British indie 90s,Indie / Alternative,indie
+Rock,Indie / Alternative,Grunge,,Indie / Alternative,Grunge
+Rock,Indie / Alternative,grunge,alias,Indie / Alternative,Grunge
+Rock,Indie / Alternative,noise rock,,Indie / Alternative,noise rock
+Rock,Indie / Alternative,math rock,,Indie / Alternative,math rock
+Rock,Indie / Alternative,art rock,,Rock,Progressive
+Rock,Indie / Alternative,jangle pop,,Indie / Alternative,indie
+Rock,Indie / Alternative,power pop,,Pop,Power Pop
+Rock,Indie / Alternative,chamber pop,orchestral indie,Indie / Alternative,indie
+Rock,Indie / Alternative,twee,,Pop,Twee
+Rock,Indie / Alternative,indietronica,indie + electronic,Indie / Alternative,indie
+Rock,Progressive Rock,Progressive rock,,Rock,Progressive
+Rock,Progressive Rock,Progressive,alias,Rock,Progressive
+Rock,Progressive Rock,krautrock,German 70s experimental rock,Rock,Progressive
+Rock,Progressive Rock,art rock,overlaps art/prog,Rock,Progressive
+Rock,Progressive Rock,space rock,,Rock,Progressive
+Rock,Psychedelic Rock,Psychedelic Rock,,psychedelic,psychedelic
+Rock,Psychedelic Rock,psychedelic,,psychedelic,psychedelic
+Rock,Psychedelic Rock,Neo-Psychedelia,,psychedelic,psychedelic
+Rock,Psychedelic Rock,Stoner Rock,,psychedelic,psychedelic
+Rock,Psychedelic Rock,psychedelia,alias,psychedelic,psychedelic
+Rock,Post-Rock,post-rock,,Rock,Post-Rock
+Rock,Post-Rock,post rock,alias,Rock,Post-Rock
+Rock,Post-Rock,Experimental Rock,,Rock,Experimental
+Rock,Garage Rock,Garage Rock,,rockabilly/Garage,rockabilly/Garage
+Rock,Garage Rock,garage rock,alias,rockabilly/Garage,rockabilly/Garage
+Rock,Southern Rock,Southern Rock,,Rock,Rock
+Rock,Glam / Hair,glam rock,,Rock,glam
+Rock,Glam / Hair,new romantic,overlaps with New Wave,New Wave,New Wave
+Metal,Heavy Metal,metal,,metal,Heavy Metal
+Metal,Heavy Metal,heavy metal,,metal,Heavy Metal
+Metal,Heavy Metal,speed metal,,metal,Heavy Metal
+Metal,Heavy Metal,alternative metal,,metal,Heavy Metal
+Metal,Heavy Metal,Nu Metal,,metal,Heavy Metal
+Metal,Heavy Metal,nu metal,alias,metal,Heavy Metal
+Metal,Heavy Metal,industrial metal,,metal,Heavy Metal
+Metal,Heavy Metal,industrial rock,,metal,Heavy Metal
+Metal,Heavy Metal,Post-Metal,,metal,Heavy Metal
+Metal,Black Metal,black metal,,metal,Black Metal
+Metal,Black Metal,atmospheric black metal,,metal,Black Metal
+Metal,Black Metal,depressive black metal,,metal,Black Metal
+Metal,Black Metal,viking metal,,metal,Black Metal
+Metal,Death Metal,death metal,,metal,Death Metal
+Metal,Death Metal,Melodic Death Metal,,metal,Death Metal
+Metal,Death Metal,Brutal Death Metal,,metal,Death Metal
+Metal,Death Metal,Technical Death Metal,,metal,Death Metal
+Metal,Death Metal,deathcore,,metal,Death Metal
+Metal,Thrash Metal,thrash metal,,metal,Thrash Metal
+Metal,Doom Metal,doom metal,,metal,Doom Metal
+Metal,Doom Metal,Sludge,,metal,Doom Metal
+Metal,Doom Metal,sludge metal,alias,metal,Doom Metal
+Metal,Gothic Metal,Gothic Metal,,metal,Gothic Metal
+Metal,Gothic Metal,symphonic metal,,metal,Gothic Metal
+Metal,Gothic Metal,Female fronted metal,,metal,Gothic Metal
+Metal,Progressive Metal,Progressive metal,,metal,metal
+Metal,Power Metal,Power metal,,metal,metal
+Metal,Folk Metal,folk metal,,metal,metal
+Metal,Metalcore,metalcore,,metal,metal
+Metal,Grindcore,grindcore,,metal,Grindcore
+Post-Punk / New Wave,Post-Punk,post-punk,,Post-Punk,Post-Punk
+Post-Punk / New Wave,Post-Punk,Post punk,alias,Post-Punk,Post-Punk
+Post-Punk / New Wave,Post-Punk,proto-punk,precursor,Post-Punk,Post-Punk
+Post-Punk / New Wave,Post-Punk,art punk,,Post-Punk,Post-Punk
+Post-Punk / New Wave,Post-Punk,dance-punk,LCD Soundsystem territory,Post-Punk,Post-Punk
+Post-Punk / New Wave,New Wave,new wave,,New Wave,New Wave
+Post-Punk / New Wave,New Wave,new romantic,,New Wave,New Wave
+Post-Punk / New Wave,Synthpop,synthpop,,Electronic / Dance,Synthpop
+Post-Punk / New Wave,Synthpop,synth pop,alias,Electronic / Dance,Synthpop
+Post-Punk / New Wave,Synthpop,synth-pop,alias,Electronic / Dance,Synthpop
+Post-Punk / New Wave,Darkwave,darkwave,,Post-Punk,Darkwave
+Post-Punk / New Wave,Darkwave,ebm,Electronic Body Music,Industrial,EBM
+Post-Punk / New Wave,Darkwave,dark electro,,Post-Punk,Darkwave
+Post-Punk / New Wave,Gothic Rock,Gothic Rock,,Gothic Rock,Gothic Rock
+Post-Punk / New Wave,Gothic Rock,Gothic,,Gothic Rock,Gothic Rock
+Post-Punk / New Wave,Gothic Rock,goth,alias,Gothic Rock,Gothic Rock
+Post-Punk / New Wave,Gothic Rock,ethereal,4AD sound,Gothic Rock,Gothic Rock
+Shoegaze / Dream Pop,Shoegaze,shoegaze,,Shoegaze / Dream Pop,Shoegaze / Dream Pop
+Shoegaze / Dream Pop,Dream Pop,dream pop,,Shoegaze / Dream Pop,Shoegaze / Dream Pop
+Shoegaze / Dream Pop,Dream Pop,Dreamy,alias,Shoegaze / Dream Pop,Shoegaze / Dream Pop
+Shoegaze / Dream Pop,Noise Pop,noise pop,,Shoegaze / Dream Pop,Noise Pop
+Shoegaze / Dream Pop,Slowcore,slowcore,,Shoegaze / Dream Pop,Slowcore
+Shoegaze / Dream Pop,Slowcore,sadcore,alias,Shoegaze / Dream Pop,Slowcore
+Shoegaze / Dream Pop,Lo-Fi,Lo-Fi,,Post-Punk,Lo-Fi
+Shoegaze / Dream Pop,Lo-Fi,lo-fi,alias,Post-Punk,Lo-Fi
+Shoegaze / Dream Pop,Chillwave,chillwave,,Shoegaze / Dream Pop,Chillwave
+Shoegaze / Dream Pop,Chillwave,indietronica,loose alias,Indie / Alternative,indie
+Shoegaze / Dream Pop,Drone / Ambient Rock,drone,,Shoegaze / Dream Pop,Drone / Ambient Rock
+Shoegaze / Dream Pop,Drone / Ambient Rock,DroneGaze,,Shoegaze / Dream Pop,Drone / Ambient Rock
+Shoegaze / Dream Pop,Folktronica,folktronica,folk + electronic,Shoegaze / Dream Pop,Folktronica
+Punk / Hardcore,Punk Rock,punk,,Punk / Hardcore,Punk Rock
+Punk / Hardcore,Punk Rock,punk rock,,Punk / Hardcore,Punk Rock
+Punk / Hardcore,Hardcore,hardcore,,Punk / Hardcore,Hardcore
+Punk / Hardcore,Hardcore,hardcore punk,,Punk / Hardcore,Hardcore
+Punk / Hardcore,Post-Hardcore,post-hardcore,,Punk / Hardcore,Post-Hardcore
+Punk / Hardcore,Post-Hardcore,screamo,,Punk / Hardcore,Post-Hardcore
+Punk / Hardcore,Post-Hardcore,emocore,alias,Punk / Hardcore,Post-Hardcore
+Punk / Hardcore,Emo,emo,,Punk / Hardcore,Emo
+Punk / Hardcore,Pop Punk,pop punk,,Pop Punk,Pop Punk
+Punk / Hardcore,Pop Punk,melodic punk,alias,Pop Punk,Pop Punk
+Punk / Hardcore,Pop Punk,Pop-punk,alias,Pop Punk,Pop Punk
+Punk / Hardcore,Melodic Hardcore,melodic hardcore,,Pop Punk,Melodic Hardcore
+Punk / Hardcore,Ska Punk,ska,overlaps World/Reggae,Ska,Ska
+Electronic / Dance,House,House,,Electronic / Dance,House
+Electronic / Dance,House,house,alias,Electronic / Dance,House
+Electronic / Dance,House,deep house,,Electronic / Dance,House
+Electronic / Dance,Techno,techno,,Electronic / Dance,Techno
+Electronic / Dance,Trance,trance,,Electronic / Dance,Trance
+Electronic / Dance,Trance,psytrance,,Electronic / Dance,Trance
+Electronic / Dance,Trance,progressive trance,,Electronic / Dance,Trance
+Electronic / Dance,Drum & Bass,Drum and bass,,Electronic / Dance,Drum & Bass
+Electronic / Dance,Drum & Bass,drum and bass,alias,Electronic / Dance,Drum & Bass
+Electronic / Dance,Drum & Bass,dnb,alias,Electronic / Dance,Drum & Bass
+Electronic / Dance,Drum & Bass,breakbeat,,Electronic / Dance,Drum & Bass
+Electronic / Dance,Drum & Bass,breakcore,,Electronic / Dance,Drum & Bass
+Electronic / Dance,IDM / Glitch,idm,Intelligent Dance Music,Electronic / Dance,IDM / Glitch
+Electronic / Dance,IDM / Glitch,glitch,,Electronic / Dance,IDM / Glitch
+Electronic / Dance,IDM / Glitch,minimal,,Ambient / Experimental,minimal
+Electronic / Dance,Electro / Electronica,electronica,,Electronic / Dance,Electro / Electronica
+Electronic / Dance,Electro / Electronica,electronic,broad tag,Electronic / Dance,Electro / Electronica
+Electronic / Dance,Electro / Electronica,electro,,Electronic / Dance,Electro / Electronica
+Electronic / Dance,Electro / Electronica,Electro Pop,alias,Electronic / Dance,Electropop
+Electronic / Dance,Dance / Club,dance,,Electronic / Dance,Dance / Club
+Electronic / Dance,Dance / Club,new rave,,Electronic / Dance,Dance / Club
+Electronic / Dance,Dance / Club,Disco,,Pop,Disco
+Electronic / Dance,Dubstep,dubstep,,Electronic / Dance,Dubstep
+Electronic / Dance,Synthwave,synthwave,not in top 250 but common,Electronic / Dance,Synthwave
+Electronic / Dance,Synthwave,dark synth,not in top 250,Electronic / Dance,Synthwave
+Hip-Hop,Hip-Hop,Hip-Hop,,Hip-Hop,Hip-Hop
+Hip-Hop,Hip-Hop,hip hop,alias,Hip-Hop,Hip-Hop
+Hip-Hop,Hip-Hop,rap,,Hip-Hop,Hip-Hop
+Hip-Hop,Gangsta Rap,Gangsta Rap,,Hip-Hop,Gangsta Rap
+Hip-Hop,Underground Hip-Hop,underground hip-hop,,Hip-Hop,Underground Hip-Hop
+Hip-Hop,Trap,trap,not in top 250 but very common now,Hip-Hop,Trap
+Hip-Hop,Conscious Hip-Hop,conscious hip hop,not in top 250,Hip-Hop,Conscious Hip-Hop
+R&B / Soul / Funk,Soul,soul,,R&B / Soul / Funk,Soul
+R&B / Soul / Funk,Funk,funk,,R&B / Soul / Funk,Funk
+R&B / Soul / Funk,R&B,rnb,,R&B / Soul / Funk,R&B
+R&B / Soul / Funk,R&B,rhythm and blues,alias,R&B / Soul / Funk,R&B
+R&B / Soul / Funk,Motown,motown,,R&B / Soul / Funk,Motown
+R&B / Soul / Funk,Neo Soul,Neo Soul,,R&B / Soul / Funk,Neo Soul
+R&B / Soul / Funk,Neo Soul,neo soul,alias,R&B / Soul / Funk,Neo Soul
+R&B / Soul / Funk,Blues,blues,overlaps Rock,R&B / Soul / Funk,Blues
+Jazz,Jazz,jazz,,Jazz,Jazz
+Jazz,Jazz Fusion,jazz fusion,,Jazz,Jazz Fusion
+Jazz,Jazz Fusion,Fusion,alias,Jazz,Jazz Fusion
+Jazz,Smooth Jazz,Smooth Jazz,,Jazz,Smooth Jazz
+Jazz,Smooth Jazz,smooth jazz,alias,Jazz,Smooth Jazz
+Jazz,Bebop,bebop,not in top 250,Jazz,Bebop
+Jazz,Big Band / Swing,swing,,Jazz,Big Band / Swing
+Jazz,Big Band / Swing,big band,not in top 250,Jazz,Big Band / Swing
+Jazz,Acid Jazz,acid jazz,,Jazz,Acid Jazz
+Jazz,Nu Jazz,nu jazz,,Jazz,Nu Jazz
+Classical,Classical,Classical,,Classical,Classical
+Classical,Classical,classical,alias,Classical,Classical
+Classical,Baroque,baroque,,Classical,Classical
+Classical,Contemporary Classical,contemporary classical,,Classical,Classical
+Classical,Contemporary Classical,neoclassical,,Classical,Classical
+Classical,Contemporary Classical,Avant-Garde,20th century,Ambient / Experimental,Avant-Garde
+Classical,Orchestral,orchestral,not in top 250,Classical,Classical
+Classical,Minimalism,minimal,overlaps Electronic/IDM,Ambient / Experimental,minimal
+Classical,Soundtrack / Score,Soundtrack,film / game / TV,Classical,Classical
+Classical,Soundtrack / Score,video game music,,Classical,Classical
+Classical,Soundtrack / Score,anime,Japanese animation scores,Classical,Classical
+Classical,Piano / Instrumental,piano,instrument used as genre tag,Classical,Classical
+Folk / Country / Acoustic,Folk,folk,,Folk,Folk
+Folk / Country / Acoustic,Singer-Songwriter,singer-songwriter,,Folk,Folk
+Folk / Country / Acoustic,Acoustic,acoustic,,Folk,Folk
+Folk / Country / Acoustic,Country,country,,Country,Country
+Folk / Country / Acoustic,Americana,americana,in top 250 at rank 196,Country,Country
+Folk / Country / Acoustic,Alt-Country,Alt-country,,Country,Country
+Folk / Country / Acoustic,Alt-Country,alt-country,alias,Country,Country
+Folk / Country / Acoustic,Bluegrass,bluegrass,not in top 250,Country,Country
+Folk / Country / Acoustic,Indie Folk,indie folk,,Folk,Folk
+Folk / Country / Acoustic,Neofolk,neofolk,dark/pagan folk,Folk,Folk
+Folk / Country / Acoustic,Celtic,celtic,overlaps World,Folk,Folk
+Folk / Country / Acoustic,Folk Rock,folk rock,,Folk,Folk
+Folk / Country / Acoustic,Folk Rock,Alt-country,alias,Country,Country
+Ambient / Experimental,Ambient,ambient,,Ambient / Experimental,Ambient
+Ambient / Experimental,Dark Ambient,dark ambient,,Ambient / Experimental,Dark Ambient
+Ambient / Experimental,Drone,drone,overlaps Shoegaze,Shoegaze / Dream Pop,Drone / Ambient Rock
+Ambient / Experimental,Experimental,experimental,,Ambient / Experimental,Experimental
+Ambient / Experimental,Noise,noise,,Ambient / Experimental,Noise
+Ambient / Experimental,Noise,noise rock,overlaps Rock,Indie / Alternative,noise rock
+Ambient / Experimental,New Age,new age,,Ambient / Experimental,New Age
+Ambient / Experimental,Avant-Garde,Avant-Garde,overlaps Classical,Ambient / Experimental,Avant-Garde
+Ambient / Experimental,Minimalism,minimal,overlaps Classical/Electronic,Ambient / Experimental,minimal
+Ambient / Experimental,Space / Atmospheric,atmospheric,,Ambient / Experimental,Space / Atmospheric
+Pop,Pop,pop,,Pop,Pop
+Pop,Indie Pop,indie pop,,Indie / Alternative,Indie Pop
+Pop,Electropop,electropop,,Electronic / Dance,Electropop
+Pop,Electropop,Electro Pop,alias,Electronic / Dance,Electropop
+Pop,Dream Pop,dream pop,overlaps Shoegaze,Shoegaze / Dream Pop,Shoegaze / Dream Pop
+Pop,Dance Pop,dance,,Electronic / Dance,Dance / Club
+Pop,Disco,Disco,overlaps Electronic,Pop,Disco
+Pop,J-Pop,j-pop,,Pop,japanese
+Pop,J-Pop,JPop,alias,Pop,japanese
+Pop,J-Pop,japanese,when applied to pop artists,Pop,japanese
+Pop,K-Pop,k-pop,,Pop,Korean
+Pop,K-Pop,Korean,when applied to pop artists,Pop,Korean
+Pop,J-Rock,J-rock,,Pop,japanese
+Pop,Power Pop,power pop,,Pop,Power Pop
+Pop,Twee,twee,,Pop,Twee
+Pop,Easy Listening,easy listening,,Pop,Easy Listening
+Pop,Easy Listening,lounge,,Pop,Easy Listening
+Pop,Easy Listening,Mellow,mood but used as genre,Pop,Easy Listening
+Trip-Hop / Downtempo,Trip-Hop,trip-hop,,Trip-Hop / Downtempo,Trip-Hop
+Trip-Hop / Downtempo,Trip-Hop,trip hop,alias,Trip-Hop / Downtempo,Trip-Hop
+Trip-Hop / Downtempo,Downtempo,downtempo,,Trip-Hop / Downtempo,Downtempo
+Trip-Hop / Downtempo,Chillout,chillout,,Trip-Hop / Downtempo,Chillout
+Trip-Hop / Downtempo,Chillout,chill,alias,Trip-Hop / Downtempo,Chillout
+World / Reggae,Reggae,reggae,,World / Reggae,Reggae
+World / Reggae,Dub,dub,,World / Reggae,Dub
+World / Reggae,Ska,ska,overlaps Punk,Ska,Ska
+World / Reggae,Latin,latin,,World / Reggae,Latin
+World / Reggae,Brazilian,brazilian,,World / Reggae,Brazilian
+World / Reggae,Brazilian,mpb,Música Popular Brasileira,World / Reggae,Brazilian
+World / Reggae,Brazilian,brasil,alias,World / Reggae,Brazilian
+World / Reggae,World Music,world,,World / Reggae,World Music
+World / Reggae,World Music,World Music,alias,World / Reggae,World Music
+World / Reggae,Celtic,celtic,overlaps Folk,Folk,Folk
+World / Reggae,African,afrobeat,not in top 250 but common,World / Reggae,African
+Industrial / EBM,Industrial,industrial,,Industrial,Industrial
+Industrial / EBM,Industrial,industrial metal,overlaps Metal,metal,Heavy Metal
+Industrial / EBM,Industrial,industrial rock,overlaps Rock,metal,Heavy Metal
+Industrial / EBM,EBM,ebm,overlaps Darkwave,Industrial,EBM
+Industrial / EBM,EBM,dark electro,overlaps Darkwave,Post-Punk,Darkwave
+NOISE (ignore),Non-Genre Tag,seen live,user listening tag,Other,Other
+NOISE (ignore),Non-Genre Tag,bookmark,,Other,Other
+NOISE (ignore),Non-Genre Tag,albums I own,,Other,Other
+NOISE (ignore),Non-Genre Tag,under 2000 listeners,,Other,Other
+NOISE (ignore),Non-Genre Tag,love at first listen,,Other,Other
+NOISE (ignore),Non-Genre Tag,fip,French radio station,Other,Other
+NOISE (ignore),Non-Genre Tag,All,,Other,Other
+NOISE (ignore),Nationality,british,,Other,Other
+NOISE (ignore),Nationality,american,,Other,Other
+NOISE (ignore),Nationality,german,,Other,Other
+NOISE (ignore),Nationality,japanese,,Pop,japanese
+NOISE (ignore),Nationality,french,,Other,Other
+NOISE (ignore),Nationality,russian,,Other,Other
+NOISE (ignore),Nationality,swedish,,Other,Other
+NOISE (ignore),Nationality,norwegian,,Other,Other
+NOISE (ignore),Nationality,finnish,,Other,Other
+NOISE (ignore),Nationality,polish,,Other,Other
+NOISE (ignore),Nationality,Canadian,,Other,Other
+NOISE (ignore),Nationality,australian,,Other,Other
+NOISE (ignore),Nationality,irish,,Other,Other
+NOISE (ignore),Nationality,italian,,Other,Other
+NOISE (ignore),Nationality,spanish,,Other,Other
+NOISE (ignore),Nationality,korean,,Pop,Korean
+NOISE (ignore),Nationality,USA,,Other,Other
+NOISE (ignore),Nationality,UK,,Other,Other
+NOISE (ignore),Nationality,Scottish,,Other,Other
+NOISE (ignore),Nationality,welsh,,Other,Other
+NOISE (ignore),Nationality,deutsch,,Other,Other
+NOISE (ignore),Era,80s,,Other,Other
+NOISE (ignore),Era,90s,,Other,Other
+NOISE (ignore),Era,70s,,Other,Other
+NOISE (ignore),Era,60s,,Other,Other
+NOISE (ignore),Era,00s,,Other,Other
+NOISE (ignore),Era,2000s,,Other,Other
+NOISE (ignore),Era,10s,,Other,Other
+NOISE (ignore),Era,oldies,,Other,Other
+NOISE (ignore),Era,classic,vague era reference,Other,Other
+NOISE (ignore),Mood,sad,,Other,Other
+NOISE (ignore),Mood,melancholic,,Other,Other
+NOISE (ignore),Mood,melancholy,alias,Other,Other
+NOISE (ignore),Mood,romantic,,Other,Other
+NOISE (ignore),Mood,happy,,Other,Other
+NOISE (ignore),Mood,chill,,Trip-Hop / Downtempo,Chillout
+NOISE (ignore),Mood,Mellow,,Pop,Easy Listening
+NOISE (ignore),Mood,relaxing,,Other,Other
+NOISE (ignore),Mood,relax,alias,Other,Other
+NOISE (ignore),Mood,dark,,Other,Other
+NOISE (ignore),Mood,atmospheric,vague,Ambient / Experimental,Space / Atmospheric
+NOISE (ignore),Mood,epic,,Other,Other
+NOISE (ignore),Mood,amazing,,Other,Other
+NOISE (ignore),Mood,beautiful,,Other,Other
+NOISE (ignore),Mood,fun,,Other,Other
+NOISE (ignore),Mood,catchy,,Other,Other
+NOISE (ignore),Mood,smooth,,Other,Other
+NOISE (ignore),Mood,funky,overlaps with actual Funk genre tag,Other,Other
+NOISE (ignore),Descriptor,female vocalists,,Other,Other
+NOISE (ignore),Descriptor,female vocalist,alias,Other,Other
+NOISE (ignore),Descriptor,male vocalists,,Other,Other
+NOISE (ignore),Descriptor,male vocalist,alias,Other,Other
+NOISE (ignore),Descriptor,female,,Other,Other
+NOISE (ignore),Descriptor,female vocals,alias,Other,Other
+NOISE (ignore),Descriptor,instrumental,cross-genre descriptor,Other,Other
+NOISE (ignore),Descriptor,guitar,instrument,Other,Other
+NOISE (ignore),Descriptor,saxophone,instrument,Other,Other
+NOISE (ignore),Descriptor,composer,role,Other,Other
+NOISE (ignore),Descriptor,vocal,,Other,Other
+NOISE (ignore),Descriptor,guitar virtuoso,,Other,Other
+NOISE (ignore),Format,cover,,Other,Other
+NOISE (ignore),Format,covers,alias,Other,Other
+NOISE (ignore),Format,remix,,Other,Other
+NOISE (ignore),Format,live,,Other,Other
+NOISE (ignore),Label / Scene,4ad,record label,Other,Other
+NOISE (ignore),Label / Scene,Constellation,record label,Other,Other
+NOISE (ignore),Label / Scene,norrland,geographic scene,Other,Other
+NOISE (ignore),Label / Scene,Leeds,geographic scene,Other,Other
+NOISE (ignore),Label / Scene,nashville,geographic scene,Other,Other
+NOISE (ignore),Label / Scene,detroit,geographic scene,Other,Other
+NOISE (ignore),Label / Scene,OC ReMix,video game remix community,Other,Other
+NOISE (ignore),Broad Catch-All,Ballad,mood/format descriptor,Other,Other
+NOISE (ignore),Broad Catch-All,easy listening,too broad,Pop,Easy Listening
+NOISE (ignore),Broad Catch-All,christian,lyrical content,Other,Other
+NOISE (ignore),Broad Catch-All,comedy,,Other,Other
+NOISE (ignore),Broad Catch-All,party,,Other,Other
+NOISE (ignore),Broad Catch-All,medieval,overlaps Neofolk but vague,Other,Other
+NOISE (ignore),Broad Catch-All,visual kei,Japanese fashion subculture,Other,Other
+NOISE (ignore),Broad Catch-All,russian rock,nationality + genre combo,Other,Other
+NOISE (ignore),Broad Catch-All,J-rock,overlaps Rock/Japanese,Pop,japanese

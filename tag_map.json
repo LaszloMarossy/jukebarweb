@@ -1,0 +1,870 @@
+{
+  "rock": {
+    "pie": "rock",
+    "band": "rock"
+  },
+  "classic rock": {
+    "pie": "rock",
+    "band": "classic rock"
+  },
+  "hard rock": {
+    "pie": "rock",
+    "band": "rock"
+  },
+  "blues rock": {
+    "pie": "r&b / soul / funk",
+    "band": "blues"
+  },
+  "rock n roll": {
+    "pie": "rock",
+    "band": "rock n roll"
+  },
+  "rock and roll": {
+    "pie": "rock",
+    "band": "rock n roll"
+  },
+  "soft rock": {
+    "pie": "rock",
+    "band": "classic rock"
+  },
+  "pop rock": {
+    "pie": "pop",
+    "band": "pop"
+  },
+  "glam rock": {
+    "pie": "rock",
+    "band": "glam"
+  },
+  "rockabilly": {
+    "pie": "rockabilly/garage",
+    "band": "rockabilly/garage"
+  },
+  "psychobilly": {
+    "pie": "rockabilly/garage",
+    "band": "rockabilly/garage"
+  },
+  "indie rock": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "indie": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "flying nun": {
+    "pie": "indie / alternative",
+    "band": "kiwi"
+  },
+  "alternative rock": {
+    "pie": "indie / alternative",
+    "band": "alternative"
+  },
+  "alternative": {
+    "pie": "indie / alternative",
+    "band": "alternative"
+  },
+  "britpop": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "grunge": {
+    "pie": "indie / alternative",
+    "band": "grunge"
+  },
+  "noise rock": {
+    "pie": "indie / alternative",
+    "band": "noise rock"
+  },
+  "math rock": {
+    "pie": "indie / alternative",
+    "band": "math rock"
+  },
+  "art rock": {
+    "pie": "rock",
+    "band": "progressive"
+  },
+  "jangle pop": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "dunedin sound": {
+    "pie": "indie / alternative",
+    "band": "kiwi"
+  },
+  "female vocalists": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "female vocalist": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "new zealand": {
+    "pie": "indie / alternative",
+    "band": "kiwi"
+  },
+  "kiwi": {
+    "pie": "indie / alternative",
+    "band": "kiwi"
+  },
+  "power pop": {
+    "pie": "pop",
+    "band": "power pop"
+  },
+  "chamber pop": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "twee": {
+    "pie": "pop",
+    "band": "twee"
+  },
+  "indietronica": {
+    "pie": "indie / alternative",
+    "band": "indie"
+  },
+  "progressive rock": {
+    "pie": "rock",
+    "band": "progressive"
+  },
+  "progressive": {
+    "pie": "rock",
+    "band": "progressive"
+  },
+  "krautrock": {
+    "pie": "rock",
+    "band": "progressive"
+  },
+  "space rock": {
+    "pie": "rock",
+    "band": "progressive"
+  },
+  "psychedelic rock": {
+    "pie": "psychedelic",
+    "band": "psychedelic"
+  },
+  "psychedelic": {
+    "pie": "psychedelic",
+    "band": "psychedelic"
+  },
+  "neo-psychedelia": {
+    "pie": "psychedelic",
+    "band": "psychedelic"
+  },
+  "stoner rock": {
+    "pie": "psychedelic",
+    "band": "psychedelic"
+  },
+  "psychedelia": {
+    "pie": "psychedelic",
+    "band": "psychedelic"
+  },
+  "post-rock": {
+    "pie": "rock",
+    "band": "post-rock"
+  },
+  "post rock": {
+    "pie": "rock",
+    "band": "post-rock"
+  },
+  "experimental rock": {
+    "pie": "rock",
+    "band": "experimental"
+  },
+  "garage rock": {
+    "pie": "rockabilly/garage",
+    "band": "rockabilly/garage"
+  },
+  "garage": {
+    "pie": "rockabilly/garage",
+    "band": "rockabilly/garage"
+  },
+  "southern rock": {
+    "pie": "rock",
+    "band": "rock"
+  },
+  "new romantic": {
+    "pie": "new wave",
+    "band": "new wave"
+  },
+  "metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "heavy metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "speed metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "alternative metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "nu metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "industrial metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "industrial rock": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "post-metal": {
+    "pie": "metal",
+    "band": "heavy metal"
+  },
+  "black metal": {
+    "pie": "metal",
+    "band": "black metal"
+  },
+  "atmospheric black metal": {
+    "pie": "metal",
+    "band": "black metal"
+  },
+  "depressive black metal": {
+    "pie": "metal",
+    "band": "black metal"
+  },
+  "viking metal": {
+    "pie": "metal",
+    "band": "black metal"
+  },
+  "death metal": {
+    "pie": "metal",
+    "band": "death metal"
+  },
+  "melodic death metal": {
+    "pie": "metal",
+    "band": "death metal"
+  },
+  "brutal death metal": {
+    "pie": "metal",
+    "band": "death metal"
+  },
+  "technical death metal": {
+    "pie": "metal",
+    "band": "death metal"
+  },
+  "deathcore": {
+    "pie": "metal",
+    "band": "death metal"
+  },
+  "thrash metal": {
+    "pie": "metal",
+    "band": "thrash metal"
+  },
+  "doom metal": {
+    "pie": "metal",
+    "band": "doom metal"
+  },
+  "sludge": {
+    "pie": "metal",
+    "band": "doom metal"
+  },
+  "sludge metal": {
+    "pie": "metal",
+    "band": "doom metal"
+  },
+  "gothic metal": {
+    "pie": "metal",
+    "band": "gothic metal"
+  },
+  "symphonic metal": {
+    "pie": "metal",
+    "band": "gothic metal"
+  },
+  "female fronted metal": {
+    "pie": "metal",
+    "band": "gothic metal"
+  },
+  "progressive metal": {
+    "pie": "metal",
+    "band": "metal"
+  },
+  "power metal": {
+    "pie": "metal",
+    "band": "metal"
+  },
+  "folk metal": {
+    "pie": "metal",
+    "band": "metal"
+  },
+  "metalcore": {
+    "pie": "metal",
+    "band": "metal"
+  },
+  "grindcore": {
+    "pie": "metal",
+    "band": "grindcore"
+  },
+  "post-punk": {
+    "pie": "post-punk",
+    "band": "post-punk"
+  },
+  "post punk": {
+    "pie": "post-punk",
+    "band": "post-punk"
+  },
+  "proto-punk": {
+    "pie": "post-punk",
+    "band": "post-punk"
+  },
+  "art punk": {
+    "pie": "post-punk",
+    "band": "post-punk"
+  },
+  "dance-punk": {
+    "pie": "post-punk",
+    "band": "post-punk"
+  },
+  "new wave": {
+    "pie": "new wave",
+    "band": "new wave"
+  },
+  "synthpop": {
+    "pie": "electronic / dance",
+    "band": "synthpop"
+  },
+  "synth pop": {
+    "pie": "electronic / dance",
+    "band": "synthpop"
+  },
+  "synth-pop": {
+    "pie": "electronic / dance",
+    "band": "synthpop"
+  },
+  "darkwave": {
+    "pie": "post-punk",
+    "band": "darkwave"
+  },
+  "ebm": {
+    "pie": "industrial",
+    "band": "ebm"
+  },
+  "dark electro": {
+    "pie": "post-punk",
+    "band": "darkwave"
+  },
+  "gothic rock": {
+    "pie": "gothic rock",
+    "band": "gothic rock"
+  },
+  "gothic": {
+    "pie": "gothic rock",
+    "band": "gothic rock"
+  },
+  "goth": {
+    "pie": "gothic rock",
+    "band": "gothic rock"
+  },
+  "ethereal": {
+    "pie": "gothic rock",
+    "band": "gothic rock"
+  },
+  "shoegaze": {
+    "pie": "shoegaze / dream pop",
+    "band": "shoegaze / dream pop"
+  },
+  "dream pop": {
+    "pie": "shoegaze / dream pop",
+    "band": "shoegaze / dream pop"
+  },
+  "dreamy": {
+    "pie": "shoegaze / dream pop",
+    "band": "shoegaze / dream pop"
+  },
+  "noise pop": {
+    "pie": "shoegaze / dream pop",
+    "band": "noise pop"
+  },
+  "slowcore": {
+    "pie": "shoegaze / dream pop",
+    "band": "slowcore"
+  },
+  "sadcore": {
+    "pie": "shoegaze / dream pop",
+    "band": "slowcore"
+  },
+  "lo-fi": {
+    "pie": "post-punk",
+    "band": "lo-fi"
+  },
+  "chillwave": {
+    "pie": "shoegaze / dream pop",
+    "band": "chillwave"
+  },
+  "drone": {
+    "pie": "shoegaze / dream pop",
+    "band": "drone / ambient rock"
+  },
+  "dronegaze": {
+    "pie": "shoegaze / dream pop",
+    "band": "drone / ambient rock"
+  },
+  "folktronica": {
+    "pie": "shoegaze / dream pop",
+    "band": "folktronica"
+  },
+  "punk": {
+    "pie": "punk / hardcore",
+    "band": "punk rock"
+  },
+  "punk rock": {
+    "pie": "punk / hardcore",
+    "band": "punk rock"
+  },
+  "hardcore": {
+    "pie": "punk / hardcore",
+    "band": "hardcore"
+  },
+  "hardcore punk": {
+    "pie": "punk / hardcore",
+    "band": "hardcore"
+  },
+  "post-hardcore": {
+    "pie": "punk / hardcore",
+    "band": "post-hardcore"
+  },
+  "screamo": {
+    "pie": "punk / hardcore",
+    "band": "post-hardcore"
+  },
+  "emocore": {
+    "pie": "punk / hardcore",
+    "band": "post-hardcore"
+  },
+  "emo": {
+    "pie": "punk / hardcore",
+    "band": "emo"
+  },
+  "pop punk": {
+    "pie": "pop punk",
+    "band": "pop punk"
+  },
+  "melodic punk": {
+    "pie": "pop punk",
+    "band": "pop punk"
+  },
+  "pop-punk": {
+    "pie": "pop punk",
+    "band": "pop punk"
+  },
+  "melodic hardcore": {
+    "pie": "pop punk",
+    "band": "melodic hardcore"
+  },
+  "ska": {
+    "pie": "ska",
+    "band": "ska"
+  },
+  "house": {
+    "pie": "electronic / dance",
+    "band": "house"
+  },
+  "deep house": {
+    "pie": "electronic / dance",
+    "band": "house"
+  },
+  "techno": {
+    "pie": "electronic / dance",
+    "band": "techno"
+  },
+  "trance": {
+    "pie": "electronic / dance",
+    "band": "trance"
+  },
+  "psytrance": {
+    "pie": "electronic / dance",
+    "band": "trance"
+  },
+  "progressive trance": {
+    "pie": "electronic / dance",
+    "band": "trance"
+  },
+  "drum and bass": {
+    "pie": "electronic / dance",
+    "band": "drum & bass"
+  },
+  "dnb": {
+    "pie": "electronic / dance",
+    "band": "drum & bass"
+  },
+  "breakbeat": {
+    "pie": "electronic / dance",
+    "band": "drum & bass"
+  },
+  "breakcore": {
+    "pie": "electronic / dance",
+    "band": "drum & bass"
+  },
+  "idm": {
+    "pie": "electronic / dance",
+    "band": "idm / glitch"
+  },
+  "glitch": {
+    "pie": "electronic / dance",
+    "band": "idm / glitch"
+  },
+  "minimal": {
+    "pie": "ambient / experimental",
+    "band": "minimal"
+  },
+  "minimal synth": {
+    "pie": "ambient / experimental",
+    "band": "minimal"
+  },
+  "electronica": {
+    "pie": "electronic / dance",
+    "band": "electro / electronica"
+  },
+  "electronic": {
+    "pie": "electronic / dance",
+    "band": "electro / electronica"
+  },
+  "electro": {
+    "pie": "electronic / dance",
+    "band": "electro / electronica"
+  },
+  "electro pop": {
+    "pie": "electronic / dance",
+    "band": "electropop"
+  },
+  "dance": {
+    "pie": "electronic / dance",
+    "band": "dance / club"
+  },
+  "new rave": {
+    "pie": "electronic / dance",
+    "band": "dance / club"
+  },
+  "disco": {
+    "pie": "pop",
+    "band": "disco"
+  },
+  "dubstep": {
+    "pie": "electronic / dance",
+    "band": "dubstep"
+  },
+  "synthwave": {
+    "pie": "electronic / dance",
+    "band": "synthwave"
+  },
+  "dark synth": {
+    "pie": "electronic / dance",
+    "band": "synthwave"
+  },
+  "hip-hop": {
+    "pie": "hip-hop",
+    "band": "hip-hop"
+  },
+  "hip hop": {
+    "pie": "hip-hop",
+    "band": "hip-hop"
+  },
+  "rap": {
+    "pie": "hip-hop",
+    "band": "hip-hop"
+  },
+  "gangsta rap": {
+    "pie": "hip-hop",
+    "band": "gangsta rap"
+  },
+  "underground hip-hop": {
+    "pie": "hip-hop",
+    "band": "underground hip-hop"
+  },
+  "trap": {
+    "pie": "hip-hop",
+    "band": "trap"
+  },
+  "conscious hip hop": {
+    "pie": "hip-hop",
+    "band": "conscious hip-hop"
+  },
+  "soul": {
+    "pie": "r&b / soul / funk",
+    "band": "soul"
+  },
+  "funk": {
+    "pie": "r&b / soul / funk",
+    "band": "funk"
+  },
+  "rnb": {
+    "pie": "r&b / soul / funk",
+    "band": "r&b"
+  },
+  "rhythm and blues": {
+    "pie": "r&b / soul / funk",
+    "band": "r&b"
+  },
+  "motown": {
+    "pie": "r&b / soul / funk",
+    "band": "motown"
+  },
+  "neo soul": {
+    "pie": "r&b / soul / funk",
+    "band": "neo soul"
+  },
+  "blues": {
+    "pie": "r&b / soul / funk",
+    "band": "blues"
+  },
+  "jazz": {
+    "pie": "jazz",
+    "band": "jazz"
+  },
+  "jazz fusion": {
+    "pie": "jazz",
+    "band": "jazz fusion"
+  },
+  "fusion": {
+    "pie": "jazz",
+    "band": "jazz fusion"
+  },
+  "smooth jazz": {
+    "pie": "jazz",
+    "band": "smooth jazz"
+  },
+  "bebop": {
+    "pie": "jazz",
+    "band": "bebop"
+  },
+  "swing": {
+    "pie": "jazz",
+    "band": "big band / swing"
+  },
+  "big band": {
+    "pie": "jazz",
+    "band": "big band / swing"
+  },
+  "acid jazz": {
+    "pie": "jazz",
+    "band": "acid jazz"
+  },
+  "nu jazz": {
+    "pie": "jazz",
+    "band": "nu jazz"
+  },
+  "classical": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "baroque": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "contemporary classical": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "neoclassical": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "avant-garde": {
+    "pie": "ambient / experimental",
+    "band": "avant-garde"
+  },
+  "orchestral": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "soundtrack": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "video game music": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "anime": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "piano": {
+    "pie": "classical",
+    "band": "classical"
+  },
+  "folk": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "singer-songwriter": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "acoustic": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "country": {
+    "pie": "country",
+    "band": "country"
+  },
+  "americana": {
+    "pie": "country",
+    "band": "country"
+  },
+  "alt-country": {
+    "pie": "country",
+    "band": "country"
+  },
+  "bluegrass": {
+    "pie": "country",
+    "band": "country"
+  },
+  "indie folk": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "neofolk": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "celtic": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "folk rock": {
+    "pie": "folk",
+    "band": "folk"
+  },
+  "ambient": {
+    "pie": "ambient / experimental",
+    "band": "ambient"
+  },
+  "dark ambient": {
+    "pie": "ambient / experimental",
+    "band": "dark ambient"
+  },
+  "experimental": {
+    "pie": "ambient / experimental",
+    "band": "experimental"
+  },
+  "noise": {
+    "pie": "ambient / experimental",
+    "band": "noise"
+  },
+  "new age": {
+    "pie": "ambient / experimental",
+    "band": "new age"
+  },
+  "atmospheric": {
+    "pie": "ambient / experimental",
+    "band": "space / atmospheric"
+  },
+  "pop": {
+    "pie": "pop",
+    "band": "pop"
+  },
+  "indie pop": {
+    "pie": "indie / alternative",
+    "band": "indie pop"
+  },
+  "electropop": {
+    "pie": "electronic / dance",
+    "band": "electropop"
+  },
+  "j-pop": {
+    "pie": "pop",
+    "band": "japanese"
+  },
+  "jpop": {
+    "pie": "pop",
+    "band": "japanese"
+  },
+  "japanese": {
+    "pie": "pop",
+    "band": "japanese"
+  },
+  "k-pop": {
+    "pie": "pop",
+    "band": "korean"
+  },
+  "korean": {
+    "pie": "pop",
+    "band": "korean"
+  },
+  "j-rock": {
+    "pie": "pop",
+    "band": "japanese"
+  },
+  "easy listening": {
+    "pie": "pop",
+    "band": "easy listening"
+  },
+  "lounge": {
+    "pie": "pop",
+    "band": "easy listening"
+  },
+  "mellow": {
+    "pie": "pop",
+    "band": "easy listening"
+  },
+  "trip-hop": {
+    "pie": "trip-hop / downtempo",
+    "band": "trip-hop"
+  },
+  "trip hop": {
+    "pie": "trip-hop / downtempo",
+    "band": "trip-hop"
+  },
+  "downtempo": {
+    "pie": "trip-hop / downtempo",
+    "band": "downtempo"
+  },
+  "chillout": {
+    "pie": "trip-hop / downtempo",
+    "band": "chillout"
+  },
+  "chill": {
+    "pie": "trip-hop / downtempo",
+    "band": "chillout"
+  },
+  "reggae": {
+    "pie": "world / reggae",
+    "band": "reggae"
+  },
+  "dub": {
+    "pie": "world / reggae",
+    "band": "dub"
+  },
+  "latin": {
+    "pie": "world / reggae",
+    "band": "latin"
+  },
+  "brazilian": {
+    "pie": "world / reggae",
+    "band": "brazilian"
+  },
+  "mpb": {
+    "pie": "world / reggae",
+    "band": "brazilian"
+  },
+  "brasil": {
+    "pie": "world / reggae",
+    "band": "brazilian"
+  },
+  "world": {
+    "pie": "world / reggae",
+    "band": "world music"
+  },
+  "world music": {
+    "pie": "world / reggae",
+    "band": "world music"
+  },
+  "afrobeat": {
+    "pie": "world / reggae",
+    "band": "african"
+  },
+  "industrial": {
+    "pie": "industrial",
+    "band": "industrial"
+  }
+}
