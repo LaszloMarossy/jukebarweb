@@ -362,18 +362,33 @@ const PIE_COLORS = {
   'other':                  '#555555',
 };
 
-function pieCSSGradient(combined_pie) {
+function pieSVG(combined_pie, size, isLive) {
   if (!combined_pie) return null;
   const entries = Object.entries(combined_pie).filter(([, v]) => v > 0);
   if (!entries.length) return null;
-  let pos = 0;
-  const stops = entries.map(([genre, frac]) => {
+  const r  = (size - 6) / 2;
+  const cx = size / 2, cy = size / 2;
+  let angle = -Math.PI / 2;
+  const paths = [];
+  for (const [genre, frac] of entries) {
     const color = PIE_COLORS[genre] || '#666';
-    const start = (pos * 100).toFixed(1);
-    pos += frac;
-    return `${color} ${start}% ${(pos * 100).toFixed(1)}%`;
-  });
-  return `conic-gradient(${stops.join(', ')})`;
+    const pct   = Math.round(frac * 100);
+    if (frac >= 0.9999) {
+      paths.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"><title>${genre} ${pct}%</title></circle>`);
+    } else {
+      const a0 = angle;
+      angle += frac * 2 * Math.PI;
+      const x1 = (cx + r * Math.cos(a0)).toFixed(1);
+      const y1 = (cy + r * Math.sin(a0)).toFixed(1);
+      const x2 = (cx + r * Math.cos(angle)).toFixed(1);
+      const y2 = (cy + r * Math.sin(angle)).toFixed(1);
+      const lg = frac > 0.5 ? 1 : 0;
+      paths.push(`<path d="M${cx},${cy}L${x1},${y1}A${r},${r} 0 ${lg},1 ${x2},${y2}Z" fill="${color}"><title>${genre} ${pct}%</title></path>`);
+    }
+  }
+  const ring = isLive ? '#4ade80' : '#fff';
+  paths.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${ring}" stroke-width="3" pointer-events="none"/>`);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));cursor:pointer">${paths.join('')}</svg>`;
 }
 
 function genreHexFor(artistName, bar) {
@@ -440,16 +455,18 @@ function openPanel(bar) {
       const notePart = pl.note ? ` <span class="playlist-line-note">(${esc(pl.note)})</span>` : '';
       const line = `<div class="playlist-line">${esc(displayName)}${notePart}</div>`;
       const bubbles = (pl.artists || []).map(artist => {
-        const genre = genreHexFor(artist, bar);
+        const bandColor = profilingOn && bar.profiling && bar.profiling.artist_colors && bar.profiling.artist_colors[artist];
+        const hex = bandColor ? (GENRE_COLORS[bandColor] || null) : null;
         let bg, fg;
-        if (genre) {
-          bg = genre; fg = fgFor(bg);
+        if (hex) {
+          bg = hex; fg = fgFor(bg);
         } else if (profilingOn) {
-          bg = '#c8c8c8'; fg = '#333';   // profiling on but artist not yet profiled
+          bg = '#c8c8c8'; fg = '#333';
         } else {
           bg = PALETTE[ci % PALETTE.length]; fg = fgFor(bg); ci++;
         }
-        return `<div class="bubble" style="background:${bg};color:${fg}">${esc(artist)}</div>`;
+        const tip = bandColor ? ` title="${esc(bandColor)}"` : '';
+        return `<div class="bubble" style="background:${bg};color:${fg}"${tip}>${esc(artist)}</div>`;
       }).join('');
       return `<div class="playlist-section">${line}<div class="bubble-wrap">${bubbles}</div></div>`;
     }).join('');
@@ -492,18 +509,16 @@ async function loadBars() {
 
   const bounds = [];
   mapped.forEach(bar => {
-    const pieGrad = profilingOn && bar.profiling && pieCSSGradient(bar.profiling.combined_pie);
-    const size = pieGrad ? 52 : 28;
+    const pieSvg = profilingOn && bar.profiling && pieSVG(bar.profiling.combined_pie, 52, bar.is_live);
+    const size = pieSvg ? 52 : 28;
     const half = size / 2;
 
     const el = document.createElement('div');
-    el.className = 'jb-marker' + (bar.is_live ? ' live' : '');
-    el.style.width  = size + 'px';
-    el.style.height = size + 'px';
-    if (pieGrad) {
-      el.style.background   = pieGrad;
-      el.style.borderColor  = bar.is_live ? '#4ade80' : '#fff';
+    if (pieSvg) {
+      el.style.cssText = `width:${size}px;height:${size}px`;
+      el.innerHTML = pieSvg;
     } else {
+      el.className = 'jb-marker' + (bar.is_live ? ' live' : '');
       el.textContent = '♪';
     }
 
