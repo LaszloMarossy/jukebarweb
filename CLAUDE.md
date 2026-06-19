@@ -40,10 +40,13 @@ Every payment/approval setting change must be reflected in all five:
 
 **`stripe_enabled` derived from key presence on register** — relay register handler originally derived `stripe_enabled = bool(pk)` (key present = enabled). Now uses `body.get("stripe_enabled", bool(pk))` so host can explicitly disable Stripe while keeping the key stored. Android client sends `stripe_enabled` explicitly; iOS sends empty key when disabled.
 
-**Auto-accept is a mode, not a timer** — `auto_accept_minutes` was removed. When payments are involved, you can't auto-accept without payment. When no payments, `requireApproval = false` is the mode. No timer fallback.
+**Auto-accept is a mode, not a timer** — `auto_accept_minutes` is gone from all surfaces. There are three approval modes: Stripe payment required, pay-to-bartender, or auto-accept (free requests, no approval). No timer fallback exists or is planned.
 
 **Payment labels (all admin pages):** "Stripe 💳", "Pay to bartender", "Auto (free requests)"
 
 ## Planned next
-- Apple Pay domain verification file at `/.well-known/apple-developer-merchantid-domain-association`
-- Discovery pipeline: Last.fm genre profiling + recommended playlist (see `docs/render_spec.md`)
+- Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
+- Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
+- Apple Pay domain file is served; needs Stripe dashboard domain registration to activate
+- LLM fallback for obscure artists (no Last.fm data): deferred — needs API cost/rate infrastructure first
+- Recommended playlist pipeline: deferred (see `docs/render_spec.md`)
