@@ -84,12 +84,13 @@ def save_bar_profile(bar_id: str, profile: dict) -> None:
 # ── Profiling ─────────────────────────────────────────────────────────────────
 
 async def _profile_playlist(
-    artist_names: list[str],
+    artist_entries: list,
     band_cache: dict,
     api_key: str,
 ) -> tuple[dict, list[dict]]:
     """
     Profile one playlist's artists.
+    artist_entries: list of str or {name, song_count} dicts.
     Checks band_cache first; only calls Last.fm for unknown artists.
     Returns (pie_chart, artists_list).
     """
@@ -97,8 +98,15 @@ async def _profile_playlist(
     artists_out: list[dict] = []
 
     async with httpx.AsyncClient() as client:
-        for name in artist_names:
-            song_count = 1  # default until iOS/Android send per-artist counts
+        for entry in artist_entries:
+            if isinstance(entry, dict):
+                name       = entry.get("name", "")
+                song_count = entry.get("song_count", 1)
+            else:
+                name       = str(entry)
+                song_count = 1
+            if not name:
+                continue
 
             if name not in band_cache:
                 tags = await fetch_artist_tags(client, name, api_key)
@@ -164,13 +172,13 @@ async def run_once(band_cache: dict) -> int:
             if updated_at <= profiled_at:
                 continue  # up to date
 
-            artist_names = pl.get("artists", [])
-            if not artist_names:
+            artist_entries = pl.get("artists", [])
+            if not artist_entries:
                 continue
 
-            print(f"[daemon] {bar_name} / {pl_name}: {len(artist_names)} artists", flush=True)
+            print(f"[daemon] {bar_name} / {pl_name}: {len(artist_entries)} artists", flush=True)
             t0 = time.time()
-            pie, artists = await _profile_playlist(artist_names, band_cache, LASTFM_API_KEY)
+            pie, artists = await _profile_playlist(artist_entries, band_cache, LASTFM_API_KEY)
             elapsed = time.time() - t0
             top4 = list(pie.items())[:4]
             print(f"[daemon] {bar_name} / {pl_name}: done in {elapsed:.1f}s — {top4}", flush=True)

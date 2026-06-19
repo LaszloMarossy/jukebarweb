@@ -302,7 +302,19 @@ async def map_register(body: dict[str, Any]):
     playlist_name         = body.get("playlist_name") or "Playlist"
     playlist_display_name = body.get("playlist_display_name") or playlist_name
     playlist_note         = body.get("playlist_note", "")
-    new_artists           = sorted(body.get("artists", []), key=str.casefold)
+    raw_artists = body.get("artists", [])
+    if raw_artists and isinstance(raw_artists[0], str):
+        # legacy format: ["Artist Name", ...]
+        new_artists = sorted(
+            [{"name": a, "song_count": 1} for a in raw_artists if isinstance(a, str)],
+            key=lambda x: x["name"].casefold(),
+        )
+    else:
+        # new format: [{"name": ..., "song_count": N}, ...]
+        new_artists = sorted(
+            [a for a in raw_artists if isinstance(a, dict) and a.get("name")],
+            key=lambda x: x["name"].casefold(),
+        )
     now           = time.time()
     existing      = _map_entries.get(jukebar_id)
 
@@ -386,7 +398,13 @@ async def map_bars():
             "location":      e.location,
             "lat":           e.lat,
             "lng":           e.lng,
-            "playlists":     e.playlists,
+            "playlists":     [
+                {**p, "artists": [
+                    a["name"] if isinstance(a, dict) else a
+                    for a in p.get("artists", [])
+                ]}
+                for p in e.playlists
+            ],
             "registered_at": e.registered_at,
             "last_seen":     e.last_seen,
             "is_live":       e.last_seen >= cutoff and e.jukebar_id in _bars,
