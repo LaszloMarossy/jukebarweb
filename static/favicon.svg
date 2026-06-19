@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+  <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#dc7955" stroke-width="1.5"/>
+  <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+  <circle cx="36" cy="36" r="24" fill="#fda185"/>
+  <line x1="36" y1="36" x2="36"    y2="12"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="48"    y2="15.22" stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="56.78" y2="24"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="60"    y2="36"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="56.78" y2="48"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="48"    y2="56.78" stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="36"    y2="60"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="24"    y2="56.78" stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="15.22" y2="48"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="12"    y2="36"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="15.22" y2="24"    stroke="white" stroke-width="1" opacity="0.75"/>
+  <line x1="36" y1="36" x2="24"    y2="15.22" stroke="white" stroke-width="1" opacity="0.75"/>
+  <circle cx="36" cy="36" r="3" fill="white" opacity="0.85"/>
+</svg>
