@@ -135,6 +135,24 @@ async def _profile_playlist(
             })
 
     pie = compute_playlist_pie(all_pie_scores)
+
+    # Log top-5 artists by song count so weighting effect is visible
+    total_songs = sum(a["song_count"] for a in artists_out)
+    top5 = sorted(artists_out, key=lambda a: -a["song_count"])[:5]
+    print(f"    song counts — total tracks: {total_songs}, "
+          f"top artists: {', '.join(f\"{a['name']} ×{a['song_count']} ({a['band_color']})\" for a in top5)}",
+          flush=True)
+
+    # Compare weighted vs flat (every artist = 1) to show weighting impact
+    flat_scores = [resolve_artist(a["name"], 1,
+                                  [tuple(t) for t in band_cache.get(a["name"], {}).get("tags", [])],
+                                  TOP_N_TAGS)["pie_scores"]
+                   for a in artists_out]
+    flat_pie = compute_playlist_pie(flat_scores)
+    weighted_top = list(pie.items())[:3]
+    flat_top     = list(flat_pie.items())[:3]
+    print(f"    weighted pie: {weighted_top}  |  flat (×1): {flat_top}", flush=True)
+
     return pie, artists_out
 
 

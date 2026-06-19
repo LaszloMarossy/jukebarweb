@@ -22,15 +22,18 @@ Fallback for obscure artists not in Last.fm: LLM (Claude/GPT) classification by 
 
 ### Pipeline 1 — Genre Profile & Map Pie Chart
 
-**Input:** `[{artist, song_count}]` from the bar's Apple Music playlist
-(iOS app change needed: send song counts alongside artist names in `POST /api/map/register`)
+**Input:** `[{name, song_count}]` from the bar's playlist — **implemented June 2026**.
+iOS (`AppState.swift`) and Android (`RelayClient.kt`) now count songs per artist and send `[{name, song_count}]`.
+Relay accepts both legacy `[str]` and new `[{name, song_count}]` for backward compat.
+Daemon unpacks counts and uses them as weights throughout the pipeline.
 
 **Step 1 — Tag each artist**
 Call `artist.getTopTags` for each band. Returns tags like `["heavy metal", "thrash metal", "hard rock"]`
 with a community weight per tag.
 
-**Step 2 — Weight by song count**
+**Step 2 — Weight by song count** ✓ implemented
 Multiply tag weights by the band's song count in the playlist.
+A band with 20 songs contributes 20× more to the pie than a one-off track.
 Result: a weighted dictionary of the bar's true genre identity.
 
 **Step 3 — Map to top-level genre palette**

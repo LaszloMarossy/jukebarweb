@@ -98,6 +98,18 @@ iOS already sent `lat`/`lng` from `CLLocationManager`. Android was sending only 
 
 ---
 
+### 2026-06-19 — Per-artist song count weighting in genre profiling
+
+**Context:** The profiling daemon was treating every artist as equally important (song_count=1), regardless of how many tracks they appear on in the playlist. A bar where The Cure plays 25 times looked the same as one where they appear once.
+
+**Change:** iOS (`AppState.swift`) and Android (`RelayClient.kt` + `MainActivity.kt`) now count tracks per artist and send `[{name, song_count}]` instead of `[String]` to `POST /api/map/register`. The relay normalises legacy format on the way in. The daemon unpacks the count and passes it to `resolve_artist()` which multiplies tag weights by `song_count` — so an artist with 20 plays contributes 20× more to the pie.
+
+**Backward compat:** Relay accepts the old `[String]` format and converts it to `[{name, song_count: 1}]` so un-updated clients keep working.
+
+**Logging added:** Daemon prints top-5 artists by song count per playlist so the weighting effect is visible in the log.
+
+---
+
 ### 2026-06-01 — Map clustering; map persistence policy confirmed
 
 **Map clustering (`discover.html`):**
