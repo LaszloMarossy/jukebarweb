@@ -231,7 +231,9 @@ async def main() -> None:
             save_band_cache(band_cache)
             print(f"[daemon] cycle done — {updated} bar(s) updated", flush=True)
         except Exception as e:
+            import traceback
             print(f"[daemon] unexpected error: {e}", flush=True)
+            traceback.print_exc()
         print(f"[daemon] sleeping {POLL_INTERVAL}s...", flush=True)
         await asyncio.sleep(POLL_INTERVAL)
 
