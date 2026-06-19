@@ -74,9 +74,9 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   flex-shrink: 0; padding: 0 16px 10px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.panel-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
-.panel-name  { font-size: 20px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.panel-meta  { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.panel-title-row { flex: 1; min-width: 0; }
+.panel-name  { font-size: 23px; font-weight: 800; line-height: 1.35; }
+.panel-bar-detail { font-size: 15px; font-weight: 400; color: #fff; }
 .live-dot {
   display: inline-block; width: 8px; height: 8px;
   border-radius: 50%; background: var(--live);
@@ -96,25 +96,28 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   padding: 0 14px 20px;
 }
 
+/* ── Section labels (BAR PROFILE, PLAYLIST:) ── */
+.section-label {
+  font-weight: 300; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--accent);
+}
+
 /* ── Bar Profile section ── */
-.bar-profile { margin-bottom: 18px; }
-.bar-profile-title {
-  font-size: 10px; font-weight: 700; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
-}
-.bar-profile-label {
-  font-size: 17px; font-weight: 800; letter-spacing: .02em; color: var(--accent);
-  min-height: 24px; margin-bottom: 5px; line-height: 1.3;
-}
+.bar-profile { margin-bottom: 16px; }
+.bar-profile-title { font-size: 15px; display: block; margin-bottom: 3px; }
 .bar-profile-bar {
   display: flex; height: 28px; border-radius: 6px; overflow: hidden;
   width: calc(100% - 4px); cursor: crosshair; touch-action: none; user-select: none;
+}
+.bar-profile-label {
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  height: 1.5em; line-height: 1.5; margin-top: 3px;
 }
 .playlist-section + .playlist-section {
   margin-top: 14px; padding-top: 14px;
   border-top: 1px solid var(--border);
 }
-.playlist-line { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.playlist-line { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
 .playlist-line-note { font-weight: 400; color: var(--muted); }
 .bubble-wrap {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -208,7 +211,6 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   <div class="panel-head">
     <div class="panel-title-row">
       <div class="panel-name" id="panel-name"></div>
-      <div class="panel-meta" id="panel-meta"></div>
     </div>
     <button class="panel-close" onclick="closePanel()">✕</button>
   </div>
@@ -455,16 +457,17 @@ map.addLayer(clusterGroup);
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 function openPanel(bar) {
-  document.getElementById('panel-name').textContent = bar.bar_name || 'Unknown bar';
-
   const live = bar.is_live;
   const lastSeen = bar.last_seen
     ? new Date(bar.last_seen * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
-  const loc = bar.location ? ` · ${bar.location}` : '';
-  document.getElementById('panel-meta').innerHTML = live
-    ? `<span class="live-dot"></span>Live now${loc}`
-    : `Last active ${lastSeen}${loc}`;
+  let detail = '';
+  if (bar.location) detail += ` — ${esc(bar.location)}`;
+  if (live) detail += ` &nbsp;<span class="live-dot"></span>Live`;
+  else if (lastSeen) detail += ` (last active: ${lastSeen})`;
+  document.getElementById('panel-name').innerHTML =
+    `<span>${esc(bar.bar_name || 'Unknown bar')}</span>` +
+    (detail ? `<span class="panel-bar-detail">${detail}</span>` : '');
 
   // ── Bar Profile bar ──
   const profileSlot = document.getElementById('panel-profile');
@@ -479,9 +482,9 @@ function openPanel(bar) {
       }).join('');
     profileSlot.innerHTML = `
       <div class="bar-profile">
-        <div class="bar-profile-title">Bar Profile</div>
-        <div class="bar-profile-label" id="profile-label">&nbsp;</div>
+        <span class="section-label bar-profile-title">Bar Profile</span>
         <div class="bar-profile-bar" id="profile-bar">${segments}</div>
+        <div class="bar-profile-label" id="profile-label"></div>
       </div>`;
 
     const barEl   = document.getElementById('profile-bar');
@@ -500,7 +503,7 @@ function openPanel(bar) {
 
     barEl.addEventListener('pointermove', e => showGenreAt(e.clientX));
     barEl.addEventListener('pointerdown', e => { showGenreAt(e.clientX); e.preventDefault(); });
-    barEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') labelEl.innerHTML = '&nbsp;'; });
+    barEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') labelEl.textContent = ''; });
   } else {
     profileSlot.innerHTML = '';
   }
@@ -515,7 +518,7 @@ function openPanel(bar) {
     wrap.innerHTML = playlists.map(pl => {
       const displayName = pl.display_name || pl.name;
       const notePart = pl.note ? ` <span class="playlist-line-note">(${esc(pl.note)})</span>` : '';
-      const line = `<div class="playlist-line">${esc(displayName)}${notePart}</div>`;
+      const line = `<div class="playlist-line"><span class="section-label">Playlist: </span>${esc(displayName)}${notePart}</div>`;
       const bubbles = (pl.artists || []).map(artist => {
         const bandColor = profilingOn && bar.profiling && bar.profiling.artist_colors && bar.profiling.artist_colors[artist];
         const hex = bandColor ? (GENRE_COLORS[bandColor] || null) : null;
