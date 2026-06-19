@@ -102,8 +102,23 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   text-transform: uppercase; color: var(--accent);
 }
 
+#panel-profile { padding: 0 14px 10px; flex-shrink: 0; }
+
 /* ── Bar Profile section ── */
-.bar-profile { margin-bottom: 16px; }
+.bar-profile { margin-bottom: 0; }
+
+/* ── Band detail card ── */
+.band-detail-card {
+  background: #1a1a1a; border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+}
+.band-detail-name { font-size: 15px; font-weight: 800; margin-bottom: 7px; }
+.band-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.band-detail-tag {
+  font-size: 12px; border: 1px solid var(--border);
+  border-radius: 12px; padding: 3px 10px; color: var(--muted);
+}
+.band-detail-score { font-weight: 700; color: var(--accent); margin-right: 4px; }
 .bar-profile-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
 .bar-profile-title { font-size: 15px; }
 .bar-profile-label { font-size: 19px; font-weight: 800; color: var(--accent); line-height: 1.3; }
@@ -212,8 +227,9 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
     </div>
     <button class="panel-close" onclick="closePanel()">✕</button>
   </div>
+  <div id="panel-profile"></div>
   <div class="bubble-scroll">
-    <div id="panel-profile"></div>
+    <div id="band-detail" class="band-detail-card" style="display:none"></div>
     <div id="panel-bubbles"></div>
   </div>
 </div>
@@ -221,6 +237,7 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 <script>
 // Set from /api/map response. When true, use genre colors; grey for unprofiled artists.
 let profilingOn = false;
+let currentBar = null;
 
 // Rotating palette used when profiling is off
 const PALETTE = [
@@ -454,7 +471,26 @@ const clusterGroup = L.markerClusterGroup({
 map.addLayer(clusterGroup);
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
+function showBandDetail(artist) {
+  const detailEl = document.getElementById('band-detail');
+  if (!currentBar || !currentBar.profiling) return;
+  const tags   = currentBar.profiling.artist_tags  && currentBar.profiling.artist_tags[artist];
+  const color  = currentBar.profiling.artist_colors && currentBar.profiling.artist_colors[artist];
+  const colorLabel = color ? `<span style="color:var(--accent);font-size:12px;font-weight:300;letter-spacing:.08em;text-transform:uppercase">${esc(color)}</span>` : '';
+  let inner = `<div class="band-detail-name">${esc(artist)}${color ? '  ' + colorLabel : ''}</div>`;
+  if (tags && tags.length) {
+    const pills = tags.map(([t, s]) =>
+      `<div class="band-detail-tag"><span class="band-detail-score">${s}</span>${esc(t)}</div>`
+    ).join('');
+    inner += `<div class="band-detail-tags">${pills}</div>`;
+  }
+  detailEl.innerHTML = inner;
+  detailEl.style.display = 'block';
+  detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function openPanel(bar) {
+  currentBar = bar;
   const live = bar.is_live;
   const lastSeen = bar.last_seen
     ? new Date(bar.last_seen * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
@@ -530,13 +566,13 @@ function openPanel(bar) {
         } else {
           bg = PALETTE[ci % PALETTE.length]; fg = fgFor(bg); ci++;
         }
-        const tip = bandColor ? ` title="${esc(bandColor)}"` : '';
-        return `<div class="bubble" style="background:${bg};color:${fg}"${tip}>${esc(artist)}</div>`;
+        return `<div class="bubble" style="background:${bg};color:${fg}" data-artist="${esc(artist)}">${esc(artist)}</div>`;
       }).join('');
       return `<div class="playlist-section">${line}<div class="bubble-wrap">${bubbles}</div></div>`;
     }).join('');
   }
 
+  document.getElementById('band-detail').style.display = 'none';
   document.getElementById('panel').classList.add('open');
 }
 
@@ -547,6 +583,11 @@ function closePanel() {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+document.getElementById('panel-bubbles').addEventListener('click', e => {
+  const b = e.target.closest('.bubble');
+  if (b) showBandDetail(b.dataset.artist);
+});
 
 // ── Load bars ─────────────────────────────────────────────────────────────────
 async function loadBars() {

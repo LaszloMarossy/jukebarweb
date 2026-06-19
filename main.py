@@ -365,15 +365,20 @@ async def map_bars():
         profiling = None
         if raw_profile:
             artist_colors: dict[str, str] = {}
+            artist_tags: dict[str, list] = {}
             for pl_data in raw_profile.get("playlists", {}).values():
                 for a in pl_data.get("artists", []):
                     name = a.get("name")
                     color = a.get("band_color")
+                    tags = a.get("tags")
                     if name and color:
                         artist_colors[name] = color
+                    if name and tags:
+                        artist_tags[name] = tags
             profiling = {
                 "combined_pie":  raw_profile.get("combined_pie", {}),
                 "artist_colors": artist_colors,
+                "artist_tags":   artist_tags,
             }
         result.append({
             "jukebar_id":    e.jukebar_id,

@@ -123,6 +123,7 @@ async def _profile_playlist(
                 "name":       name,
                 "song_count": song_count,
                 "band_color": resolved["band_color"],
+                "tags":       [list(t) for t in tags_for_resolve[:TOP_N_TAGS]],
             })
 
     pie = compute_playlist_pie(all_pie_scores)
