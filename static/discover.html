@@ -104,14 +104,12 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 
 /* ── Bar Profile section ── */
 .bar-profile { margin-bottom: 16px; }
-.bar-profile-title { font-size: 15px; display: block; margin-bottom: 3px; }
+.bar-profile-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
+.bar-profile-title { font-size: 15px; }
+.bar-profile-label { font-size: 19px; font-weight: 800; color: var(--accent); line-height: 1.3; }
 .bar-profile-bar {
   display: flex; height: 28px; border-radius: 6px; overflow: hidden;
   width: calc(100% - 4px); cursor: crosshair; touch-action: none; user-select: none;
-}
-.bar-profile-label {
-  font-size: 13px; font-weight: 700; color: var(--accent);
-  height: 1.5em; line-height: 1.5; margin-top: 3px;
 }
 .playlist-section + .playlist-section {
   margin-top: 14px; padding-top: 14px;
@@ -195,7 +193,7 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
       </svg>
       <div class="brand-name" id="brand-name">JukeBars</div>
     </div>
-    <div class="brand-sub">Find JukeBars near you and see what bands they play!</div>
+    <div class="brand-sub">Find JukeBars near you; see what they play!</div>
   </a>
 </div>
 
@@ -482,9 +480,11 @@ function openPanel(bar) {
       }).join('');
     profileSlot.innerHTML = `
       <div class="bar-profile">
-        <span class="section-label bar-profile-title">Bar Profile</span>
+        <div class="bar-profile-header">
+          <span class="section-label bar-profile-title">Music Profile:</span>
+          <span class="bar-profile-label" id="profile-label"></span>
+        </div>
         <div class="bar-profile-bar" id="profile-bar">${segments}</div>
-        <div class="bar-profile-label" id="profile-label"></div>
       </div>`;
 
     const barEl   = document.getElementById('profile-bar');
