@@ -101,12 +101,12 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
 }
 .bar-profile-label {
-  font-size: 13px; font-weight: 700; color: var(--accent);
-  min-height: 20px; margin-bottom: 5px; line-height: 1.3;
+  font-size: 17px; font-weight: 800; letter-spacing: .02em; color: var(--accent);
+  min-height: 24px; margin-bottom: 5px; line-height: 1.3;
 }
 .bar-profile-bar {
   display: flex; height: 28px; border-radius: 6px; overflow: hidden;
-  width: 80%; cursor: crosshair; touch-action: none; user-select: none;
+  width: calc(100% - 4px); cursor: crosshair; touch-action: none; user-select: none;
 }
 .playlist-section + .playlist-section {
   margin-top: 14px; padding-top: 14px;
@@ -466,6 +466,7 @@ function openPanel(bar) {
   if (pie && Object.keys(pie).length) {
     const segments = Object.entries(pie)
       .filter(([, v]) => v > 0)
+      .sort(([a], [b]) => a === 'other' ? 1 : b === 'other' ? -1 : 0)
       .map(([genre, frac]) => {
         const color = PIE_COLORS[genre] || '#666';
         return `<div style="width:${(frac*100).toFixed(2)}%;background:${color};height:100%" data-genre="${esc(genre)}" data-w="${frac}"></div>`;
