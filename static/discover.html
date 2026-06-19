@@ -93,6 +93,21 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   flex: 1; overflow-y: auto;
   padding: 0 14px 20px;
 }
+
+/* ── Bar Profile section ── */
+.bar-profile { margin-bottom: 18px; }
+.bar-profile-title {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.bar-profile-label {
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  min-height: 20px; margin-bottom: 5px; line-height: 1.3;
+}
+.bar-profile-bar {
+  display: flex; height: 28px; border-radius: 6px; overflow: hidden;
+  width: 80%; cursor: crosshair; touch-action: none; user-select: none;
+}
 .playlist-section + .playlist-section {
   margin-top: 14px; padding-top: 14px;
   border-top: 1px solid var(--border);
@@ -192,7 +207,8 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
     <button class="panel-close" onclick="closePanel()">✕</button>
   </div>
   <div class="bubble-scroll">
-    <div class="bubble-wrap" id="panel-bubbles"></div>
+    <div id="panel-profile"></div>
+    <div id="panel-bubbles"></div>
   </div>
 </div>
 
@@ -444,6 +460,45 @@ function openPanel(bar) {
     ? `<span class="live-dot"></span>Live now${loc}`
     : `Last active ${lastSeen}${loc}`;
 
+  // ── Bar Profile bar ──
+  const profileSlot = document.getElementById('panel-profile');
+  const pie = profilingOn && bar.profiling && bar.profiling.combined_pie;
+  if (pie && Object.keys(pie).length) {
+    const segments = Object.entries(pie)
+      .filter(([, v]) => v > 0)
+      .map(([genre, frac]) => {
+        const color = PIE_COLORS[genre] || '#666';
+        return `<div style="width:${(frac*100).toFixed(2)}%;background:${color};height:100%" data-genre="${esc(genre)}" data-w="${frac}"></div>`;
+      }).join('');
+    profileSlot.innerHTML = `
+      <div class="bar-profile">
+        <div class="bar-profile-title">Bar Profile</div>
+        <div class="bar-profile-label" id="profile-label">&nbsp;</div>
+        <div class="bar-profile-bar" id="profile-bar">${segments}</div>
+      </div>`;
+
+    const barEl   = document.getElementById('profile-bar');
+    const labelEl = document.getElementById('profile-label');
+
+    function showGenreAt(clientX) {
+      const rect = barEl.getBoundingClientRect();
+      const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      let cum = 0;
+      for (const seg of barEl.children) {
+        cum += parseFloat(seg.dataset.w);
+        if (x <= cum + 0.001) { labelEl.textContent = seg.dataset.genre; return; }
+      }
+      labelEl.textContent = barEl.lastElementChild?.dataset.genre || '';
+    }
+
+    barEl.addEventListener('pointermove', e => showGenreAt(e.clientX));
+    barEl.addEventListener('pointerdown', e => { showGenreAt(e.clientX); e.preventDefault(); });
+    barEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') labelEl.innerHTML = '&nbsp;'; });
+  } else {
+    profileSlot.innerHTML = '';
+  }
+
+  // ── Playlists + bubbles ──
   const wrap = document.getElementById('panel-bubbles');
   const playlists = bar.playlists || [];
   if (playlists.length === 0) {
