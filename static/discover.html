@@ -406,6 +406,12 @@ const PIE_COLORS = {
   'other':                  '#555555',
 };
 
+// Single color lookup used by pie chart, profile bar, and band bubbles.
+// Checks PIE_COLORS first (compound keys), falls back to GENRE_COLORS (simple keys).
+function genreColor(key) {
+  return PIE_COLORS[key] || GENRE_COLORS[key] || '#666';
+}
+
 function pieSVG(combined_pie, size, isLive) {
   if (!combined_pie) return null;
   const entries = Object.entries(combined_pie).filter(([, v]) => v > 0);
@@ -415,7 +421,7 @@ function pieSVG(combined_pie, size, isLive) {
   let angle = -Math.PI / 2;
   const paths = [];
   for (const [genre, frac] of entries) {
-    const color = PIE_COLORS[genre] || '#666';
+    const color = genreColor(genre);
     const pct   = Math.round(frac * 100);
     if (frac >= 0.9999) {
       paths.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"><title>${genre} ${pct}%</title></circle>`);
@@ -441,7 +447,7 @@ function genreHexFor(artistName, bar) {
   if (!colors) return null;
   const bandColor = colors[artistName];
   if (!bandColor) return null;
-  return GENRE_COLORS[bandColor] || null;
+  return genreColor(bandColor) || null;
 }
 
 function fgFor(hex) {
@@ -536,7 +542,7 @@ function openPanel(bar) {
       .filter(([, v]) => v > 0)
       .sort(([a], [b]) => a === 'other' ? 1 : b === 'other' ? -1 : 0)
       .map(([genre, frac]) => {
-        const color = PIE_COLORS[genre] || '#666';
+        const color = genreColor(genre);
         return `<div style="width:${(frac*100).toFixed(2)}%;background:${color};height:100%" data-genre="${esc(genre)}" data-w="${frac}"></div>`;
       }).join('');
     profileSlot.innerHTML = `
@@ -582,7 +588,7 @@ function openPanel(bar) {
       const line = `<div class="playlist-line"><span class="section-label">Playlist: </span>${esc(displayName)}${notePart}</div>`;
       const bubbles = (pl.artists || []).map(artist => {
         const bandColor = profilingOn && bar.profiling && bar.profiling.artist_colors && bar.profiling.artist_colors[artist];
-        const hex = bandColor ? (GENRE_COLORS[bandColor] || null) : null;
+        const hex = bandColor ? (genreColor(bandColor) || null) : null;
         let bg, fg;
         if (hex) {
           bg = hex; fg = fgFor(bg);
