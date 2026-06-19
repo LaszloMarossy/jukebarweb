@@ -46,7 +46,7 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   font-size: 28px; color: var(--accent); line-height: 1;
 }
 .brand-sub { font-size: 13px; color: #ddd; }
-#bar-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
 
 /* ── Map ── */
 #map { position: fixed; inset: 0; top: 70px; z-index: 0; }
@@ -194,7 +194,6 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
     </div>
     <div class="brand-sub">Find JukeBars near you and see what bands they play!</div>
   </a>
-  <div id="bar-count"></div>
 </div>
 
 <div id="map"></div>
@@ -555,9 +554,6 @@ async function loadBars() {
 
   const mapped = bars.filter(b => b.lat != null && b.lng != null);
   const count  = mapped.length;
-
-  document.getElementById('bar-count').textContent =
-    count === 0 ? 'No bars yet' : `${count} bar${count === 1 ? '' : 's'} on the map`;
 
   if (count === 0) {
     document.getElementById('empty').style.display = 'block';
