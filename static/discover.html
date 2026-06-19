@@ -107,16 +107,25 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
 /* ── Bar Profile section ── */
 .bar-profile { margin-bottom: 0; }
 
-/* ── Band detail card ── */
-.band-detail-card {
-  background: #1a1a1a; border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+/* ── Band popup overlay ── */
+#band-popup {
+  display: none; position: absolute;
+  left: 12px; right: 12px; top: 50%; transform: translateY(-50%);
+  background: #1e1e1e; border: 1px solid var(--accent);
+  border-radius: 14px; padding: 16px 18px 14px;
+  z-index: 20; box-shadow: 0 8px 32px rgba(0,0,0,.7);
 }
-.band-detail-name { font-size: 15px; font-weight: 800; margin-bottom: 7px; }
+.band-popup-close {
+  position: absolute; top: 10px; right: 14px;
+  background: none; border: none; color: var(--muted);
+  font-size: 20px; cursor: pointer; padding: 0; line-height: 1;
+}
+.band-detail-name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+.band-detail-genre { font-size: 12px; font-weight: 300; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
 .band-detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .band-detail-tag {
-  font-size: 12px; border: 1px solid var(--border);
-  border-radius: 12px; padding: 3px 10px; color: var(--muted);
+  font-size: 13px; border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px 11px; color: var(--muted);
 }
 .band-detail-score { font-weight: 700; color: var(--accent); margin-right: 4px; }
 .bar-profile-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
@@ -229,8 +238,13 @@ html, body { height: 100%; background: #e8e0d8; color: var(--text); font-family:
   </div>
   <div id="panel-profile"></div>
   <div class="bubble-scroll">
-    <div id="band-detail" class="band-detail-card" style="display:none"></div>
     <div id="panel-bubbles"></div>
+  </div>
+  <div id="band-popup">
+    <button class="band-popup-close" onclick="closeBandPopup()">✕</button>
+    <div class="band-detail-name" id="popup-name"></div>
+    <div class="band-detail-genre" id="popup-genre"></div>
+    <div class="band-detail-tags" id="popup-tags"></div>
   </div>
 </div>
 
@@ -472,21 +486,22 @@ map.addLayer(clusterGroup);
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 function showBandDetail(artist) {
-  const detailEl = document.getElementById('band-detail');
-  if (!currentBar || !currentBar.profiling) return;
-  const tags   = currentBar.profiling.artist_tags  && currentBar.profiling.artist_tags[artist];
-  const color  = currentBar.profiling.artist_colors && currentBar.profiling.artist_colors[artist];
-  const colorLabel = color ? `<span style="color:var(--accent);font-size:12px;font-weight:300;letter-spacing:.08em;text-transform:uppercase">${esc(color)}</span>` : '';
-  let inner = `<div class="band-detail-name">${esc(artist)}${color ? '  ' + colorLabel : ''}</div>`;
-  if (tags && tags.length) {
-    const pills = tags.map(([t, s]) =>
-      `<div class="band-detail-tag"><span class="band-detail-score">${s}</span>${esc(t)}</div>`
-    ).join('');
-    inner += `<div class="band-detail-tags">${pills}</div>`;
-  }
-  detailEl.innerHTML = inner;
-  detailEl.style.display = 'block';
-  detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (!currentBar) return;
+  const profiling = currentBar.profiling || {};
+  const tags  = profiling.artist_tags   && profiling.artist_tags[artist];
+  const color = profiling.artist_colors && profiling.artist_colors[artist];
+
+  document.getElementById('popup-name').textContent  = artist;
+  document.getElementById('popup-genre').textContent = color || '';
+  document.getElementById('popup-tags').innerHTML = (tags && tags.length)
+    ? tags.map(([t, s]) => `<div class="band-detail-tag"><span class="band-detail-score">${s}</span>${esc(t)}</div>`).join('')
+    : '<span style="color:var(--muted);font-size:13px">No tag data yet</span>';
+
+  document.getElementById('band-popup').style.display = 'block';
+}
+
+function closeBandPopup() {
+  document.getElementById('band-popup').style.display = 'none';
 }
 
 function openPanel(bar) {
@@ -572,11 +587,12 @@ function openPanel(bar) {
     }).join('');
   }
 
-  document.getElementById('band-detail').style.display = 'none';
+  closeBandPopup();
   document.getElementById('panel').classList.add('open');
 }
 
 function closePanel() {
+  closeBandPopup();
   document.getElementById('panel').classList.remove('open');
 }
 
