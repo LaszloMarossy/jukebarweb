@@ -586,7 +586,11 @@ function openPanel(bar) {
       const displayName = pl.display_name || pl.name;
       const notePart = pl.note ? ` <span class="playlist-line-note">(${esc(pl.note)})</span>` : '';
       const line = `<div class="playlist-line"><span class="section-label">Playlist: </span>${esc(displayName)}${notePart}</div>`;
-      const bubbles = (pl.artists || []).map(artist => {
+      const bubbles = (pl.artists || []).slice().sort((a, b) => {
+        const ka = a.replace(/^the\s+/i, '').toLowerCase();
+        const kb = b.replace(/^the\s+/i, '').toLowerCase();
+        return ka.localeCompare(kb);
+      }).map(artist => {
         const bandColor = profilingOn && bar.profiling && bar.profiling.artist_colors && bar.profiling.artist_colors[artist];
         const hex = bandColor ? (genreColor(bandColor) || null) : null;
         let bg, fg;
