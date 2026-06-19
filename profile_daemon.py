@@ -139,9 +139,8 @@ async def _profile_playlist(
     # Log top-5 artists by song count so weighting effect is visible
     total_songs = sum(a["song_count"] for a in artists_out)
     top5 = sorted(artists_out, key=lambda a: -a["song_count"])[:5]
-    print(f"    song counts — total tracks: {total_songs}, "
-          f"top artists: {', '.join(f\"{a['name']} ×{a['song_count']} ({a['band_color']})\" for a in top5)}",
-          flush=True)
+    top5_str = ", ".join(a["name"] + " x" + str(a["song_count"]) + " (" + a["band_color"] + ")" for a in top5)
+    print(f"    song counts — total tracks: {total_songs}, top artists: {top5_str}", flush=True)
 
     # Compare weighted vs flat (every artist = 1) to show weighting impact
     flat_scores = [resolve_artist(a["name"], 1,
