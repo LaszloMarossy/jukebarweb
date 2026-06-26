@@ -66,7 +66,13 @@
       display: flex; align-items: center; gap: 10px;
       padding: 16px 16px 0;
     }
-    .play-header a { flex-shrink: 0; display: flex; }
+    .play-logo { flex-shrink: 0; display: flex; }
+    .info-btn {
+      flex-shrink: 0; width: clamp(20px, 3dvh, 28px); height: clamp(20px, 3dvh, 28px);
+      border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted);
+      font-size: clamp(11px, 1.6dvh, 14px); font-style: italic; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-left: auto;
+    }
     .play-bar-name {
       font-family: 'Bubblegum Sans', cursive;
       font-size: clamp(22px, 5dvh, 48px); line-height: 1.2;
@@ -187,13 +193,15 @@
       display: flex; align-items: flex-start; flex-wrap: wrap; gap: 4px;
       padding: 8px 14px 12px; border-bottom: 1px solid var(--border);
     }
+    .crumb-back   { color: var(--accent); font-size: 20px; font-weight: 800; padding: 2px 8px 2px 0; }
+    .crumb-cancel { color: var(--muted); font-size: 18px; margin-left: auto; padding: 2px 0 2px 8px; }
     .crumb-home {
       color: var(--accent); font-size: 20px; font-weight: 800;
-      padding: 2px 0; margin-right: 8px; letter-spacing: .5px;
+      padding: 2px 0; letter-spacing: .5px;
     }
-    .crumb-link { color: var(--accent); font-size: 14px; font-weight: 600; padding: 2px 0; }
-    .crumb-sep  { color: var(--muted); font-size: 13px; }
-    .crumb-cur  { color: var(--text); font-size: 14px; font-weight: 600; }
+    .crumb-link { color: var(--accent); font-size: 20px; font-weight: 800; padding: 2px 0; }
+    .crumb-sep  { color: var(--muted); font-size: 18px; }
+    .crumb-cur  { color: var(--text); font-size: 20px; font-weight: 800; }
 
     /* search */
     .search-wrap { padding: 8px 14px 10px; background: var(--bg); }
@@ -382,7 +390,7 @@
 <!-- ── PLAY (landing) ────────────────────────────────────────────────────── -->
 <div id="s-play" class="screen">
   <div class="play-header">
-    <a href="/" title="JukeBar home" class="play-logo">
+    <button onclick="goHome()" title="Back to Now Playing" class="play-logo">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="clamp(44px,11dvh,80px)" height="clamp(44px,11dvh,80px)" style="width:clamp(44px,11dvh,80px);height:clamp(44px,11dvh,80px)">
         <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#fbbe84" stroke-width="1"/>
         <circle cx="36" cy="36" r="29" fill="#ffffff"/>
@@ -405,8 +413,9 @@
         <line x1="36" y1="36" x2="26.8" y2="13.8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
         <circle cx="36" cy="36" r="4" fill="#ffffff"/>
       </svg>
-    </a>
+    </button>
     <div class="play-bar-name" id="play-bar-name">JukeBar</div>
+    <button class="info-btn" onclick="location.href='/'" title="About JukeBar">i</button>
   </div>
 
   <div class="play-body">
@@ -444,7 +453,7 @@
 <div id="s-browse" class="screen">
   <div class="top-bar">
     <div class="bar-header">
-      <div class="browse-logo" onclick="location.href='/'" title="JukeBar home">
+      <div class="browse-logo" onclick="goHome()" title="Back to Now Playing">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
           <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#fbbe84" stroke-width="1"/>
           <circle cx="36" cy="36" r="29" fill="#ffffff"/>
@@ -469,9 +478,10 @@
         </svg>
       </div>
       <div class="bar-info">
-        <div class="bar-name" id="bar-name" onclick="showScreen('s-play')" title="Now Playing">JukeBar</div>
+        <div class="bar-name" id="bar-name" onclick="goHome()" title="Back to Now Playing">JukeBar</div>
         <div class="now-playing" id="now-playing">—</div>
       </div>
+      <button class="info-btn" onclick="location.href='/'" title="About JukeBar">i</button>
     </div>
   </div>
 
@@ -745,6 +755,10 @@ function renderBrowse() {
 function renderBreadcrumb() {
   const { level, letter, artistIdx, albumIdx } = S.nav;
   const parts = [];
+  if (level !== 'letters') {
+    const backTo = level === 'artists' ? 'letters' : level === 'albums' ? 'artists' : 'albums';
+    parts.push(`<button class="crumb-back" onclick="drillBack('${backTo}')">‹</button>`);
+  }
   parts.push(`<button class="crumb-home" onclick="drillBack('letters')">A–Z</button>`);
   if (level !== 'letters') {
     parts.push(`<span class="crumb-sep">›</span>`);
@@ -755,19 +769,34 @@ function renderBreadcrumb() {
   }
   if (level === 'albums' || level === 'songs') {
     const artist = S.tree[artistIdx]?.artist || '';
+    const artistTrunc = artist.length > 8 ? artist.slice(0, 8) + '…' : artist;
     parts.push(`<span class="crumb-sep">›</span>`);
     if (level === 'albums')
-      parts.push(`<span class="crumb-cur">${esc(artist)}</span>`);
+      parts.push(`<span class="crumb-cur">${esc(artistTrunc)}</span>`);
     else
-      parts.push(`<button class="crumb-link" onclick="drillBack('albums')">${esc(artist)}</button>`);
+      parts.push(`<button class="crumb-link" onclick="drillBack('albums')">${esc(artistTrunc)}</button>`);
   }
   if (level === 'songs') {
     const album = S.tree[artistIdx]?.albums[albumIdx]?.album || 'Unknown Album';
+    const albumTrunc = album.length > 8 ? album.slice(0, 8) + '…' : album;
     parts.push(`<span class="crumb-sep">›</span>`);
-    parts.push(`<span class="crumb-cur">${esc(album)}</span>`);
+    parts.push(`<span class="crumb-cur">${esc(albumTrunc)}</span>`);
   }
+  parts.push(`<button class="crumb-cancel" onclick="cancelBrowse()">✕</button>`);
   $('breadcrumb').innerHTML = parts.join('');
 }
+
+function goHome() {
+  if ($('pay-overlay').classList.contains('open')) closePayOverlay();
+  dismissToast();
+  S.selected = [];
+  S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
+  $('search').value = ''; $('clear-btn').classList.remove('visible');
+  renderBasket();
+  renderBrowse();
+  showScreen('s-play');
+}
+function cancelBrowse() { goHome(); }
 
 function _fgFor(hex) {
   const r = parseInt(hex.slice(1,3), 16) / 255;
