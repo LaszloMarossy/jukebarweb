@@ -190,11 +190,13 @@
 
     /* breadcrumb */
     .breadcrumb {
-      display: flex; align-items: flex-start; flex-wrap: wrap; gap: 4px;
-      padding: 8px 14px 12px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 8px 14px 10px; border-bottom: 1px solid var(--border);
     }
-    .crumb-back   { color: var(--accent); font-size: 28px; font-weight: 900; padding: 2px 8px 2px 0; }
-    .crumb-cancel { color: var(--muted); font-size: 18px; margin-left: auto; padding: 2px 0 2px 8px; }
+    .crumb-row1 { display: flex; align-items: center; gap: 6px; }
+    .crumb-row2 { display: flex; align-items: center; gap: 6px; }
+    .crumb-back   { background: var(--accent); color: #111; font-size: 24px; font-weight: 900; border-radius: 50px; padding: 1px 13px 2px; }
+    .crumb-cancel { background: var(--accent); color: #111; font-size: 20px; font-weight: 900; border-radius: 50px; padding: 2px 13px; margin-left: auto; }
     .crumb-home {
       color: var(--accent); font-size: 20px; font-weight: 800;
       padding: 2px 0; letter-spacing: .5px;
@@ -754,36 +756,44 @@ function renderBrowse() {
 
 function renderBreadcrumb() {
   const { level, letter, artistIdx, albumIdx } = S.nav;
-  const parts = [];
-  if (level !== 'letters') {
+
+  // Row 1: ‹  A-Z  [sep Letter]  ✕
+  const r1 = [];
+  if (level === 'letters') {
+    r1.push(`<button class="crumb-back" onclick="goHome()">‹</button>`);
+  } else {
     const backTo = level === 'artists' ? 'letters' : level === 'albums' ? 'artists' : 'albums';
-    parts.push(`<button class="crumb-back" onclick="drillBack('${backTo}')">‹</button>`);
+    r1.push(`<button class="crumb-back" onclick="drillBack('${backTo}')">‹</button>`);
   }
-  parts.push(`<button class="crumb-home" onclick="drillBack('letters')">A–Z</button>`);
+  r1.push(`<button class="crumb-home" onclick="drillBack('letters')">A–Z</button>`);
   if (level !== 'letters') {
-    parts.push(`<span class="crumb-sep">›</span>`);
+    r1.push(`<span class="crumb-sep">›</span>`);
     if (level === 'artists')
-      parts.push(`<span class="crumb-cur">${esc(letter)}</span>`);
+      r1.push(`<span class="crumb-cur">${esc(letter)}</span>`);
     else
-      parts.push(`<button class="crumb-link" onclick="drillBack('artists')">${esc(letter)}</button>`);
+      r1.push(`<button class="crumb-link" onclick="drillBack('artists')">${esc(letter)}</button>`);
   }
+  r1.push(`<button class="crumb-cancel" onclick="cancelBrowse()">✕</button>`);
+
+  // Row 2: Band [sep Album]  — only at albums/songs level
+  const r2 = [];
   if (level === 'albums' || level === 'songs') {
     const artist = S.tree[artistIdx]?.artist || '';
     const artistTrunc = artist.length > 8 ? artist.slice(0, 8) + '…' : artist;
-    parts.push(`<span class="crumb-sep">›</span>`);
     if (level === 'albums')
-      parts.push(`<span class="crumb-cur">${esc(artistTrunc)}</span>`);
+      r2.push(`<span class="crumb-cur">${esc(artistTrunc)}</span>`);
     else
-      parts.push(`<button class="crumb-link" onclick="drillBack('albums')">${esc(artistTrunc)}</button>`);
+      r2.push(`<button class="crumb-link" onclick="drillBack('albums')">${esc(artistTrunc)}</button>`);
   }
   if (level === 'songs') {
     const album = S.tree[artistIdx]?.albums[albumIdx]?.album || 'Unknown Album';
     const albumTrunc = album.length > 8 ? album.slice(0, 8) + '…' : album;
-    parts.push(`<span class="crumb-sep">›</span>`);
-    parts.push(`<span class="crumb-cur">${esc(albumTrunc)}</span>`);
+    r2.push(`<span class="crumb-sep">›</span>`);
+    r2.push(`<span class="crumb-cur">${esc(albumTrunc)}</span>`);
   }
-  parts.push(`<button class="crumb-cancel" onclick="cancelBrowse()">✕</button>`);
-  $('breadcrumb').innerHTML = parts.join('');
+
+  $('breadcrumb').innerHTML = `<div class="crumb-row1">${r1.join('')}</div>` +
+    (r2.length ? `<div class="crumb-row2">${r2.join('')}</div>` : '');
 }
 
 function goHome() {
