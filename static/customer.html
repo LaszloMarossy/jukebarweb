@@ -818,18 +818,7 @@ function _fgFor(hex) {
 function renderLetters() {
   if (!S.tree.length) { $('catalog').innerHTML = '<div class="empty">No songs in this playlist.</div>'; return; }
   const has = new Set(S.tree.map(n => firstLetter(n.artist)));
-  const upNextHtml = S.upNext.length
-    ? `<div class="section-title" style="margin-top:4px">UP NEXT</div>` +
-      S.upNext.flatMap(r => {
-        const nameHtml = r.requester_name ? `<span style="color:#fde047;font-weight:700">${esc(r.requester_name.slice(0, 8))}</span>: ` : '';
-        const details = r.song_details || [];
-        if (details.length) return details.map(s => `${nameHtml}${esc(s.artist)} — ${esc(s.album)} — ${esc(s.title)}`);
-        return (r.song_titles || []).map(t => `${nameHtml}${esc(t)}`);
-      }).slice(0, 4)
-        .map(t => `<div style="font-size:14px;padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--accent)">▸ </span>${t}</div>`)
-        .join('') + '<div style="margin-bottom:12px"></div>'
-    : '';
-  $('catalog').innerHTML = upNextHtml + '<div class="section-title">BANDS</div><div class="letter-grid">' +
+  $('catalog').innerHTML = '<div class="section-title">BANDS</div><div class="letter-grid">' +
     ALPHA.map((l, i) => {
       const active = has.has(l);
       const col    = PALETTE[i % PALETTE.length];
