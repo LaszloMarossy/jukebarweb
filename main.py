@@ -450,7 +450,25 @@ async def host_register(body: dict[str, Any]):
     # Keep map entry's last_seen fresh if the bar is registered there
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
-    return {"ok": True}
+
+    # Return profiling data if already computed so the host can color band bubbles immediately.
+    profiling: dict | None = None
+    raw_profile = _bar_profiles.get(jukebar_id)
+    if raw_profile:
+        artist_colors: dict[str, str] = {}
+        artist_tags:   dict[str, list] = {}
+        for pl_data in raw_profile.get("playlists", {}).values():
+            for a in pl_data.get("artists", []):
+                name  = a.get("name")
+                color = a.get("band_color")
+                tags  = a.get("tags")
+                if name and color:
+                    artist_colors[name] = color
+                if name and tags:
+                    artist_tags[name] = tags
+        profiling = {"artist_colors": artist_colors, "artist_tags": artist_tags}
+
+    return {"ok": True, "profiling": profiling}
 
 
 @app.post("/api/host/nowplaying")
