@@ -150,3 +150,117 @@ Android background task:
 - MusicKit (iOS, existing) — on-device only
 - Spotify Android SDK (existing in spotonjukebar) — on-device only
 - No Spotify Web API or Apple Music server-side credentials needed
+
+---
+
+## MacLord — Genre Profiling Daemon Setup
+
+MacLord is a always-on Mac (macOS Catalina 10.15) on the local LAN that runs `profile_daemon.py`
+as a background LaunchAgent. It polls GCS every 30 s, profiles stale bar playlists via Last.fm,
+and writes results back to GCS.
+
+**Machine details**
+- Local IP: `192.168.0.108`
+- Python: `/usr/local/bin/python3`
+- GCS key: `/Users/laszlo/gcs-key.json`
+- Repo clone: `~/jukebarweb/`
+
+---
+
+### LaunchAgent plist
+
+File: `~/Library/LaunchAgents/com.jukebar.profiler.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jukebar.profiler</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-is</string>
+    <string>/usr/local/bin/python3</string>
+    <string>/Users/laszlo/jukebarweb/profile_daemon.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GCS_BUCKET</key>
+    <string>jukebar-data</string>
+    <key>GOOGLE_APPLICATION_CREDENTIALS</key>
+    <string>/Users/laszlo/gcs-key.json</string>
+    <key>LASTFM_API_KEY</key>
+    <string>91af5134238b343dc80bece72905780a</string>
+    <key>PROFILE_POLL_INTERVAL</key>
+    <string>30</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/laszlo/jukebarweb</string>
+  <key>StandardOutPath</key>
+  <string>/Users/laszlo/jukebarweb/daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/laszlo/jukebarweb/daemon.log</string>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+```
+
+`caffeinate -is` wraps the daemon so MacLord stays awake with the lid closed.
+`KeepAlive: true` means launchd auto-restarts it if it crashes.
+
+---
+
+### Install / update commands
+
+```bash
+# First install
+cp com.jukebar.profiler.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.jukebar.profiler.plist
+
+# After editing the plist or pulling a new daemon version
+launchctl unload ~/Library/LaunchAgents/com.jukebar.profiler.plist
+cd ~/jukebarweb && git pull
+launchctl load ~/Library/LaunchAgents/com.jukebar.profiler.plist
+
+# Check it's running (shows PID and exit code)
+launchctl list | grep jukebar
+
+# Tail the log
+tail -f ~/jukebarweb/daemon.log
+```
+
+Shortcut — `~/jukebarweb/restart_daemon.sh` does the unload/pull/load sequence.
+
+---
+
+### macOS server hardening (run once, prevents auto-update chaos)
+
+macOS will schedule OS updates and restart the machine automatically unless disabled.
+After a restart, it restores every app that was open ("window state restoration"), causing
+heat, lag, and an unusable desktop. Disable both permanently:
+
+```bash
+# Disable all automatic OS/app store updates
+sudo softwareupdate --schedule off
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled -bool false
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall -bool false
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate ConfigDataInstall -bool false
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdateRestartRequired -bool false
+
+# Disable window restoration on login (stops all apps reopening after restart)
+defaults write com.apple.loginwindow TALLogoutSavesState -bool false
+defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
+
+# Disable Chrome auto-update (Chrome 128 is the ceiling for Catalina anyway)
+sudo defaults write com.google.Keystone.Agent checkInterval 0
+```
+
+The LaunchAgent daemon is unaffected by these settings — it is managed by `launchctl`,
+not by Login Items, and survives restarts automatically via `KeepAlive: true`.
