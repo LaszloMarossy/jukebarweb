@@ -121,6 +121,7 @@ _map_entries: dict[str, MapEntry] = {}   # persisted to disk
 _bars: dict[str, BarSession] = {}        # in-memory only
 _bar_profiles: dict[str, dict] = {}     # bar_id → profile.json contents; refreshed from GCS every PROFILE_CACHE_TTL s
 _profiles_loaded_at: float = 0.0
+_bar_genre_cache: dict[str, dict] = {}  # bar_id → {"artists":[...]}; set by host on register, fallback when GCS absent
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +454,11 @@ async def host_register(body: dict[str, Any]):
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
 
+    # Cache genre data if the host already has it (populated from a previous MacLord run)
+    genres = body.get("genres")
+    if genres and isinstance(genres, dict) and genres.get("artists"):
+        _bar_genre_cache[jukebar_id] = genres
+
     return {"ok": True}
 
 
@@ -613,16 +619,25 @@ async def bar_genres(jukebar_id: str, playlist: str | None = Query(default=None)
     registered playlist_name (so the customer page can call this without knowing it).
     """
     raw_profile = _bar_profiles.get(jukebar_id)
-    if not raw_profile:
-        raise HTTPException(404, "No profile for this bar yet")
     bar = _bars.get(jukebar_id)
     resolved = playlist or (bar.playlist_name if bar else "")
+
+    # Try GCS-sourced profile first
+    if raw_profile and resolved:
+        pl_data = raw_profile.get("playlists", {}).get(resolved)
+        if pl_data:
+            return pl_data
+
+    # Fall back to genre data the host pushed on registration
+    cached = _bar_genre_cache.get(jukebar_id)
+    if cached:
+        return cached
+
+    if not raw_profile:
+        raise HTTPException(404, "No profile for this bar yet")
     if not resolved:
         raise HTTPException(404, "Playlist not specified and bar has no registered playlist")
-    pl_data = raw_profile.get("playlists", {}).get(resolved)
-    if not pl_data:
-        raise HTTPException(404, f"Playlist '{resolved}' not found in profile")
-    return pl_data
+    raise HTTPException(404, f"Playlist '{resolved}' not found in profile")
 
 
 @app.get("/api/bar/{jukebar_id}/nowplaying")
