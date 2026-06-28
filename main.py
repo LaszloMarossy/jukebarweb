@@ -103,6 +103,7 @@ class BarSession:
     price_per_song: float = 0.0
     price_for_three: float = 0.0
     currency: str = ""
+    playlist_name: str = ""
     stripe_enabled: bool = False       # false = send empty key to customer (even if key is stored)
     stripe_publishable_key: str = ""
     stripe_secret_key: str = ""
@@ -434,6 +435,7 @@ async def host_register(body: dict[str, Any]):
         jukebar_id=jukebar_id,
         session=session,
         bar_name=body.get("bar_name", ""),
+        playlist_name=body.get("playlist_name", ""),
         require_approval=body.get("require_approval", True),
         bartender_enabled=body.get("bartender_enabled", True),
         catalog=catalog,
@@ -604,14 +606,22 @@ async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body
 
 
 @app.get("/api/bar/{jukebar_id}/genres")
-async def bar_genres(jukebar_id: str, playlist: str = Query(...)):
-    """Return the profiling section for one playlist — artist_colors + artist_tags as stored."""
+async def bar_genres(jukebar_id: str, playlist: str | None = Query(default=None)):
+    """Return the profiling section for one playlist.
+
+    playlist param is optional — if omitted, falls back to the bar's currently
+    registered playlist_name (so the customer page can call this without knowing it).
+    """
     raw_profile = _bar_profiles.get(jukebar_id)
     if not raw_profile:
         raise HTTPException(404, "No profile for this bar yet")
-    pl_data = raw_profile.get("playlists", {}).get(playlist)
+    bar = _bars.get(jukebar_id)
+    resolved = playlist or (bar.playlist_name if bar else "")
+    if not resolved:
+        raise HTTPException(404, "Playlist not specified and bar has no registered playlist")
+    pl_data = raw_profile.get("playlists", {}).get(resolved)
     if not pl_data:
-        raise HTTPException(404, "Playlist not found in profile")
+        raise HTTPException(404, f"Playlist '{resolved}' not found in profile")
     return pl_data
 
 

@@ -500,6 +500,14 @@
 
   <div class="catalog" id="catalog"></div>
 
+  <!-- Genre tag popup (long-press on artist bubble) -->
+  <div id="tag-popup" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,.88);border-radius:14px;padding:14px 18px;min-width:160px;max-width:80vw;
+    z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:auto;" onclick="hideTagPopup()">
+    <div id="tag-popup-name" style="font-weight:700;font-size:15px;color:#fff;margin-bottom:6px"></div>
+    <div id="tag-popup-tags"></div>
+  </div>
+
   <!-- basket -->
   <div class="basket" id="basket">
     <div class="basket-songs" id="basket-songs"></div>
@@ -535,6 +543,26 @@ const PALETTE    = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a'];
 const ALPHA      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 const TITLE_COLS = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
 
+const GENRE_COLORS = {
+  'indie / alternative':'#5b8db8','rock':'#e63946','classic rock':'#e63946','progressive':'#b82030',
+  'post-rock':'#c4384a','glam':'#e8557a','heavy metal':'#2b2d42','metal':'#2b2d42',
+  'black metal':'#111827','death metal':'#1f2937','thrash metal':'#1a2035','doom metal':'#2e3152',
+  'gothic metal':'#3b1a4a','post-punk / darkwave':'#6a4c93','post-punk':'#6a4c93',
+  'darkwave':'#4a2c7e','gothic rock':'#5a1a6e','electronic / dance':'#4cc9f0',
+  'electro / electronica':'#4cc9f0','house':'#22b4e8','techno':'#0090cc',
+  'synthpop':'#00bfff','synthwave':'#b366ff','folk / acoustic':'#3aad6f','folk':'#3aad6f',
+  'country':'#d4a373','punk / hardcore':'#f77f00','punk rock':'#f77f00','hardcore':'#e06a00',
+  'emo':'#d45500','pop punk':'#ff924c','psychedelic':'#c77dff',
+  'ambient / experimental':'#06d6a0','ambient':'#06d6a0','experimental':'#00b890',
+  'hip-hop':'#f4a261','trap':'#e8904a','jazz':'#e9c46a','jazz fusion':'#f0c050',
+  'classical':'#c8b280','r&b / soul / funk':'#dc7955','soul':'#dc7955','funk':'#e88040',
+  'r&b':'#d06040','blues':'#4a7ab0','new wave':'#00b4d8','shoegaze / dream pop':'#b5a4dc',
+  'trip-hop / downtempo':'#4a6fa5','trip-hop':'#4a6fa5','pop':'#e8406a','disco':'#ff69b4',
+  'world / reggae':'#38b000','reggae':'#38b000','latin':'#ff6b35','ska':'#c8d600',
+  'industrial':'#6b7280','indie':'#5b8db8','alternative':'#4a7aa0','other':'#666666',
+};
+function genreColor(key) { return GENRE_COLORS[key] || '#666666'; }
+
 // ── State ──────────────────────────────────────────────────────────────────
 function getCustomerId() {
   let id = localStorage.getItem('jb_customer_id');
@@ -561,9 +589,13 @@ const S = {
   selected:        [],   // max 3 song objects
   upNext:          [],
   colorMap:        new Map(),
+  genreMap:        new Map(), // artist → {color: colorKey, tags: [string]}
+  genrePollTimer:  null,
   nav:             { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 },
 };
 let _toastTimer = null;
+let _lpTimer    = null;
+let _lpFired    = false;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -610,10 +642,70 @@ async function boot() {
 
     fetchDisplay();
     setInterval(fetchDisplay, 5_000);
+    fetchGenres();
   } catch {
     showError('Network error', 'Check your connection and try again.');
   }
 }
+
+async function fetchGenres() {
+  clearTimeout(S.genrePollTimer);
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/genres`);
+    if (res.ok) {
+      const d = await res.json();
+      const newMap = new Map();
+      for (const a of (d.artists || [])) {
+        if (a.name) newMap.set(a.name, { color: a.band_color || 'other', tags:
+          (a.tags || []).map(t => Array.isArray(t) ? t[0] : t).filter(Boolean) });
+      }
+      S.genreMap = newMap;
+      if (S.nav.level === 'artists' || S.nav.level === 'albums' || S.nav.level === 'songs') renderBrowse();
+      const allCovered = S.tree.every(n => S.genreMap.has(n.artist));
+      if (!allCovered) S.genrePollTimer = setTimeout(fetchGenres, 5 * 60 * 1000);
+    } else {
+      S.genrePollTimer = setTimeout(fetchGenres, 5 * 60 * 1000);
+    }
+  } catch {
+    S.genrePollTimer = setTimeout(fetchGenres, 5 * 60 * 1000);
+  }
+}
+
+function _setupLongPress(el, artistName) {
+  el.addEventListener('touchstart', e => {
+    _lpFired = false;
+    _lpTimer = setTimeout(() => {
+      _lpFired = true;
+      e.preventDefault();
+      showTagPopup(artistName);
+    }, 500);
+  }, { passive: false });
+  el.addEventListener('touchend',  () => clearTimeout(_lpTimer));
+  el.addEventListener('touchmove', () => clearTimeout(_lpTimer));
+}
+
+function showTagPopup(artistName) {
+  const info = S.genreMap.get(artistName);
+  $('tag-popup-name').textContent = artistName;
+  const tagsEl = $('tag-popup-tags');
+  tagsEl.innerHTML = '';
+  if (info && info.tags.length) {
+    info.tags.slice(0, 4).forEach(t => {
+      const d = document.createElement('div');
+      d.textContent = t;
+      d.style.cssText = 'font-size:13px;color:rgba(255,255,255,.82);margin-top:4px';
+      tagsEl.appendChild(d);
+    });
+  } else {
+    const d = document.createElement('div');
+    d.textContent = info ? 'Genre: Other' : 'Not yet categorized';
+    d.style.cssText = 'font-size:12px;color:rgba(255,255,255,.5);margin-top:4px';
+    tagsEl.appendChild(d);
+  }
+  $('tag-popup').style.display = 'block';
+}
+
+function hideTagPopup() { $('tag-popup').style.display = 'none'; }
 
 // ── Index ──────────────────────────────────────────────────────────────────
 function sortKey(s) {
@@ -744,6 +836,7 @@ async function fetchDisplay() {
 
 // ── Render browse ────────────────────────────────────────────────────────────
 function renderBrowse() {
+  hideTagPopup();
   const q = ($('search').value || '').trim().toLowerCase();
   renderBreadcrumb();
   if (q) { renderSearch(q); return; }
@@ -832,20 +925,25 @@ function renderArtists() {
     .map((node, i) => ({ node, i }))
     .filter(({ node }) => firstLetter(node.artist) === S.nav.letter);
   if (!artists.length) { drillBack('letters'); return; }
-  $('catalog').innerHTML = '<div class="section-title">BANDS</div><div class="bubble-wrap">' +
+  $('catalog').innerHTML = '<div class="section-title">BANDS</div><div class="bubble-wrap" id="artist-bubbles">' +
     artists.map(({ node, i }) => {
-      const col = S.colorMap.get(node.artist) ?? PALETTE[i % PALETTE.length];
+      const gi  = S.genreMap.get(node.artist);
+      const col = gi ? genreColor(gi.color) : (S.colorMap.get(node.artist) ?? PALETTE[i % PALETTE.length]);
       const fg  = _fgFor(col);
-      return `<div class="bubble" style="background:${col};color:${fg}" onclick="drillArtist(${i})">${esc(node.artist)}</div>`;
+      return `<div class="bubble" style="background:${col};color:${fg}" data-artist="${esc(node.artist)}" onclick="if(!_lpFired)drillArtist(${i})">${esc(node.artist)}</div>`;
     }).join('') + '</div>';
+  document.querySelectorAll('#artist-bubbles .bubble').forEach(el => {
+    _setupLongPress(el, el.dataset.artist);
+  });
 }
 
 function renderAlbums() {
   const node = S.tree[S.nav.artistIdx];
   if (!node) { drillBack('artists'); return; }
+  const gi = S.genreMap.get(node.artist);
   $('catalog').innerHTML = '<div class="section-title">ALBUMS</div><div class="bubble-wrap">' +
     node.albums.map((a, i) => {
-      const col = PALETTE[i % PALETTE.length];
+      const col = gi ? genreColor(gi.color) : PALETTE[i % PALETTE.length];
       const fg  = _fgFor(col);
       return `<div class="bubble" style="background:${col};color:${fg}" onclick="drillAlbum(${i})">${esc(a.album || 'Unknown Album')}</div>`;
     }).join('') + '</div>';
@@ -856,11 +954,12 @@ function renderSongs() {
   const album = node?.albums[S.nav.albumIdx];
   if (!album) { drillBack('albums'); return; }
   const full = S.selected.length >= 3;
+  const gi = node ? S.genreMap.get(node.artist) : null;
   $('catalog').innerHTML = '<div class="section-title">SONGS — tap to select (max 3)</div><div class="bubble-wrap">' +
     album.songs.map((s, i) => {
       const sel  = S.selected.some(x => x.id === s.id);
       const dim  = !sel && full;
-      const col  = PALETTE[i % PALETTE.length];
+      const col  = gi ? genreColor(gi.color) : PALETTE[i % PALETTE.length];
       const fg   = _fgFor(col);
       const mark = sel ? ' ✓' : '';
       const cls  = `bubble${sel ? ' selected' : ''}${dim ? ' dim-out' : ''}`;
