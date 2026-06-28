@@ -451,24 +451,29 @@ async def host_register(body: dict[str, Any]):
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
 
-    # Return profiling data if already computed so the host can color band bubbles immediately.
-    profiling: dict | None = None
+    # Return per-playlist profiling data if already computed.
+    # Keyed by playlist name so the host can look up its active playlist by name.
+    # combined_pie (merged bar) is intentionally excluded — host doesn't need it.
     raw_profile = _bar_profiles.get(jukebar_id)
+    playlists_profiling: dict | None = None
     if raw_profile:
-        artist_colors: dict[str, str] = {}
-        artist_tags:   dict[str, list] = {}
-        for pl_data in raw_profile.get("playlists", {}).values():
-            for a in pl_data.get("artists", []):
-                name  = a.get("name")
-                color = a.get("band_color")
-                tags  = a.get("tags")
-                if name and color:
-                    artist_colors[name] = color
-                if name and tags:
-                    artist_tags[name] = tags
-        profiling = {"artist_colors": artist_colors, "artist_tags": artist_tags}
+        playlists_profiling = {
+            pl_name: {
+                "artist_colors": {
+                    a["name"]: a["band_color"]
+                    for a in pl_data.get("artists", [])
+                    if a.get("name") and a.get("band_color")
+                },
+                "artist_tags": {
+                    a["name"]: a["tags"]
+                    for a in pl_data.get("artists", [])
+                    if a.get("name") and a.get("tags")
+                },
+            }
+            for pl_name, pl_data in raw_profile.get("playlists", {}).items()
+        }
 
-    return {"ok": True, "profiling": profiling}
+    return {"ok": True, "profiling": playlists_profiling}
 
 
 @app.post("/api/host/nowplaying")
