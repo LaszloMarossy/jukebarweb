@@ -451,29 +451,7 @@ async def host_register(body: dict[str, Any]):
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
 
-    # Return per-playlist profiling data if already computed.
-    # Keyed by playlist name so the host can look up its active playlist by name.
-    # combined_pie (merged bar) is intentionally excluded — host doesn't need it.
-    raw_profile = _bar_profiles.get(jukebar_id)
-    playlists_profiling: dict | None = None
-    if raw_profile:
-        playlists_profiling = {
-            pl_name: {
-                "artist_colors": {
-                    a["name"]: a["band_color"]
-                    for a in pl_data.get("artists", [])
-                    if a.get("name") and a.get("band_color")
-                },
-                "artist_tags": {
-                    a["name"]: a["tags"]
-                    for a in pl_data.get("artists", [])
-                    if a.get("name") and a.get("tags")
-                },
-            }
-            for pl_name, pl_data in raw_profile.get("playlists", {}).items()
-        }
-
-    return {"ok": True, "profiling": playlists_profiling}
+    return {"ok": True}
 
 
 @app.post("/api/host/nowplaying")
@@ -623,6 +601,18 @@ async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body
     if body.get("pin_hash") != bar.pin_hash:
         raise HTTPException(403, "Incorrect PIN")
     return {"ok": True}
+
+
+@app.get("/api/bar/{jukebar_id}/genres")
+async def bar_genres(jukebar_id: str, playlist: str = Query(...)):
+    """Return the profiling section for one playlist — artist_colors + artist_tags as stored."""
+    raw_profile = _bar_profiles.get(jukebar_id)
+    if not raw_profile:
+        raise HTTPException(404, "No profile for this bar yet")
+    pl_data = raw_profile.get("playlists", {}).get(playlist)
+    if not pl_data:
+        raise HTTPException(404, "Playlist not found in profile")
+    return pl_data
 
 
 @app.get("/api/bar/{jukebar_id}/nowplaying")
