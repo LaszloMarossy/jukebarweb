@@ -502,10 +502,13 @@
 
   <!-- Genre tag popup (long-press on artist bubble) -->
   <div id="tag-popup" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,.88);border-radius:14px;padding:14px 18px;min-width:160px;max-width:80vw;
-    z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:auto;" onclick="hideTagPopup()">
-    <div id="tag-popup-name" style="font-weight:700;font-size:15px;color:#fff;margin-bottom:6px"></div>
-    <div id="tag-popup-tags"></div>
+    background:#ffe14d;border-radius:10px;padding:10px 40px 12px 14px;min-width:180px;max-width:85vw;
+    z-index:9999;box-shadow:0 4px 18px rgba(0,0,0,.5);color:#1a1000;pointer-events:auto;cursor:pointer"
+    onclick="hideTagPopup()">
+    <button onclick="event.stopPropagation();hideTagPopup()" style="position:absolute;top:6px;right:8px;
+      background:none;border:none;color:#7a6000;font-size:18px;cursor:pointer;padding:0;line-height:1">✕</button>
+    <div id="tag-popup-name" style="font-weight:700;font-size:19px;color:#1a1000;margin-bottom:5px"></div>
+    <div id="tag-popup-body" style="font-size:16px;line-height:1.6;word-wrap:break-word"></div>
   </div>
 
   <!-- basket -->
@@ -656,8 +659,8 @@ async function fetchGenres() {
       const d = await res.json();
       const newMap = new Map();
       for (const a of (d.artists || [])) {
-        if (a.name) newMap.set(a.name, { color: a.band_color || 'other', tags:
-          (a.tags || []).map(t => Array.isArray(t) ? t[0] : t).filter(Boolean) });
+        if (a.name) newMap.set(a.name, { color: a.band_color || 'other',
+          tags: (a.tags || []).map(t => Array.isArray(t) ? [t[0], t[1] ?? null] : [t, null]).filter(([n]) => n) });
       }
       S.genreMap = newMap;
       if (S.nav.level === 'artists' || S.nav.level === 'albums' || S.nav.level === 'songs') renderBrowse();
@@ -687,20 +690,17 @@ function _setupLongPress(el, artistName) {
 function showTagPopup(artistName) {
   const info = S.genreMap.get(artistName);
   $('tag-popup-name').textContent = artistName;
-  const tagsEl = $('tag-popup-tags');
-  tagsEl.innerHTML = '';
-  if (info && info.tags.length) {
-    info.tags.slice(0, 4).forEach(t => {
-      const d = document.createElement('div');
-      d.textContent = t;
-      d.style.cssText = 'font-size:13px;color:rgba(255,255,255,.82);margin-top:4px';
-      tagsEl.appendChild(d);
-    });
+  const body = $('tag-popup-body');
+  if (!info) {
+    body.innerHTML = '<em style="color:#8b6000">Not yet categorized</em>';
+  } else if (!info.tags.length) {
+    body.innerHTML = '<span style="color:#7a1f3a;font-weight:700">Genre: Other</span>';
   } else {
-    const d = document.createElement('div');
-    d.textContent = info ? 'Genre: Other' : 'Not yet categorized';
-    d.style.cssText = 'font-size:12px;color:rgba(255,255,255,.5);margin-top:4px';
-    tagsEl.appendChild(d);
+    body.innerHTML =
+      `<span style="color:#7a1f3a;font-weight:700">${esc(info.color)}</span>` +
+      `<span style="color:#5a0020"> (${info.tags.slice(0,4).map(([n, s]) =>
+        `${esc(n)}${s != null ? ` <b style="color:#c07000">${s}</b>` : ''}`
+      ).join(', ')})</span>`;
   }
   $('tag-popup').style.display = 'block';
 }
