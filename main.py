@@ -947,7 +947,14 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: di
         v = bool(body["stripe_enabled"])
         action["stripe_enabled"] = v
         bar.stripe_enabled = v
-    if "require_approval" in body:
+    # Derive require_approval from payment flags: both off = auto-approve (free requests).
+    # Also queue the derived value so the host syncs to the same state.
+    if "bartender_enabled" in body or "stripe_enabled" in body:
+        derived = bar.stripe_enabled or bar.bartender_enabled
+        if bar.require_approval != derived:
+            bar.require_approval = derived
+            action["require_approval"] = derived
+    if "require_approval" in body:  # explicit override from host or legacy clients
         v = bool(body["require_approval"])
         action["require_approval"] = v
         bar.require_approval = v

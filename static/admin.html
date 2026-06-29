@@ -396,17 +396,13 @@
         <span class="pay-label">Pay to bartender</span>
         <div class="toggle-track" id="tog-bartender" onclick="togglePayment('bartender')"><div class="toggle-thumb"></div></div>
       </div>
-      <div class="pay-row">
-        <span class="pay-label">Auto (free requests)</span>
-        <div class="toggle-track" id="tog-autoapproval" onclick="toggleAutoApproval()"><div class="toggle-thumb"></div></div>
-      </div>
       <div class="pay-warning" id="pay-warning">Both off — all requests auto-accepted for free</div>
     </div>
   </div>
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, autoApproval: false };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true };
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -561,18 +557,15 @@ async function loadPaymentState() {
     const d = await res.json();
     S.stripeEnabled    = !!d.stripe_enabled;
     S.bartenderEnabled = d.bartender_enabled !== false;
-    S.autoApproval     = d.require_approval === false;
     updatePaymentUI();
   } catch {}
 }
 
 function updatePaymentUI() {
-  const autoOn = S.autoApproval;
-  $('tog-stripe')?.classList.toggle('on', !autoOn && S.stripeEnabled);
-  $('tog-bartender')?.classList.toggle('on', !autoOn && S.bartenderEnabled);
-  $('tog-autoapproval')?.classList.toggle('on', autoOn);
+  $('tog-stripe')?.classList.toggle('on', S.stripeEnabled);
+  $('tog-bartender')?.classList.toggle('on', S.bartenderEnabled);
   const warn = $('pay-warning');
-  if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled && !autoOn);
+  if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled);
 }
 
 async function postSetting(body) {
@@ -591,15 +584,6 @@ async function togglePayment(which) {
     if (!await postSetting(body)) return;
     if (which === 'stripe') S.stripeEnabled = newVal;
     else S.bartenderEnabled = newVal;
-    updatePaymentUI();
-  } catch {}
-}
-
-async function toggleAutoApproval() {
-  const newVal = !S.autoApproval;
-  try {
-    if (!await postSetting({ require_approval: !newVal })) return;
-    S.autoApproval = newVal;
     updatePaymentUI();
   } catch {}
 }
