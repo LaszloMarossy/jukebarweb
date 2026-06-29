@@ -531,9 +531,10 @@ async def host_sync(body: dict[str, Any]):
             "requester_name": r.requester_name,
             "jump": r.jump,
             "paid": r.paid,
+            "status": r.status,
         }
         for r in bar.requests.values()
-        if r.status == "pending" or (r.paid and r.status == "approved")
+        if r.status in ("pending", "approved", "approved_jump")
     ]
 
     actions = list(bar.pending_actions)
