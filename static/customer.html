@@ -582,6 +582,7 @@ const S = {
   customerId:      getCustomerId(),
   requireApproval:  true,
   bartenderEnabled: true,
+  stripeEnabled:    false,
   pricePerSong:     0,
   priceForThree:    0,
   currency:         '',
@@ -627,6 +628,7 @@ async function boot() {
     }
     S.requireApproval  = d.require_approval  !== false;
     S.bartenderEnabled = d.bartender_enabled !== false;
+    S.stripeEnabled    = !!d.stripe_enabled;
     S.pricePerSong     = d.price_per_song  || 0;
     S.priceForThree    = d.price_for_three || 0;
     S.currency         = d.currency        || '';
@@ -765,11 +767,14 @@ async function fetchDisplay() {
 
     // Live payment settings — pushed from host on every propagateBarDetails()
     if ('bartender_enabled' in d) {
-      const newReq = d.require_approval !== false;
-      const changed = S.requireApproval !== newReq
+      const newReq        = d.require_approval !== false;
+      const newStripeOn   = !!d.stripe_enabled;
+      const changed = S.requireApproval  !== newReq
+                   || S.stripeEnabled    !== newStripeOn
                    || S.bartenderEnabled !== (d.bartender_enabled !== false)
-                   || S.stripeKey !== (d.stripe_publishable_key || '');
+                   || S.stripeKey        !== (d.stripe_publishable_key || '');
       S.requireApproval  = newReq;
+      S.stripeEnabled    = newStripeOn;
       S.bartenderEnabled = d.bartender_enabled !== false;
       S.stripeKey        = d.stripe_publishable_key || '';
       if (changed && $('basket')?.classList.contains('show')) renderBasket();
@@ -1043,7 +1048,7 @@ function renderBasket() {
   $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
   const autoMode = !S.requireApproval;
-  $('rb-pay-btn').style.display = (!autoMode && S.stripeKey && total > 0) ? '' : 'none';
+  $('rb-pay-btn').style.display = (!autoMode && S.stripeEnabled && total > 0) ? '' : 'none';
   $('submit-btn').style.display = (autoMode || S.bartenderEnabled) ? '' : 'none';
   const sBtn = $('submit-btn');
   if (sBtn) sBtn.textContent = autoMode ? 'Submit (free)' : 'Submit to Bartender';
@@ -1169,6 +1174,10 @@ function loadStripeJs() {
 
 async function reqPayOnline() {
   if (!S.selected.length) return;
+  if (!S.stripeKey) {
+    showError('Stripe not configured', 'Online payment is not set up at this bar yet — please ask the bartender.');
+    return;
+  }
   const nameEl = $('requester-name');
   const name   = (nameEl.value || '').trim();
   if (!name) {

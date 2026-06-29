@@ -665,6 +665,7 @@ async def bar_display(jukebar_id: str, s: str = Query(None)):
         "session_valid":          session_valid,
         "require_approval":       bar.require_approval,
         "bartender_enabled":      bar.bartender_enabled,
+        "stripe_enabled":         bar.stripe_enabled,
         "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
     }
 
