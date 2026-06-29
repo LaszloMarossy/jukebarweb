@@ -567,11 +567,12 @@ async function loadPaymentState() {
 }
 
 function updatePaymentUI() {
-  $('tog-stripe')?.classList.toggle('on', S.stripeEnabled);
-  $('tog-bartender')?.classList.toggle('on', S.bartenderEnabled);
-  $('tog-autoapproval')?.classList.toggle('on', S.autoApproval);
+  const autoOn = S.autoApproval;
+  $('tog-stripe')?.classList.toggle('on', !autoOn && S.stripeEnabled);
+  $('tog-bartender')?.classList.toggle('on', !autoOn && S.bartenderEnabled);
+  $('tog-autoapproval')?.classList.toggle('on', autoOn);
   const warn = $('pay-warning');
-  if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled && !S.autoApproval);
+  if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled && !autoOn);
 }
 
 async function postSetting(body) {

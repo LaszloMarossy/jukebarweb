@@ -765,8 +765,11 @@ async function fetchDisplay() {
 
     // Live payment settings — pushed from host on every propagateBarDetails()
     if ('bartender_enabled' in d) {
-      const changed = S.bartenderEnabled !== (d.bartender_enabled !== false)
+      const newReq = d.require_approval !== false;
+      const changed = S.requireApproval !== newReq
+                   || S.bartenderEnabled !== (d.bartender_enabled !== false)
                    || S.stripeKey !== (d.stripe_publishable_key || '');
+      S.requireApproval  = newReq;
       S.bartenderEnabled = d.bartender_enabled !== false;
       S.stripeKey        = d.stripe_publishable_key || '';
       if (changed && $('basket')?.classList.contains('show')) renderBasket();
@@ -1039,8 +1042,11 @@ function renderBasket() {
   const total = basketTotal();
   $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
-  $('rb-pay-btn').style.display    = (S.stripeKey && total > 0) ? '' : 'none';
-  $('submit-btn').style.display    = S.bartenderEnabled ? '' : 'none';
+  const autoMode = !S.requireApproval;
+  $('rb-pay-btn').style.display = (!autoMode && S.stripeKey && total > 0) ? '' : 'none';
+  $('submit-btn').style.display = (autoMode || S.bartenderEnabled) ? '' : 'none';
+  const sBtn = $('submit-btn');
+  if (sBtn) sBtn.textContent = autoMode ? 'Submit (free)' : 'Submit to Bartender';
   basket.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -1074,20 +1080,20 @@ async function submitRequest() {
         jump:           false,
       }),
     });
-    if (res.status === 403) { btn.disabled = false; btn.textContent = 'Submit to Bartender'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
+    if (res.status === 403) { btn.disabled = false; btn.textContent = !S.requireApproval ? 'Submit (free)' : 'Submit to Bartender'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
     if (!res.ok) throw new Error(res.status);
     const { status } = await res.json();
     const submitted = [...S.selected];
 
     S.selected = [];
     S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
-    btn.disabled = false; btn.textContent = 'Submit to Bartender';
+    btn.disabled = false; btn.textContent = !S.requireApproval ? 'Submit (free)' : 'Submit to Bartender';
     renderBasket();
     renderBrowse();
 
     returnToPlay(status || 'pending', submitted, name);
   } catch {
-    btn.disabled = false; btn.textContent = 'Submit to Bartender';
+    btn.disabled = false; btn.textContent = !S.requireApproval ? 'Submit (free)' : 'Submit to Bartender';
     alert('Submission failed — check your connection and try again.');
   }
 }
