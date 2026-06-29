@@ -278,11 +278,7 @@
       <span class="cfg-label">Pay to bartender</span>
       <div class="lan-toggle" id="lan-tog-bartender" onclick="toggleBtPayment('bartender')"><div class="lan-thumb"></div></div>
     </div>
-    <div class="cfg-row">
-      <span class="cfg-label">Auto (free requests)</span>
-      <div class="lan-toggle" id="lan-tog-approval" onclick="toggleBtPayment('approval')"><div class="lan-thumb"></div></div>
-    </div>
-    <div class="lan-pay-warn" id="lan-pay-warn" style="display:none">⚠ No payment mode selected — requests are free and auto-accepted.</div>
+    <div class="lan-pay-warn" id="lan-pay-warn" style="display:none">Both off — requests are free and auto-accepted.</div>
   </div>
 
   <div id="requests-pane">
@@ -309,7 +305,6 @@ const actedRequests = new Map(); // requestId → label; cleared when server con
 let currentTab = 'requests';
 let btStripeEnabled    = false;
 let btBartenderEnabled = true;
-let btAutoFree         = false;
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -423,7 +418,6 @@ async function poll() {
     S.currency         = d.currency         || '';
     btStripeEnabled    = !!d.stripe_enabled;
     btBartenderEnabled = d.bartender_enabled !== false;
-    btAutoFree         = !d.stripe_enabled && !d.bartender_enabled;
     updatePaymentToggleUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -550,27 +544,23 @@ function markActed(btn, label) {
 function updatePaymentToggleUI() {
   $('lan-tog-stripe')?.classList.toggle('on', btStripeEnabled);
   $('lan-tog-bartender')?.classList.toggle('on', btBartenderEnabled);
-  $('lan-tog-approval')?.classList.toggle('on', btAutoFree);
   const warn = $('lan-pay-warn');
-  if (warn) warn.style.display = (!btStripeEnabled && !btBartenderEnabled && !btAutoFree) ? '' : 'none';
+  if (warn) warn.style.display = (!btStripeEnabled && !btBartenderEnabled) ? '' : 'none';
 }
 
 async function toggleBtPayment(which) {
   const togEl = $('lan-tog-' + which);
   if (!togEl) return;
   const newOn = !togEl.classList.contains('on');
-  const body  = which === 'stripe'     ? { stripe_enabled: newOn }
-              : which === 'bartender'  ? { bartender_enabled: newOn }
-              : newOn ? { stripe_enabled: false, bartender_enabled: false } : { bartender_enabled: true };
+  const body  = which === 'stripe' ? { stripe_enabled: newOn } : { bartender_enabled: newOn };
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/settings?s=${enc(S.session)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) { alert('Could not update setting.'); return; }
-    if (which === 'stripe')       { btStripeEnabled    = newOn; btAutoFree = false; }
-    else if (which === 'bartender') { btBartenderEnabled = newOn; btAutoFree = false; }
-    else                          { btAutoFree = newOn; if (newOn) { btStripeEnabled = false; btBartenderEnabled = false; } }
+    if (which === 'stripe') btStripeEnabled = newOn;
+    else btBartenderEnabled = newOn;
     updatePaymentToggleUI();
   } catch { alert('Could not update setting.'); }
 }
