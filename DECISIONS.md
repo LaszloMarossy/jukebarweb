@@ -98,6 +98,20 @@ iOS already sent `lat`/`lng` from `CLLocationManager`. Android was sending only 
 
 ---
 
+### 2026-06-29 — Hotspot/WiFi mode: offline operation and limitations
+
+**Advantage — works with zero internet:**
+When the iOS host device has no WiFi and no cellular, it can open a personal hotspot and run JukeBar entirely offline, provided Apple Music songs are downloaded to the device. The local HTTP server binds to the hotspot IP (typically `172.20.10.1`); customers and the bartender connect over that LAN. MusicKit plays downloaded tracks without internet. Admin actions take effect immediately with no relay round-trip — this is a concrete latency and reliability advantage over internet mode.
+
+Android + Spotify does **not** work offline: the Spotify App Remote SDK requires an authenticated Spotify session and cannot play tracks (even downloaded ones) without internet. A future local-file mode (MediaStore + ExoPlayer) would remove this constraint.
+
+**Limitations in no-internet hotspot mode:**
+- Stripe payments cannot process (requires internet to reach Stripe's API). Use auto-approve or pay-to-bartender instead.
+- The relay (`jukebarweb` on Render) is unreachable — internet mode is unavailable, but LAN mode needs no relay.
+- **The option to list the bar on the community page at jukebars.com will not work** — map registration (`POST /api/map/register`) requires the relay, which is internet-only.
+
+---
+
 ### 2026-06-19 — Per-artist song count weighting in genre profiling
 
 **Context:** The profiling daemon was treating every artist as equally important (song_count=1), regardless of how many tracks they appear on in the playlist. A bar where The Cure plays 25 times looked the same as one where they appear once.
