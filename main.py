@@ -96,7 +96,6 @@ class BarSession:
     jukebar_id: str
     session: str          # playlist_id from iOS — rotates on every app restart
     bar_name: str
-    require_approval: bool
     catalog: list[dict]        # full song objects for /api/bar/{id}/catalog
     bartender_enabled: bool = True  # false = hide Submit to Bartender on customer page
     song_index: dict = field(default_factory=dict)  # id → song dict, built at register time
@@ -115,6 +114,10 @@ class BarSession:
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
+
+    @property
+    def require_approval(self) -> bool:
+        return self.stripe_enabled or self.bartender_enabled
 
 
 _map_entries: dict[str, MapEntry] = {}   # persisted to disk
@@ -436,7 +439,6 @@ async def host_register(body: dict[str, Any]):
         session=session,
         bar_name=body.get("bar_name", ""),
         playlist_name=body.get("playlist_name", ""),
-        require_approval=body.get("require_approval", True),
         bartender_enabled=body.get("bartender_enabled", True),
         catalog=catalog,
         song_index={s["id"]: s for s in catalog if "id" in s},
@@ -945,16 +947,5 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: di
         v = bool(body["stripe_enabled"])
         action["stripe_enabled"] = v
         bar.stripe_enabled = v
-    # Derive require_approval from payment flags: both off = auto-approve (free requests).
-    # Also queue the derived value so the host syncs to the same state.
-    if "bartender_enabled" in body or "stripe_enabled" in body:
-        derived = bar.stripe_enabled or bar.bartender_enabled
-        if bar.require_approval != derived:
-            bar.require_approval = derived
-            action["require_approval"] = derived
-    if "require_approval" in body:  # explicit override from host or legacy clients
-        v = bool(body["require_approval"])
-        action["require_approval"] = v
-        bar.require_approval = v
     bar.pending_actions.append(action)
     return {"ok": True}
