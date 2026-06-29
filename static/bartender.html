@@ -165,31 +165,6 @@
     }
     .tab.active { color: #fff; border-color: #fda185; }
 
-    /* ── actions pane ── */
-    #actions-pane { display: none; padding-top: 8px; }
-
-    /* ── cfg rows (payment toggles) ── */
-    .cfg-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 0; border-bottom: 1px solid var(--border);
-    }
-    .cfg-row:last-child { border-bottom: none; }
-    .cfg-title { font-size: 15px; font-weight: 600; }
-    .cfg-label { font-size: 13px; color: #888; margin-top: 2px; }
-
-    /* ── payment toggle (peach) ── */
-    .lan-toggle {
-      position: relative; width: 48px; height: 28px;
-      border-radius: 14px; background: #333; cursor: pointer;
-      transition: background .2s; flex-shrink: 0;
-    }
-    .lan-toggle.on { background: rgba(251,190,132,.4); }
-    .lan-thumb {
-      position: absolute; top: 3px; left: 3px;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: #666; transition: transform .2s, background .2s;
-    }
-    .lan-toggle.on .lan-thumb { transform: translateX(20px); background: #fbbe84; }
 
     /* ── loading overlay ── */
     #s-loading {
@@ -278,7 +253,6 @@
 
   <div class="tabs">
     <div class="tab active" id="tab-requests-btn" onclick="setTab('requests')">Requests</div>
-    <div class="tab" id="tab-actions-btn" onclick="setTab('actions')">Actions</div>
   </div>
 
   <div id="requests-pane">
@@ -296,35 +270,11 @@
     </div>
   </div>
 
-  <div id="actions-pane">
-    <div class="section-title" style="margin-top:16px">Payments</div>
-    <div class="cfg-row">
-      <div>
-        <div class="cfg-title">Stripe 💳</div>
-        <div class="cfg-label">Card payment</div>
-      </div>
-      <div class="lan-toggle" id="tog-stripe" onclick="togglePayment('stripe')"><div class="lan-thumb"></div></div>
-    </div>
-    <div class="cfg-row">
-      <div>
-        <div class="cfg-title">Pay to bartender</div>
-        <div class="cfg-label">Cash or tap</div>
-      </div>
-      <div class="lan-toggle" id="tog-bartender" onclick="togglePayment('bartender')"><div class="lan-thumb"></div></div>
-    </div>
-    <div class="cfg-row">
-      <div>
-        <div class="cfg-title">Auto (free requests)</div>
-        <div class="cfg-label">No approval needed</div>
-      </div>
-      <div class="lan-toggle" id="tog-approval" onclick="togglePayment('approval')"><div class="lan-thumb"></div></div>
-    </div>
-  </div>
 
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '', stripeEnabled: false, bartenderEnabled: false, autoFree: false };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 let currentTab = 'requests';
 
@@ -438,10 +388,6 @@ async function poll() {
     S.pricePerSong     = d.price_per_song   || 0;
     S.priceForThree    = d.price_for_three  || 0;
     S.currency         = d.currency         || '';
-    if (d.stripe_enabled    !== undefined) S.stripeEnabled    = d.stripe_enabled;
-    if (d.bartender_enabled !== undefined) S.bartenderEnabled = d.bartender_enabled;
-    if (d.require_approval  !== undefined) S.autoFree         = d.require_approval === false;
-    updatePaymentToggleUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch {}
@@ -567,35 +513,7 @@ function markActed(btn, label) {
 function setTab(tab) {
   currentTab = tab;
   $('tab-requests-btn').classList.toggle('active', tab === 'requests');
-  $('tab-actions-btn').classList.toggle('active', tab === 'actions');
-  $('requests-pane').style.display = tab === 'requests' ? 'block' : 'none';
-  $('actions-pane').style.display  = tab === 'actions'  ? 'block' : 'none';
-}
-
-// ── Payment toggles ────────────────────────────────────────────────────────
-function updatePaymentToggleUI() {
-  setToggleOn('tog-stripe',    S.stripeEnabled);
-  setToggleOn('tog-bartender', S.bartenderEnabled);
-  setToggleOn('tog-approval',  S.autoFree);
-}
-function setToggleOn(id, on) {
-  const el = $(id);
-  if (el) el.classList.toggle('on', on);
-}
-
-async function togglePayment(which) {
-  let body = {};
-  if (which === 'stripe')    { S.stripeEnabled    = !S.stripeEnabled;    body = { stripe_enabled:    S.stripeEnabled }; }
-  if (which === 'bartender') { S.bartenderEnabled = !S.bartenderEnabled; body = { bartender_enabled: S.bartenderEnabled }; }
-  if (which === 'approval')  { S.autoFree         = !S.autoFree;         body = { require_approval:  !S.autoFree }; }
-  updatePaymentToggleUI();
-  try {
-    await fetch(`/api/bar/${S.jukebarId}/settings?s=${enc(S.session)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch {}
+  $('requests-pane').style.display = 'block';
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
