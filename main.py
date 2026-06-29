@@ -511,6 +511,7 @@ async def host_sync(body: dict[str, Any]):
     _validate_session(bar, session)
     _touch(bar)
 
+    # Android bartender screen: IDs approved natively on the device
     for rid in body.get("approved_request_ids", []):
         if rid in bar.requests and bar.requests[rid].status == "pending":
             bar.requests[rid].status = "approved"
@@ -522,6 +523,12 @@ async def host_sync(body: dict[str, Any]):
 
     if "up_next" in body:
         bar.up_next_queue = body["up_next"]
+        # Host's up_next is the authority: mark any request the host has queued as approved
+        up_next_ids = {item.get("request_id") for item in body["up_next"] if item.get("request_id")}
+        for rid in up_next_ids:
+            if rid in bar.requests and bar.requests[rid].status == "pending":
+                bar.requests[rid].status = "approved"
+                bar.requests[rid].approved_at = time.time()
 
     new_requests = [
         {
@@ -531,10 +538,9 @@ async def host_sync(body: dict[str, Any]):
             "requester_name": r.requester_name,
             "jump": r.jump,
             "paid": r.paid,
-            "status": r.status,
         }
         for r in bar.requests.values()
-        if r.status in ("pending", "approved", "approved_jump")
+        if r.status == "pending"
     ]
 
     actions = list(bar.pending_actions)
@@ -687,18 +693,9 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
         requester_name=body.get("requester_name", ""),
         customer_id=body.get("customer_id", ""),
         jump=body.get("jump", False),
-        status="pending" if bar.require_approval else "approved",
+        status="pending",  # always pending; host confirms via up_next — relay is not the authority
     )
     bar.requests[rid] = req
-
-    if not bar.require_approval:
-        bar.pending_actions.append({
-            "type": "approve",
-            "request_id": rid,
-            "song_ids": song_ids,
-            "jump": req.jump,
-        })
-
     return {"request_id": rid, "status": req.status}
 
 
@@ -861,9 +858,8 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
     if req is None:
         raise HTTPException(404, "Request not found")
     jump = body.get("jump", req.jump)
-    req.status = "approved"
     req.jump = jump
-    req.approved_at = time.time()
+    # Don't mark approved here — host confirms via up_next on next sync
     bar.pending_actions.append({
         "type": "approve",
         "request_id": rid,
