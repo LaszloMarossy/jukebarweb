@@ -160,6 +160,7 @@
     .btn-deny    { background: #7f1d1d; color: #f87171; }
     .req-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
     .req-badge.approved { background: #166534; color: #4ade80; }
+    .req-badge.acted    { background: #1f2937; color: #6b7280; border: 1px dashed #374151; font-style: italic; }
     .req-time   { font-size: 10px; color: var(--muted); white-space: nowrap; }
     .req-device { font-size: 11px; color: var(--text); font-weight: 600; white-space: nowrap; margin-left: auto; }
 
@@ -403,6 +404,7 @@
 
 <script>
 const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true };
+const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -677,6 +679,10 @@ async function stopSession() {
 
 // ── Render requests ────────────────────────────────────────────────────────
 function renderRequests(requests) {
+  for (const id of actedRequests.keys()) {
+    const r = requests.find(r => r.id === id);
+    if (!r || r.status !== 'pending') actedRequests.delete(id);
+  }
   const pending  = requests.filter(r => r.status === 'pending');
   const approved = requests
     .filter(r => r.status === 'approved' || r.status === 'approved_jump')
@@ -716,13 +722,16 @@ function requestCard(r, showActions) {
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
     : 0;
   const priceHtml = price > 0 ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
-  const acts = showActions
-    ? `<span class="req-acts">
-        <button class="btn-act btn-approve" onclick="approve('${esc(r.id)}',false)">✓</button>
-        <button class="btn-act btn-jump"    onclick="approve('${esc(r.id)}',true)">Play next</button>
-        <button class="btn-act btn-deny"    onclick="deny('${esc(r.id)}')">✗</button>
-       </span>`
-    : `<span class="req-badge approved">In queue</span>`;
+  const actedLabel = actedRequests.get(r.id);
+  const acts = actedLabel
+    ? `<span class="req-badge acted">${actedLabel}</span>`
+    : showActions
+      ? `<span class="req-acts">
+          <button class="btn-act btn-approve" onclick="approve('${esc(r.id)}',false,this)">✓</button>
+          <button class="btn-act btn-jump"    onclick="approve('${esc(r.id)}',true,this)">Play next</button>
+          <button class="btn-act btn-deny"    onclick="deny('${esc(r.id)}',this)">✗</button>
+         </span>`
+      : `<span class="req-badge approved">In queue</span>`;
   const songRows = (r.song_details || []).map(s =>
     `<div class="song-row">
       <span class="song-col song-artist">${esc(s.artist)}</span>
@@ -745,8 +754,10 @@ function requestCard(r, showActions) {
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
-async function approve(requestId, jump) {
-  disableCard(requestId);
+async function approve(requestId, jump, btn) {
+  const label = jump ? '↑ Sent' : '✓ Sent';
+  actedRequests.set(requestId, label);
+  markActed(btn, label);
   try {
     await fetch(`/api/bar/${S.jukebarId}/approve?s=${enc(S.session)}`, {
       method: 'POST',
@@ -754,11 +765,11 @@ async function approve(requestId, jump) {
       body: JSON.stringify({ request_id: requestId, jump }),
     });
   } catch {}
-  await poll();
 }
 
-async function deny(requestId) {
-  disableCard(requestId);
+async function deny(requestId, btn) {
+  actedRequests.set(requestId, '✗ Sent');
+  markActed(btn, '✗ Sent');
   try {
     await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}`, {
       method: 'POST',
@@ -766,12 +777,16 @@ async function deny(requestId) {
       body: JSON.stringify({ request_id: requestId }),
     });
   } catch {}
-  await poll();
 }
 
-function disableCard(requestId) {
-  const card = $(`req-${requestId}`);
-  if (card) card.querySelectorAll('button').forEach(b => b.classList.add('btn-disabled'));
+function markActed(btn, label) {
+  const card = btn.closest('.req-card');
+  if (!card) return;
+  card.querySelectorAll('.btn-act').forEach(b => {
+    b.style.pointerEvents = 'none';
+    if (b === btn) { b.textContent = label; }
+    else           { b.style.opacity = '0.15'; }
+  });
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────
