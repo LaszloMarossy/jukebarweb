@@ -812,6 +812,12 @@ async def bar_payment_confirmed(
         paid=True,
     )
     bar.requests[rid] = req
+    bar.pending_actions.append({
+        "type": "approve",
+        "request_id": rid,
+        "song_ids": song_ids,
+        "jump": False,
+    })
     return {"request_id": rid, "status": "approved"}
 
 
