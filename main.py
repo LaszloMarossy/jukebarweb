@@ -807,17 +807,10 @@ async def bar_payment_confirmed(
         requester_name=customer_name,
         customer_id=customer_id,
         jump=False,
-        status="approved",
-        approved_at=time.time(),
+        status="pending",   # host picks this up via new_requests (paid=True → auto-inject)
         paid=True,
     )
     bar.requests[rid] = req
-    bar.pending_actions.append({
-        "type": "approve",
-        "request_id": rid,
-        "song_ids": song_ids,
-        "jump": False,
-    })
     return {"request_id": rid, "status": "approved"}
 
 
