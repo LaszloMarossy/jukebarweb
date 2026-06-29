@@ -626,9 +626,9 @@ async function boot() {
       const toCache = Object.assign({}, d, { bartender_enabled: undefined, stripe_publishable_key: undefined });
       try { sessionStorage.setItem(cacheKey, JSON.stringify(toCache)); } catch {}
     }
-    S.requireApproval  = d.require_approval  !== false;
     S.bartenderEnabled = d.bartender_enabled !== false;
     S.stripeEnabled    = !!d.stripe_enabled;
+    S.requireApproval  = S.stripeEnabled || S.bartenderEnabled;
     S.pricePerSong     = d.price_per_song  || 0;
     S.priceForThree    = d.price_for_three || 0;
     S.currency         = d.currency        || '';
@@ -767,15 +767,15 @@ async function fetchDisplay() {
 
     // Live payment settings — pushed from host on every propagateBarDetails()
     if ('bartender_enabled' in d) {
-      const newReq        = d.require_approval !== false;
       const newStripeOn   = !!d.stripe_enabled;
-      const changed = S.requireApproval  !== newReq
-                   || S.stripeEnabled    !== newStripeOn
-                   || S.bartenderEnabled !== (d.bartender_enabled !== false)
+      const newBartender  = d.bartender_enabled !== false;
+      const newReq        = newStripeOn || newBartender;
+      const changed = S.stripeEnabled    !== newStripeOn
+                   || S.bartenderEnabled !== newBartender
                    || S.stripeKey        !== (d.stripe_publishable_key || '');
-      S.requireApproval  = newReq;
       S.stripeEnabled    = newStripeOn;
-      S.bartenderEnabled = d.bartender_enabled !== false;
+      S.bartenderEnabled = newBartender;
+      S.requireApproval  = newReq;
       S.stripeKey        = d.stripe_publishable_key || '';
       if (changed && $('basket')?.classList.contains('show')) renderBasket();
     }
