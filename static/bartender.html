@@ -166,6 +166,18 @@
     .tab.active { color: #fff; border-color: #fda185; }
 
 
+    /* ── actions tab ── */
+    #actions-pane { display: none; padding-top: 14px; }
+    .cfg-title { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin-bottom: 2px; padding: 10px 0 6px; }
+    .cfg-row   { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2d2d2d; }
+    .cfg-row:last-child { border-bottom: none; }
+    .cfg-label { font-size: 15px; font-weight: 600; color: #fff; }
+    .lan-toggle { width: 42px; height: 24px; border-radius: 12px; background: #333; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+    .lan-toggle.on { background: rgba(251,190,132,.4); }
+    .lan-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #555; transition: transform .2s, background .2s; }
+    .lan-toggle.on .lan-thumb { transform: translateX(18px); background: #fbbe84; }
+    .lan-pay-warn { font-size: 12px; color: #f87171; margin-top: 10px; }
+
     /* ── loading overlay ── */
     #s-loading {
       position: fixed; inset: 0; display: flex;
@@ -253,6 +265,24 @@
 
   <div class="tabs">
     <div class="tab active" id="tab-requests-btn" onclick="setTab('requests')">Requests</div>
+    <div class="tab" id="tab-actions-btn" onclick="setTab('actions')">Actions</div>
+  </div>
+
+  <div id="actions-pane">
+    <div class="cfg-title">Payment Mode</div>
+    <div class="cfg-row">
+      <span class="cfg-label">Stripe 💳</span>
+      <div class="lan-toggle" id="lan-tog-stripe" onclick="toggleBtPayment('stripe')"><div class="lan-thumb"></div></div>
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-label">Pay to bartender</span>
+      <div class="lan-toggle" id="lan-tog-bartender" onclick="toggleBtPayment('bartender')"><div class="lan-thumb"></div></div>
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-label">Auto (free requests)</span>
+      <div class="lan-toggle" id="lan-tog-approval" onclick="toggleBtPayment('approval')"><div class="lan-thumb"></div></div>
+    </div>
+    <div class="lan-pay-warn" id="lan-pay-warn" style="display:none">⚠ No payment mode selected — requests are free and auto-accepted.</div>
   </div>
 
   <div id="requests-pane">
@@ -277,6 +307,9 @@
 const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 let currentTab = 'requests';
+let btStripeEnabled    = false;
+let btBartenderEnabled = true;
+let btAutoFree         = false;
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -388,6 +421,10 @@ async function poll() {
     S.pricePerSong     = d.price_per_song   || 0;
     S.priceForThree    = d.price_for_three  || 0;
     S.currency         = d.currency         || '';
+    btStripeEnabled    = !!d.stripe_enabled;
+    btBartenderEnabled = d.bartender_enabled !== false;
+    btAutoFree         = !d.stripe_enabled && !d.bartender_enabled;
+    updatePaymentToggleUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch {}
@@ -509,11 +546,42 @@ function markActed(btn, label) {
   });
 }
 
+// ── Actions tab ───────────────────────────────────────────────────────────
+function updatePaymentToggleUI() {
+  $('lan-tog-stripe')?.classList.toggle('on', btStripeEnabled);
+  $('lan-tog-bartender')?.classList.toggle('on', btBartenderEnabled);
+  $('lan-tog-approval')?.classList.toggle('on', btAutoFree);
+  const warn = $('lan-pay-warn');
+  if (warn) warn.style.display = (!btStripeEnabled && !btBartenderEnabled && !btAutoFree) ? '' : 'none';
+}
+
+async function toggleBtPayment(which) {
+  const togEl = $('lan-tog-' + which);
+  if (!togEl) return;
+  const newOn = !togEl.classList.contains('on');
+  const body  = which === 'stripe'     ? { stripe_enabled: newOn }
+              : which === 'bartender'  ? { bartender_enabled: newOn }
+              : newOn ? { stripe_enabled: false, bartender_enabled: false } : { bartender_enabled: true };
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/settings?s=${enc(S.session)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { alert('Could not update setting.'); return; }
+    if (which === 'stripe')       { btStripeEnabled    = newOn; btAutoFree = false; }
+    else if (which === 'bartender') { btBartenderEnabled = newOn; btAutoFree = false; }
+    else                          { btAutoFree = newOn; if (newOn) { btStripeEnabled = false; btBartenderEnabled = false; } }
+    updatePaymentToggleUI();
+  } catch { alert('Could not update setting.'); }
+}
+
 // ── Tabs ───────────────────────────────────────────────────────────────────
 function setTab(tab) {
   currentTab = tab;
   $('tab-requests-btn').classList.toggle('active', tab === 'requests');
-  $('requests-pane').style.display = 'block';
+  $('tab-actions-btn').classList.toggle('active', tab === 'actions');
+  $('requests-pane').style.display = tab === 'actions' ? 'none' : 'block';
+  $('actions-pane').style.display  = tab === 'actions' ? 'block' : 'none';
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
