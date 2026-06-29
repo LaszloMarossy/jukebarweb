@@ -617,7 +617,7 @@ async function boot() {
       d = JSON.parse(cached);
     } else {
       const res = await fetch(`/api/bar/${S.jukebarId}/catalog?s=${enc(S.session)}`);
-      if (res.status === 403) { showScreen('s-play'); fetchDisplay(); setInterval(fetchDisplay, 5_000); return; }
+      if (res.status === 403) { showScreen('s-play'); fetchDisplay(); setInterval(fetchDisplay, 5_000); showError('Link expired', 'The bar session has changed. Please re-scan the QR code to browse and request songs.'); return; }
       if (res.status === 404) return showError('Bar offline', 'This JukeBar is not reachable right now. Try again in a moment.');
       if (!res.ok)            return showError('Error', 'Could not load the playlist. Check your connection and try again.');
       d = await res.json();
