@@ -1044,10 +1044,10 @@ function renderBasket() {
   </div>
   <button class="basket-rm" onclick="removeFromBasket(${i})">✕</button>
 </div>`).join('');
-  const total = basketTotal();
-  $('basket-total').textContent = total > 0 ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
-  basket.classList.add('show');
+  const total    = basketTotal();
   const autoMode = !S.requireApproval;
+  $('basket-total').textContent = (!autoMode && total > 0) ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
+  basket.classList.add('show');
   $('rb-pay-btn').style.display = (!autoMode && S.stripeEnabled && total > 0) ? '' : 'none';
   $('submit-btn').style.display = (autoMode || S.bartenderEnabled) ? '' : 'none';
   const sBtn = $('submit-btn');
