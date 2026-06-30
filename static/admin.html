@@ -718,7 +718,8 @@ function requestCard(r, showActions) {
   const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
   const devId = deviceLabel(r.customer_id);
   const count = (r.song_ids || r.song_details || []).length || 1;
-  const price = S.pricePerSong > 0
+  const needsPayment = S.stripeEnabled || S.bartenderEnabled;
+  const price = needsPayment && S.pricePerSong > 0
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
     : 0;
   const priceHtml = price > 0 ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
