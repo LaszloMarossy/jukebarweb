@@ -1202,7 +1202,7 @@ async function reqPayOnline() {
     await loadStripeJs();
     const res = await fetch(`/api/bar/${S.jukebarId}/create-payment-intent?s=${enc(S.session)}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ song_ids: S.selected.map(s => s.id), song_titles: S.selected.map(s => s.title), customer_name: name }),
+      body: JSON.stringify({ song_ids: S.selected.map(s => s.id), song_titles: S.selected.map(s => s.title), requester_name: name }),
     });
     if (res.status === 403) { closePayOverlay(); showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
     if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -1228,7 +1228,7 @@ async function reqPayOnline() {
     sessionStorage.setItem('jb_pending_payment', JSON.stringify({
       payment_intent_id: piId,
       song_ids:          S.selected.map(s => s.id),
-      customer_name:     name,
+      requester_name:     name,
       customer_id:       S.customerId,
     }));
   } catch (e) {
@@ -1272,7 +1272,7 @@ async function finishPaidRequest(piId) {
     sessionStorage.removeItem('jb_pending_payment');
     closePayOverlay();
     const submitted = [...S.selected];
-    const name = pending.customer_name;
+    const name = pending.requester_name;
     S.selected = [];
     S.nav = { level: 'letters', letter: '', artistIdx: -1, albumIdx: -1 };
     renderBasket(); renderBrowse();

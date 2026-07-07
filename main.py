@@ -746,10 +746,10 @@ async def bar_create_payment_intent(
     amount = _to_stripe_amount(price, currency)
 
     song_titles   = body.get("song_titles", song_ids)
-    customer_name = body.get("customer_name", "") or "Anonymous"
+    requester_name = body.get("requester_name", "") or "Anonymous"
     song_list     = ", ".join(song_titles)
     date_str      = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    description   = f"JukeBar {bar.bar_name} jukebox request for {song_list} made under name {customer_name} at {date_str}"
+    description   = f"JukeBar {bar.bar_name} jukebox request for {song_list} made under name {requester_name} at {date_str}"
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -797,14 +797,14 @@ async def bar_payment_confirmed(
         raise HTTPException(402, f"Payment not completed (status={pi_status})")
 
     rid           = str(uuid.uuid4())
-    customer_name = body.get("customer_name", "Anonymous")
+    requester_name = body.get("requester_name", "Anonymous")
     customer_id   = body.get("customer_id", "")
     song_titles   = [bar.song_index.get(sid, {}).get("title", "") for sid in song_ids]
     req = SongRequest(
         id=rid,
         song_ids=song_ids,
         song_titles=song_titles,
-        requester_name=customer_name,
+        requester_name=requester_name,
         customer_id=customer_id,
         jump=False,
         status="pending",   # host picks this up via new_requests (paid=True → auto-inject)
