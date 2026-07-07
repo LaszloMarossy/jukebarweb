@@ -486,21 +486,7 @@
   <div class="play-footer">
     <button class="play-req-btn" onclick="startRequest()">Request a Song</button>
     <div class="play-upnext">
-      <svg viewBox="0 0 100 100" class="upnext-badge" onclick="toggleApprovedQueueOverlay()">
-        <path d="M 81.65,19.43 A 44,44 0 0 1 90.19,67.90" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
-        <path d="M 9.81,67.90 A 44,44 0 0 1 18.35,19.43" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
-        <defs>
-          <path id="upTextPath-main" d="M 21.72,16.30 A 44,44 0 0 1 78.28,16.30" fill="none"/>
-          <path id="nextTextPath-main" d="M 11.90,72 A 44,44 0 0 0 88.10,72" fill="none"/>
-        </defs>
-        <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
-          <textPath href="#upTextPath-main" startOffset="50%" text-anchor="middle" textLength="61.4" lengthAdjust="spacingAndGlyphs">UP</textPath>
-        </text>
-        <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
-          <textPath href="#nextTextPath-main" startOffset="50%" text-anchor="middle" textLength="92.2" lengthAdjust="spacingAndGlyphs">NEXT</textPath>
-        </text>
-        <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="38" fill="#FFC24A" id="un-count-main">0</text>
-      </svg>
+      <svg viewBox="-10 -10 120 120" class="upnext-badge" id="un-badge-main" onclick="toggleApprovedQueueOverlay()"></svg>
     </div>
   </div>
 
@@ -508,21 +494,7 @@
   <div id="aq-overlay" onclick="closeApprovedQueueOverlay()">
     <div class="aq-panel" onclick="event.stopPropagation()">
       <div class="aq-header">
-        <svg viewBox="0 0 100 100" class="upnext-badge" style="width:44px;height:44px" onclick="closeApprovedQueueOverlay()">
-          <path d="M 81.65,19.43 A 44,44 0 0 1 90.19,67.90" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
-          <path d="M 9.81,67.90 A 44,44 0 0 1 18.35,19.43" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
-          <defs>
-            <path id="upTextPath-aq" d="M 21.72,16.30 A 44,44 0 0 1 78.28,16.30" fill="none"/>
-            <path id="nextTextPath-aq" d="M 11.90,72 A 44,44 0 0 0 88.10,72" fill="none"/>
-          </defs>
-          <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
-            <textPath href="#upTextPath-aq" startOffset="50%" text-anchor="middle" textLength="61.4" lengthAdjust="spacingAndGlyphs">UP</textPath>
-          </text>
-          <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
-            <textPath href="#nextTextPath-aq" startOffset="50%" text-anchor="middle" textLength="92.2" lengthAdjust="spacingAndGlyphs">NEXT</textPath>
-          </text>
-          <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="38" fill="#FFC24A" id="un-count-aq">0</text>
-        </svg>
+        <svg viewBox="-10 -10 120 120" class="upnext-badge" id="un-badge-aq" style="width:44px;height:44px" onclick="closeApprovedQueueOverlay()"></svg>
         <div class="aq-title" id="aq-title">APPROVED REQUESTS UP NEXT</div>
         <button class="aq-close" onclick="closeApprovedQueueOverlay()">✕</button>
       </div>
@@ -934,9 +906,7 @@ async function fetchDisplay() {
       return details.map(s => ({ ...s, requester: r.requester_name || '' }));
     });
 
-    const countMain = $('un-count-main'), countAq = $('un-count-aq');
-    if (countMain) countMain.textContent = S.upNextFlat.length;
-    if (countAq)   countAq.textContent   = S.upNextFlat.length;
+    renderUpNextBadges(S.upNextFlat.length);
     if ($('aq-overlay')?.classList.contains('open')) renderApprovedQueueList();
 
     if (S.nav.level === 'letters' && $('s-browse').classList.contains('active')) renderLetters();
@@ -1424,6 +1394,90 @@ function renderApprovedQueueList() {
         </div>
       </div>`).join('')
     : `<div class="aq-empty">No approved requests yet — shuffling…</div>`;
+}
+
+// ── Up Next badge (built in JS: measured per-letter placement, not
+// textPath — Safari/WebKit handles textLength+lengthAdjust on textPath
+// poorly (letters clip/vanish), so this mirrors the native apps' own
+// per-letter Canvas/Core Graphics placement instead, which is far more
+// consistent cross-browser). angle convention: 0°=3 o'clock, clockwise.
+const UNB_R = 44, UNB_CX = 50, UNB_CY = 50;
+let _unbMeasureCtx = null;
+function unbMeasure(ch, fontPx) {
+  if (!_unbMeasureCtx) _unbMeasureCtx = document.createElement('canvas').getContext('2d');
+  _unbMeasureCtx.font = `700 ${fontPx}px 'Bubblegum Sans', cursive`;
+  return _unbMeasureCtx.measureText(ch).width;
+}
+// top-arc letters point outward (away from center); bottom-arc letters
+// point inward — that's what keeps both readable upright to a viewer.
+function unbLayoutWord(word, centerAngleDeg, top, fontPx, letterGapFactor) {
+  const chars = [...word];
+  const widths = chars.map(ch => unbMeasure(ch, fontPx));
+  const letterGap = fontPx * letterGapFactor;
+  const totalArc = widths.reduce((a, b) => a + b, 0) + letterGap * Math.max(chars.length - 1, 0);
+  const spanDeg = (totalArc / UNB_R) * 180 / Math.PI;
+  let cursor = -totalArc / 2;
+  const letters = [];
+  for (let i = 0; i < chars.length; i++) {
+    const charCenter = cursor + widths[i] / 2;
+    const offsetDeg = (charCenter / UNB_R) * 180 / Math.PI;
+    const alphaDeg = top ? centerAngleDeg + offsetDeg : centerAngleDeg - offsetDeg;
+    const rotDeg = top ? alphaDeg + 90 : alphaDeg - 90;
+    letters.push({ ch: chars[i], alphaDeg, rotDeg });
+    cursor += widths[i] + letterGap;
+  }
+  return { letters, spanDeg };
+}
+function unbPoint(deg) {
+  const rad = deg * Math.PI / 180;
+  return [UNB_CX + UNB_R * Math.cos(rad), UNB_CY + UNB_R * Math.sin(rad)];
+}
+function unbArcPath(startDeg, sweepDeg) {
+  const s = ((startDeg % 360) + 360) % 360;
+  const e = s + sweepDeg;
+  const large = sweepDeg > 180 ? 1 : 0;
+  const [x1, y1] = unbPoint(s);
+  const [x2, y2] = unbPoint(e);
+  return `M ${x1.toFixed(2)},${y1.toFixed(2)} A ${UNB_R},${UNB_R} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)}`;
+}
+function unbLetterEls(letters) {
+  return letters.map(l => {
+    const [x, y] = unbPoint(l.alphaDeg);
+    return `<text text-anchor="middle" style="dominant-baseline:central;alignment-baseline:central" transform="translate(${x.toFixed(2)},${y.toFixed(2)}) rotate(${l.rotDeg.toFixed(2)})">${esc(l.ch)}</text>`;
+  }).join('');
+}
+function unBadgeMarkup(count) {
+  const fontPx = 16;
+  const up   = unbLayoutWord('UP',   270, true,  fontPx, 0.50);
+  const next = unbLayoutWord('NEXT', 90,  false, fontPx, 0.48);
+  const gapPad = 6;
+  const upStart   = 270 - up.spanDeg / 2 - gapPad;
+  const upEnd     = 270 + up.spanDeg / 2 + gapPad;
+  const nextStart = 90  - next.spanDeg / 2 - gapPad;
+  const nextEnd   = 90  + next.spanDeg / 2 + gapPad;
+  const ringA = unbArcPath(upEnd,   ((nextStart - upEnd) + 360) % 360);
+  const ringB = unbArcPath(nextEnd, ((upStart - nextEnd) + 360) % 360);
+  return `
+    <path d="${ringA}" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
+    <path d="${ringB}" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
+    <g font-weight="700" font-size="${fontPx}" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
+      ${unbLetterEls(up.letters)}
+      ${unbLetterEls(next.letters)}
+    </g>
+    <text x="50" y="50" text-anchor="middle" style="dominant-baseline:central;alignment-baseline:central" font-weight="800" font-size="38" fill="#FFC24A">${count}</text>
+  `;
+}
+function renderUpNextBadges(count) {
+  const main = $('un-badge-main'), aq = $('un-badge-aq');
+  const markup = unBadgeMarkup(count);
+  if (main) main.innerHTML = markup;
+  if (aq)   aq.innerHTML   = markup;
+}
+// Canvas measureText uses whatever font is currently loaded; re-render
+// once Bubblegum Sans actually finishes loading in case the first pass
+// measured against a fallback font.
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => renderUpNextBadges((S.upNextFlat || []).length));
 }
 
 function toggleApprovedQueueOverlay() {
