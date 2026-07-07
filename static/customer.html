@@ -1447,7 +1447,7 @@ function unbLetterEls(letters) {
   }).join('');
 }
 function unBadgeMarkup(count) {
-  const fontPx = 16;
+  const fontPx = 23;
   const up   = unbLayoutWord('UP',   270, true,  fontPx, 0.50);
   const next = unbLayoutWord('NEXT', 90,  false, fontPx, 0.48);
   const gapPad = 6;
@@ -1458,8 +1458,8 @@ function unBadgeMarkup(count) {
   const ringA = unbArcPath(upEnd,   ((nextStart - upEnd) + 360) % 360);
   const ringB = unbArcPath(nextEnd, ((upStart - nextEnd) + 360) % 360);
   return `
-    <path d="${ringA}" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
-    <path d="${ringB}" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
+    <path d="${ringA}" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
+    <path d="${ringB}" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
     <g font-weight="700" font-size="${fontPx}" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
       ${unbLetterEls(up.letters)}
       ${unbLetterEls(next.letters)}
