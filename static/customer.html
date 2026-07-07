@@ -118,7 +118,7 @@
        UP NEXT BADGE + APPROVED QUEUE OVERLAY
     ══════════════════════════════════════════════════════════════ */
     .play-upnext { width: 100%; display: flex; justify-content: center; }
-    .upnext-badge { width: 52px; height: 52px; cursor: pointer; }
+    .upnext-badge { width: 64px; height: 64px; cursor: pointer; }
     .upnext-badge text { font-family: 'Bubblegum Sans', cursive; }
 
     #aq-overlay {
@@ -487,19 +487,19 @@
     <button class="play-req-btn" onclick="startRequest()">Request a Song</button>
     <div class="play-upnext">
       <svg viewBox="0 0 100 100" class="upnext-badge" onclick="toggleApprovedQueueOverlay()">
-        <path d="M 89.88,31.41 A 44,44 0 0 1 93.83,53.84" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
-        <path d="M 6.17,53.84 A 44,44 0 0 1 10.12,31.41" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
+        <path d="M 81.65,19.43 A 44,44 0 0 1 90.19,67.90" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
+        <path d="M 9.81,67.90 A 44,44 0 0 1 18.35,19.43" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
         <defs>
-          <path id="upTextPath-main" d="M 10.12,31.41 A 44,44 0 0 1 89.88,31.41" fill="none"/>
-          <path id="nextTextPath-main" d="M 6.17,53.84 A 44,44 0 0 0 93.83,53.84" fill="none"/>
+          <path id="upTextPath-main" d="M 21.72,16.30 A 44,44 0 0 1 78.28,16.30" fill="none"/>
+          <path id="nextTextPath-main" d="M 11.90,72 A 44,44 0 0 0 88.10,72" fill="none"/>
         </defs>
-        <text font-weight="700" font-size="17" fill="#FFC24A" style="-webkit-text-stroke:0.6px #FFC24A">
-          <textPath href="#upTextPath-main" startOffset="50%" text-anchor="middle">UP</textPath>
+        <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
+          <textPath href="#upTextPath-main" startOffset="50%" text-anchor="middle" textLength="61.4" lengthAdjust="spacingAndGlyphs">UP</textPath>
         </text>
-        <text font-weight="700" font-size="15" fill="#FFC24A" style="-webkit-text-stroke:0.6px #FFC24A">
-          <textPath href="#nextTextPath-main" startOffset="50%" text-anchor="middle">NEXT</textPath>
+        <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
+          <textPath href="#nextTextPath-main" startOffset="50%" text-anchor="middle" textLength="92.2" lengthAdjust="spacingAndGlyphs">NEXT</textPath>
         </text>
-        <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="34" fill="#FFC24A" id="un-count-main">0</text>
+        <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="38" fill="#FFC24A" id="un-count-main">0</text>
       </svg>
     </div>
   </div>
@@ -508,20 +508,20 @@
   <div id="aq-overlay" onclick="closeApprovedQueueOverlay()">
     <div class="aq-panel" onclick="event.stopPropagation()">
       <div class="aq-header">
-        <svg viewBox="0 0 100 100" class="upnext-badge" style="width:36px;height:36px" onclick="closeApprovedQueueOverlay()">
-          <path d="M 89.88,31.41 A 44,44 0 0 1 93.83,53.84" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
-          <path d="M 6.17,53.84 A 44,44 0 0 1 10.12,31.41" fill="none" stroke="#FFC24A" stroke-width="6" stroke-linecap="butt"/>
+        <svg viewBox="0 0 100 100" class="upnext-badge" style="width:44px;height:44px" onclick="closeApprovedQueueOverlay()">
+          <path d="M 81.65,19.43 A 44,44 0 0 1 90.19,67.90" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
+          <path d="M 9.81,67.90 A 44,44 0 0 1 18.35,19.43" fill="none" stroke="#FFC24A" stroke-width="7" stroke-linecap="butt"/>
           <defs>
-            <path id="upTextPath-aq" d="M 10.12,31.41 A 44,44 0 0 1 89.88,31.41" fill="none"/>
-            <path id="nextTextPath-aq" d="M 6.17,53.84 A 44,44 0 0 0 93.83,53.84" fill="none"/>
+            <path id="upTextPath-aq" d="M 21.72,16.30 A 44,44 0 0 1 78.28,16.30" fill="none"/>
+            <path id="nextTextPath-aq" d="M 11.90,72 A 44,44 0 0 0 88.10,72" fill="none"/>
           </defs>
-          <text font-weight="700" font-size="17" fill="#FFC24A" style="-webkit-text-stroke:0.6px #FFC24A">
-            <textPath href="#upTextPath-aq" startOffset="50%" text-anchor="middle">UP</textPath>
+          <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
+            <textPath href="#upTextPath-aq" startOffset="50%" text-anchor="middle" textLength="61.4" lengthAdjust="spacingAndGlyphs">UP</textPath>
           </text>
-          <text font-weight="700" font-size="15" fill="#FFC24A" style="-webkit-text-stroke:0.6px #FFC24A">
-            <textPath href="#nextTextPath-aq" startOffset="50%" text-anchor="middle">NEXT</textPath>
+          <text font-weight="700" font-size="16" fill="#FFC24A" style="-webkit-text-stroke:0.8px #FFC24A">
+            <textPath href="#nextTextPath-aq" startOffset="50%" text-anchor="middle" textLength="92.2" lengthAdjust="spacingAndGlyphs">NEXT</textPath>
           </text>
-          <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="34" fill="#FFC24A" id="un-count-aq">0</text>
+          <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-weight="800" font-size="38" fill="#FFC24A" id="un-count-aq">0</text>
         </svg>
         <div class="aq-title" id="aq-title">APPROVED REQUESTS UP NEXT</div>
         <button class="aq-close" onclick="closeApprovedQueueOverlay()">✕</button>
