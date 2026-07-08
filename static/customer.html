@@ -159,6 +159,10 @@
       border-radius: 16px; transition: opacity .15s;
     }
     .play-req-btn:active { opacity: .8; }
+    .not-accepting-msg {
+      width: 100%; text-align: center; color: var(--muted);
+      font-size: 14px; font-style: italic; padding: 16px 0;
+    }
 
     /* ══════════════════════════════════════════════════════════════
        TOAST (confirmation popup on play screen)
@@ -484,7 +488,8 @@
   </div>
 
   <div class="play-footer">
-    <button class="play-req-btn" onclick="startRequest()">Request a Song</button>
+    <button class="play-req-btn" id="play-req-btn" onclick="startRequest()">Request a Song</button>
+    <div class="not-accepting-msg" id="play-req-closed-msg" style="display:none">Not accepting requests right now</div>
     <div class="play-upnext">
       <svg viewBox="-10 -10 120 120" class="upnext-badge" id="un-badge-main" onclick="toggleApprovedQueueOverlay()"></svg>
     </div>
@@ -579,6 +584,7 @@
       <input class="basket-name" id="requester-name" type="text" placeholder="Your name" maxlength="40">
       <button class="basket-pay" id="rb-pay-btn" onclick="reqPayOnline()" style="display:none">💳 Pay Online</button>
       <button class="basket-submit" id="submit-btn" onclick="submitRequest()">Submit to Bartender</button>
+      <div class="not-accepting-msg" id="basket-closed-msg" style="display:none">Not accepting requests right now</div>
     </div>
   </div>
 </div>
@@ -702,9 +708,13 @@ async function boot() {
       const toCache = Object.assign({}, d, { bartender_enabled: undefined, stripe_publishable_key: undefined });
       try { sessionStorage.setItem(cacheKey, JSON.stringify(toCache)); } catch {}
     }
-    S.bartenderEnabled = d.bartender_enabled !== false;
-    S.stripeEnabled    = !!d.stripe_enabled;
-    S.requireApproval  = S.stripeEnabled || S.bartenderEnabled;
+    S.bartenderEnabled  = d.bartender_enabled !== false;
+    S.stripeEnabled     = !!d.stripe_enabled;
+    S.requireApproval   = S.stripeEnabled || S.bartenderEnabled;
+    S.acceptingRequests = d.accepting_requests !== false;
+    const reqBtn0 = $('play-req-btn'), reqMsg0 = $('play-req-closed-msg');
+    if (reqBtn0) reqBtn0.style.display = S.acceptingRequests ? '' : 'none';
+    if (reqMsg0) reqMsg0.style.display = S.acceptingRequests ? 'none' : '';
     S.pricePerSong     = d.price_per_song  || 0;
     S.priceForThree    = d.price_for_three || 0;
     S.currency         = d.currency        || '';
@@ -908,6 +918,15 @@ async function fetchDisplay() {
 
     renderUpNextBadges(S.upNextFlat.length);
     if ($('aq-overlay')?.classList.contains('open')) renderApprovedQueueList();
+
+    // Closing time: hides Request/Pay buttons everywhere: home screen entry
+    // point and, in case a customer's basket was already open when the flag
+    // flipped, the Pay/Submit buttons directly too.
+    S.acceptingRequests = d.accepting_requests !== false;
+    const reqBtn = $('play-req-btn'), reqMsg = $('play-req-closed-msg');
+    if (reqBtn) reqBtn.style.display = S.acceptingRequests ? '' : 'none';
+    if (reqMsg) reqMsg.style.display = S.acceptingRequests ? 'none' : '';
+    if ($('basket')?.classList.contains('show')) renderBasket();
 
     if (S.nav.level === 'letters' && $('s-browse').classList.contains('active')) renderLetters();
   } catch {}
@@ -1119,8 +1138,11 @@ function renderBasket() {
   const autoMode = !S.requireApproval;
   $('basket-total').textContent = (!autoMode && total > 0) ? `Total: ${S.currency} ${total.toFixed(2)}` : '';
   basket.classList.add('show');
-  $('rb-pay-btn').style.display = (!autoMode && S.stripeEnabled && total > 0) ? '' : 'none';
-  $('submit-btn').style.display = (autoMode || S.bartenderEnabled) ? '' : 'none';
+  const accepting = S.acceptingRequests !== false;
+  $('rb-pay-btn').style.display = (accepting && !autoMode && S.stripeEnabled && total > 0) ? '' : 'none';
+  $('submit-btn').style.display = (accepting && (autoMode || S.bartenderEnabled)) ? '' : 'none';
+  const closedMsg = $('basket-closed-msg');
+  if (closedMsg) closedMsg.style.display = accepting ? 'none' : '';
   const sBtn = $('submit-btn');
   if (sBtn) sBtn.textContent = autoMode ? 'Submit (free)' : 'Submit to Bartender';
   basket.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

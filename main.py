@@ -98,6 +98,7 @@ class BarSession:
     bar_name: str
     catalog: list[dict]        # full song objects for /api/bar/{id}/catalog
     bartender_enabled: bool = True  # false = hide Submit to Bartender on customer page
+    accepting_requests: bool = True  # false = hide Request/Pay buttons + QR everywhere; admin/bartender still work
     song_index: dict = field(default_factory=dict)  # id → song dict, built at register time
     price_per_song: float = 0.0
     price_for_three: float = 0.0
@@ -440,6 +441,7 @@ async def host_register(body: dict[str, Any]):
         bar_name=body.get("bar_name", ""),
         playlist_name=body.get("playlist_name", ""),
         bartender_enabled=body.get("bartender_enabled", True),
+        accepting_requests=body.get("accepting_requests", True),
         catalog=catalog,
         song_index={s["id"]: s for s in catalog if "id" in s},
         price_per_song=body.get("price_per_song", 0.0),
@@ -594,6 +596,7 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "price_for_three":        bar.price_for_three,
             "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
+            "accepting_requests":     bar.accepting_requests,
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -677,12 +680,15 @@ async def bar_display(jukebar_id: str, s: str = Query(None)):
         "bartender_enabled":      bar.bartender_enabled,
         "stripe_enabled":         bar.stripe_enabled,
         "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
+        "accepting_requests":     bar.accepting_requests,
     }
 
 
 @app.post("/api/bar/{jukebar_id}/request")
 async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
+    if not bar.accepting_requests:
+        raise HTTPException(403, "Not accepting requests right now")
 
     song_ids: list[str] = body.get("song_ids", [])
     if not song_ids:
@@ -731,6 +737,8 @@ async def bar_create_payment_intent(
 ):
     import httpx
     bar = _customer_bar(jukebar_id, s)
+    if not bar.accepting_requests:
+        raise HTTPException(403, "Not accepting requests right now")
     if not bar.stripe_secret_key:
         raise HTTPException(400, "Stripe not configured")
     song_ids: list[str] = body.get("song_ids", [])

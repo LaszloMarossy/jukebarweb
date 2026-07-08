@@ -11,6 +11,28 @@ JukeBarSpot is JukeBar for Android. Same concept: a self-contained jukebox runni
 
 ---
 
+## Setup
+
+### Host device battery settings (Samsung / OEM battery management)
+
+Samsung devices (and other OEMs with similar aggressive battery management) can silently freeze backgrounded app threads to save power — Samsung calls this **"Freecess"**, visible in `adb logcat` as repeated entries like:
+
+```
+D/FreecessHandler: freeze com.giffy.spotonjukebar(<uid>) result : 12
+```
+
+This can kill the embedded WiFi server (customer/bartender/admin pages stop loading) while on-device kiosk playback keeps running fine — the freeze targets background threads specifically, and playback wasn't tied to any foreground status, so it wasn't exempt.
+
+The app runs a foreground service (`LanForegroundService`, see DECISIONS.md) for the duration the LAN WiFi server is active, which should prevent this in most cases. As a required one-time setup step on each host device, also configure:
+
+1. **Settings → Battery and device care → Battery → Background usage limits** — remove the app from "Sleeping apps" / "Deep sleeping apps" (or add it to "Never sleeping apps")
+2. **Settings → Apps → [JukeBar app] → Battery** — set to "Unrestricted" (not "Optimized")
+3. **Settings → Apps → [JukeBar app] → Notifications** — allow notifications (the foreground service posts a low-priority persistent notification; some OEMs throttle apps more aggressively if their foreground notification is blocked)
+
+**Symptom if skipped:** WiFi customer/bartender/admin pages stop responding after the device has been idle for a while (screen off, no interaction), even though the kiosk display/playback keeps working. Confirm via `adb logcat | grep FreecessHandler` — repeated `freeze ... result : 12` entries confirm this is the cause, not a code bug.
+
+---
+
 ## What's the same as JukeBar (iOS)
 
 - Customer web app (customer.html) — reused as-is

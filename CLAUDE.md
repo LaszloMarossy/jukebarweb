@@ -24,13 +24,28 @@ The Android/iOS host app owns all state. The relay is a message-passing layer:
 
 **Optimistic apply:** `POST /api/bar/{id}/settings` now also immediately updates `BarSession` in memory so the admin page doesn't see a stale value in the 0–10 s window before the host re-registers.
 
-## Five admin surfaces (all must stay in sync)
-Every payment/approval setting change must be reflected in all five:
-1. Relay admin (`static/admin.html`) — this repo
-2. Android LAN admin (`app/src/main/assets/admin.html`) — spotonjukebar repo
-3. iOS LAN admin (`JukeBar/WebApps/admin.html`) — JukeBar repo
-4. Android native (`ui/AdminScreen.kt`) — spotonjukebar repo
-5. iOS native (`AdminView.swift`) — JukeBar repo
+## UI surface matrix (13 surfaces, all must stay in sync)
+JukeBar has three codebases — iOS (`~/dev/giffy/JukeBar`), Android (`~/dev/giffy/spotonjukebar`), and this relay (jukebarweb). Every page type exists across multiple delivery surfaces and (except Bartender) both host platforms. Any task touching admin/bartender/customer UI or behavior should be checked against every relevant cell below, not just the one surface mentioned. Look and feel should be near-identical (ideally identical) across all surfaces of a given page type. The Render (internet) cell is a single shared page regardless of which platform is hosting — there is no iOS/Android branching in `static/*.html` or `main.py`.
+
+### Admin (5 surfaces)
+| Surface | iOS | Android |
+|---|---|---|
+| Kiosk-native | `JukeBar/AdminView.swift` | `ui/AdminScreen.kt` |
+| WiFi-served LAN HTML | `JukeBar/WebApps/admin.html` (served by `LocalServer.swift`) | `assets/admin.html` (served by `local/LocalServer.kt`) |
+| Internet (Render), shared | `static/admin.html` — this repo | same |
+
+### Bartender (3 surfaces — no kiosk-native; bartenders use their own device, not the host kiosk)
+| Surface | iOS | Android |
+|---|---|---|
+| WiFi-served LAN HTML | `JukeBar/WebApps/bartender.html` | `assets/bartender.html` |
+| Internet (Render), shared | `static/bartender.html` — this repo | same |
+
+### Customer request (5 surfaces)
+| Surface | iOS | Android |
+|---|---|---|
+| Kiosk-native | `JukeBar/KioskView.swift` | `ui/KioskView.kt` + `ui/LocalRequestSheet.kt` |
+| WiFi-served LAN HTML | `JukeBar/WebApps/customer.html` | `assets/customer.html` |
+| Internet (Render), shared | `static/customer.html` — this repo | same |
 
 ## Key decisions
 
