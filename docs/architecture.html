@@ -185,6 +185,14 @@
   .edge.lit text { fill: var(--accent); }
   marker path { fill: var(--ink-mute); }
 
+  /* edge captions: free-floating text that describes a group of edges —
+     dim by default (there's no line connecting them to what they describe),
+     lit gold + bold when a node at either end of one of their edges is
+     hovered, faded further when a different, unrelated node is hovered. */
+  .edge-caption { font-family: var(--mono); font-size: 10px; fill: var(--ink-mute); opacity: 0.55; transition: opacity 0.15s, fill 0.15s; }
+  .edge-caption.lit { opacity: 1; fill: var(--accent); font-weight: 700; }
+  .edge-caption.dimmed { opacity: 0.15; }
+
   .info-badge circle { fill: var(--surface); stroke: var(--ink-mute); stroke-width: 1; }
   .info-badge text { fill: var(--ink-mute); font-family: var(--mono); font-size: 9px; font-weight: 700; text-anchor: middle; }
   .info-badge { cursor: pointer; }
@@ -517,7 +525,7 @@
 
         <g class="edge" data-from="ios-appstate" data-to="relay-main"><path d="M 285,300 L 302,300 L 302,499 L 618,499 L 618,176 L 635,176" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="and-relay" data-to="relay-main"><path d="M 585,300 L 607,300 L 607,505 L 627,505 L 627,182 L 635,182" marker-end="url(#arrow)"></path></g>
-        <text x="380" y="491" class="mono" style="font-size:10px;fill:var(--ink-mute)">register + sync, ~5s · + /api/map/register (playlist + bar metadata, opt-in)</text>
+        <text x="380" y="491" class="edge-caption" data-nodes="ios-appstate,and-relay,relay-main">register + sync, ~5s · + /api/map/register (playlist + bar metadata, opt-in)</text>
 
         <g class="edge" data-from="ios-music" data-to="ext-applemusic"><path d="M 285,362 L 302,362 L 302,511 L 885,511 L 885,168 L 900,168" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="and-playback" data-to="ext-spotify"><path d="M 585,362 L 607,362 L 607,517 L 880,517 L 880,226 L 900,226" marker-end="url(#arrow)"></path></g>
@@ -525,7 +533,7 @@
         <g class="edge" data-from="ios-localserver" data-to="ext-stripe"><path d="M 285,238 L 310,238 L 310,523 L 890,523 L 890,284 L 900,284" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="and-localserver" data-to="ext-stripe"><path d="M 585,238 L 612,238 L 612,529 L 895,529 L 895,290 L 900,290" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="relay-main" data-to="ext-stripe"><path d="M 865,176 L 882,176 L 882,272 L 900,272" marker-end="url(#arrow)"></path></g>
-        <text x="700" y="548" class="mono" style="font-size:10px;fill:var(--ink-mute)">create-payment-intent · payment-confirmed (never gated)</text>
+        <text x="700" y="548" class="edge-caption" data-nodes="ios-localserver,and-localserver,relay-main,ext-stripe">create-payment-intent · payment-confirmed (never gated)</text>
 
         <g class="edge" data-from="relay-gcsstore" data-to="ext-gcs"><path d="M 865,366 L 885,366 L 885,418 L 900,418" marker-end="url(#arrow)"></path></g>
 
@@ -749,21 +757,29 @@
   if (!svg) return;
   var nodes = svg.querySelectorAll('.node[data-hoverable]');
   var edges = svg.querySelectorAll('.edge');
+  var captions = svg.querySelectorAll('.edge-caption');
   nodes.forEach(function (n) {
     n.addEventListener('mouseenter', function () {
       var id = n.getAttribute('data-id');
-      var related = false;
       edges.forEach(function (e) {
         if (e.getAttribute('data-from') === id || e.getAttribute('data-to') === id) {
           e.classList.add('lit');
-          related = true;
         } else {
           e.classList.add('dimmed');
+        }
+      });
+      captions.forEach(function (c) {
+        var relatedNodes = (c.getAttribute('data-nodes') || '').split(',');
+        if (relatedNodes.indexOf(id) !== -1) {
+          c.classList.add('lit');
+        } else {
+          c.classList.add('dimmed');
         }
       });
     });
     n.addEventListener('mouseleave', function () {
       edges.forEach(function (e) { e.classList.remove('lit', 'dimmed'); });
+      captions.forEach(function (c) { c.classList.remove('lit', 'dimmed'); });
     });
   });
 })();
