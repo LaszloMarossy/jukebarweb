@@ -261,10 +261,13 @@ async def discover():
     return HTMLResponse((Path("static") / "discover.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
-@app.get("/n3oqrvvzszp3jx5j3zun", response_class=HTMLResponse)
+@app.get("/youwouldnotguesss/architecture", response_class=HTMLResponse)
 async def internal_architecture_doc():
     # Unlisted on purpose — not linked from any page. Keep this path out of
     # sitemaps/nav; the only distribution channel is sharing the URL directly.
+    # /youwouldnotguesss/ is the namespace for internal-only docs like this
+    # one — add more pages under it the same way rather than inventing a new
+    # random slug each time.
     headers = {**_NO_CACHE, "X-Robots-Tag": "noindex, nofollow"}
     return HTMLResponse((Path("docs") / "architecture.html").read_text(encoding="utf-8"), headers=headers)
 
