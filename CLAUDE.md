@@ -5,6 +5,13 @@ All product specs live in `docs/` in this repo:
 - `docs/ios_spec.md` — full iOS product behaviour, API, session lifecycle, visual identity
 - `docs/android_spec.md` — Android-specific differences (Spotify instead of Apple Music)
 - `docs/render_spec.md` — planned discovery/genre-profiling pipeline (Last.fm + recommended playlist)
+- `docs/architecture.html` — system architecture reference (entry points, API/route inventories,
+  data flows, deployment topology) across all three repos + Home Mac Server. Hand-maintained, not
+  generated — served at the unlisted `jukebars.com/youwouldnotguesss/architecture` route in main.py,
+  not linked from any public page. **Keep it in sync**: when a task changes a file that's one of its
+  16 diagram nodes (see the node list / info-panel content in the file itself), or adds/removes an
+  API route, or changes what talks to what, update the diagram, the affected table row, and that
+  node's info-panel entry in the same change — don't let it silently drift.
 
 Architecture decisions belong in this CLAUDE.md, not in the spec files.
 
