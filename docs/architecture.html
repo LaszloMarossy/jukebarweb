@@ -13,6 +13,7 @@
     --accent-ink: #221a08;
     --ios: #86a9cc;
     --android: #8bbf72;
+    --mac: #cf9463;
     --ext: #a79fc2;
     --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", monospace;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", serif;
@@ -30,6 +31,7 @@
     --accent-ink: #fff8ea;
     --ios: #3c6690;
     --android: #4a7a38;
+    --mac: #a15a26;
     --ext: #675f82;
   }
   @media (prefers-color-scheme: light) {
@@ -45,6 +47,7 @@
       --accent-ink: #fff8ea;
       --ios: #3c6690;
       --android: #4a7a38;
+      --mac: #a15a26;
       --ext: #675f82;
     }
   }
@@ -166,6 +169,7 @@
   .node.lane-ios rect { stroke: color-mix(in srgb, var(--ios) 55%, var(--line)); }
   .node.lane-android rect { stroke: color-mix(in srgb, var(--android) 55%, var(--line)); }
   .node.lane-relay rect { stroke: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .node.lane-mac rect { stroke: color-mix(in srgb, var(--mac) 55%, var(--line)); }
   .node.lane-ext rect { stroke: color-mix(in srgb, var(--ext) 55%, var(--line)); }
   .node[data-hoverable]:hover rect { fill: var(--surface); stroke: var(--ink-mute); }
   .node .label { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
@@ -202,6 +206,7 @@
   .pill.ios { background: var(--ios); }
   .pill.android { background: var(--android); }
   .pill.relay { background: var(--accent); }
+  .pill.mac { background: var(--mac); }
   .pill.ext { background: var(--ext); }
   code.inline { font-family: var(--mono); font-size: 0.92em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
   .route { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
@@ -255,8 +260,8 @@
   </header>
 
   <section>
-    <h2><span class="num">01</span> The three codebases</h2>
-    <p class="lede">Same product, three runtimes. iOS and Android each ship a full host app — playback, an embedded HTTP server, and a kiosk UI — that runs unattended on a device at the bar. jukebarweb is the only piece that isn't installed anywhere; it's a hosted relay that lets the host be reached over the internet instead of just the bar's own Wi-Fi.</p>
+    <h2><span class="num">01</span> Three codebases, four runtimes</h2>
+    <p class="lede">iOS and Android each ship a full host app — playback, an embedded HTTP server, and a kiosk UI — that runs unattended on a device at the bar. jukebarweb is the only piece that isn't installed anywhere a customer can see; it runs twice, in two different places, for two different reasons.</p>
     <div class="card-row">
       <div class="card ios">
         <span class="tag">iOS</span>
@@ -271,17 +276,22 @@
       <div class="card relay">
         <span class="tag">Relay</span>
         <h3>jukebarweb <span class="mono" style="font-size:12px;color:var(--ink-mute)">(this repo, on Render)</span></h3>
-        <p>Python / FastAPI, single <code class="inline">main.py</code>. Two jobs: relay messages between hosts and internet customers, and run the public jukebars.com community/discovery pages.</p>
+        <p>Python / FastAPI, single <code class="inline">main.py</code>. Relays messages between hosts and internet customers, and runs the public jukebars.com community/discovery pages.</p>
+      </div>
+      <div class="card" style="border-color:color-mix(in srgb, var(--mac) 45%, var(--line))">
+        <span class="tag" style="background:var(--mac)">MacLord</span>
+        <h3>same repo, second runtime <span class="mono" style="font-size:12px;color:var(--ink-mute)">(profile_daemon.py)</span></h3>
+        <p>Not Render. A physical always-on Mac at the user's home, running the genre-profiling loop as a LaunchAgent. It never talks to main.py directly — only to GCS.</p>
       </div>
     </div>
-    <p class="narrow">Nothing about a bar's state is stored durably in the relay — <code class="inline">BarSession</code> is an in-memory object that's rebuilt from scratch every time the host re-registers. If jukebarweb restarts, every bar just looks briefly offline until its host's next 5-second sync catches up.</p>
+    <p class="narrow">Nothing about a bar's state is stored durably in the relay — <code class="inline">BarSession</code> is an in-memory object that's rebuilt from scratch every time the host re-registers. If jukebarweb restarts, every bar just looks briefly offline until its host's next 5-second sync catches up. Genre data is the exception: it lives in GCS, outside both processes, which is exactly why two independent runtimes can share it without ever calling each other.</p>
   </section>
 
   <section>
     <h2><span class="num">02</span> Map of the system</h2>
     <p class="lede">Every box below is a real class or file. Arrows are real calls. Hover a node to trace what it talks to.</p>
     <div class="diagram-wrap">
-      <svg viewBox="0 0 1180 605" xmlns="http://www.w3.org/2000/svg" id="arch-svg">
+      <svg viewBox="0 0 1440 660" xmlns="http://www.w3.org/2000/svg" id="arch-svg">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z"></path>
@@ -376,85 +386,103 @@
           </foreignObject>
         </g>
 
-        <!-- jukebarweb lane -->
-        <rect class="device-frame" x="620" y="118" width="300" height="370" rx="12" style="stroke:color-mix(in srgb, var(--accent) 45%, var(--line))"></rect>
+        <!-- jukebarweb lane: main.py's own responsibilities only — profiling moved to MacLord -->
+        <rect class="device-frame" x="620" y="118" width="260" height="370" rx="12" style="stroke:color-mix(in srgb, var(--accent) 45%, var(--line))"></rect>
         <text class="lane-title" x="634" y="140">jukebarweb — Render (jukebars.com)</text>
         <g class="node lane-relay" data-id="relay-main" data-hoverable>
-          <rect x="635" y="152" width="270" height="48" rx="6"></rect>
-          <foreignObject x="635" y="152" width="270" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>main.py</b><span class="sub"><br><code>app = FastAPI()</code> · /api/host, /api/bar</span></div>
+          <rect x="635" y="152" width="230" height="48" rx="6"></rect>
+          <foreignObject x="635" y="152" width="230" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>main.py</b><span class="sub"><br><code>app = FastAPI()</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-relay" data-id="relay-barsession" data-hoverable>
-          <rect x="635" y="214" width="270" height="40" rx="6"></rect>
-          <foreignObject x="635" y="214" width="270" height="40">
+          <rect x="635" y="214" width="230" height="40" rx="6"></rect>
+          <foreignObject x="635" y="214" width="230" height="40">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:5px 12px"><b>BarSession</b><span class="sub"><br>in-memory, one per bar</span></div>
           </foreignObject>
         </g>
         <g class="node lane-relay" data-id="relay-static" data-hoverable>
-          <rect x="635" y="268" width="270" height="60" rx="6"></rect>
-          <foreignObject x="635" y="268" width="270" height="60">
+          <rect x="635" y="268" width="230" height="60" rx="6"></rect>
+          <foreignObject x="635" y="268" width="230" height="60">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>static/*.html</b><span class="sub"><br>admin, bartender, customer<br>discover, index</span></div>
           </foreignObject>
         </g>
-        <g class="node lane-relay" data-id="relay-daemon" data-hoverable>
-          <rect x="635" y="342" width="270" height="48" rx="6"></rect>
-          <foreignObject x="635" y="342" width="270" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>profile_daemon.py</b><span class="sub"><br>separate worker, polls ~5 min</span></div>
+        <g class="node lane-relay" data-id="relay-gcsstore" data-hoverable>
+          <rect x="635" y="342" width="230" height="48" rx="6"></rect>
+          <foreignObject x="635" y="342" width="230" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>gcs_store.py</b><span class="sub"><br>shared read/write helper</span></div>
           </foreignObject>
         </g>
-        <g class="node lane-relay" data-id="relay-lastfm" data-hoverable>
-          <rect x="635" y="404" width="270" height="48" rx="6"></rect>
-          <foreignObject x="635" y="404" width="270" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>lastfm.py / gcs_store.py</b><span class="sub"><br>resolve_artist() · GCS I/O</span></div>
+
+        <!-- MacLord lane: a real physical Mac, not part of Render -->
+        <rect class="device-frame" x="900" y="118" width="260" height="370" rx="12" style="stroke:color-mix(in srgb, var(--mac) 45%, var(--line))"></rect>
+        <text class="lane-title" x="914" y="140">MacLord — always-on Mac (home)</text>
+        <g class="node lane-mac" data-id="mac-daemon" data-hoverable>
+          <rect x="915" y="152" width="230" height="48" rx="6"></rect>
+          <foreignObject x="915" y="152" width="230" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>profile_daemon.py</b><span class="sub"><br>LaunchAgent · polls GCS ~5 min</span></div>
           </foreignObject>
         </g>
+        <g class="node lane-mac" data-id="mac-lastfm" data-hoverable>
+          <rect x="915" y="214" width="230" height="60" rx="6"></rect>
+          <foreignObject x="915" y="214" width="230" height="60">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>lastfm.py</b><span class="sub"><br>fetch_artist_tags()<br>resolve_artist()</span></div>
+          </foreignObject>
+        </g>
+        <text x="915" y="298" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">same repo, cloned locally on MacLord —</text>
+        <text x="915" y="312" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">restart_daemon.sh: git pull + reload</text>
+        <text x="915" y="334" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">kept awake via caffeinate -is, lid closed</text>
 
         <!-- external lane -->
-        <text class="lane-title" x="944" y="140">External services</text>
+        <text class="lane-title" x="1184" y="140">External services</text>
         <g class="node lane-ext" data-id="ext-applemusic" data-hoverable>
-          <rect x="940" y="152" width="220" height="44" rx="6"></rect>
-          <foreignObject x="940" y="152" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Apple Music API</b></div></foreignObject>
+          <rect x="1180" y="152" width="220" height="44" rx="6"></rect>
+          <foreignObject x="1180" y="152" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Apple Music API</b></div></foreignObject>
         </g>
         <g class="node lane-ext" data-id="ext-spotify" data-hoverable>
-          <rect x="940" y="210" width="220" height="44" rx="6"></rect>
-          <foreignObject x="940" y="210" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Spotify Web API</b></div></foreignObject>
+          <rect x="1180" y="210" width="220" height="44" rx="6"></rect>
+          <foreignObject x="1180" y="210" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Spotify Web API</b></div></foreignObject>
         </g>
         <g class="node lane-ext" data-id="ext-stripe" data-hoverable>
-          <rect x="940" y="268" width="220" height="44" rx="6"></rect>
-          <foreignObject x="940" y="268" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Stripe API</b></div></foreignObject>
+          <rect x="1180" y="268" width="220" height="44" rx="6"></rect>
+          <foreignObject x="1180" y="268" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Stripe API</b></div></foreignObject>
         </g>
         <g class="node lane-ext" data-id="ext-lastfm" data-hoverable>
-          <rect x="940" y="326" width="220" height="44" rx="6"></rect>
-          <foreignObject x="940" y="326" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Last.fm API</b></div></foreignObject>
+          <rect x="1180" y="326" width="220" height="44" rx="6"></rect>
+          <foreignObject x="1180" y="326" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Last.fm API</b></div></foreignObject>
         </g>
         <g class="node lane-ext" data-id="ext-gcs" data-hoverable>
-          <rect x="940" y="384" width="220" height="68" rx="6"></rect>
-          <foreignObject x="940" y="384" width="220" height="68"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>GCS bucket</b><span class="sub"><br>band_cache · map_entries<br>· per-bar profiles</span></div></foreignObject>
+          <rect x="1180" y="384" width="220" height="68" rx="6"></rect>
+          <foreignObject x="1180" y="384" width="220" height="68"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>GCS bucket</b><span class="sub"><br>band_cache · map_entries<br>· per-bar profiles</span></div></foreignObject>
         </g>
 
-        <!-- edges: cross-lane connections route through the inter-lane gaps and a
-             clear channel below all boxes (y=505/511) so no path crosses a box -->
+        <!-- edges: cross-lane connections route through inter-lane gaps and a
+             clear bus channel below all boxes (y=499..535, one lane per edge) -->
         <g class="edge" data-from="browser-lan" data-to="ios-localserver"><path d="M 200,80 L 200,118 L 160,118 L 160,214" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="browser-lan" data-to="and-localserver"><path d="M 400,80 L 400,118 L 460,118 L 460,214" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="browser-net" data-to="relay-main"><path d="M 735,80 L 735,152" marker-end="url(#arrow)"></path></g>
 
-        <g class="edge" data-from="ios-appstate" data-to="relay-main"><path d="M 285,300 L 302,300 L 302,505 L 618,505 L 618,176 L 635,176" marker-end="url(#arrow)"></path></g>
-        <g class="edge" data-from="and-relay" data-to="relay-main"><path d="M 585,300 L 607,300 L 607,511 L 627,511 L 627,182 L 635,182" marker-end="url(#arrow)"></path></g>
-        <text x="430" y="497" class="mono" style="font-size:10px;fill:var(--ink-mute)">register + sync, ~5s (internet mode)</text>
+        <g class="edge" data-from="ios-appstate" data-to="relay-main"><path d="M 285,300 L 302,300 L 302,499 L 618,499 L 618,176 L 635,176" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-relay" data-to="relay-main"><path d="M 585,300 L 607,300 L 607,505 L 627,505 L 627,182 L 635,182" marker-end="url(#arrow)"></path></g>
+        <text x="380" y="491" class="mono" style="font-size:10px;fill:var(--ink-mute)">register + sync, ~5s · + /api/map/register (playlist + bar metadata, opt-in)</text>
 
-        <g class="edge" data-from="ios-music" data-to="ext-applemusic"><path d="M 285,362 L 302,362 L 302,505 L 925,505 L 925,168 L 940,168" marker-end="url(#arrow)"></path></g>
-        <g class="edge" data-from="and-playback" data-to="ext-spotify"><path d="M 585,362 L 607,362 L 607,511 L 920,511 L 920,226 L 940,226" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="ios-music" data-to="ext-applemusic"><path d="M 285,362 L 302,362 L 302,511 L 1165,511 L 1165,168 L 1180,168" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-playback" data-to="ext-spotify"><path d="M 585,362 L 607,362 L 607,517 L 1160,517 L 1160,226 L 1180,226" marker-end="url(#arrow)"></path></g>
 
-        <g class="edge" data-from="ios-localserver" data-to="ext-stripe"><path d="M 285,238 L 310,238 L 310,499 L 930,499 L 930,284 L 940,284" marker-end="url(#arrow)"></path></g>
-        <g class="edge" data-from="and-localserver" data-to="ext-stripe"><path d="M 585,238 L 612,238 L 612,517 L 935,517 L 935,290 L 940,290" marker-end="url(#arrow)"></path></g>
-        <g class="edge" data-from="relay-main" data-to="ext-stripe"><path d="M 905,176 L 926,176 L 926,296 L 940,296" marker-end="url(#arrow)"></path></g>
-        <text x="700" y="530" class="mono" style="font-size:10px;fill:var(--ink-mute)">create-payment-intent · payment-confirmed (never gated)</text>
+        <g class="edge" data-from="ios-localserver" data-to="ext-stripe"><path d="M 285,238 L 310,238 L 310,523 L 1170,523 L 1170,284 L 1180,284" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-localserver" data-to="ext-stripe"><path d="M 585,238 L 612,238 L 612,529 L 1175,529 L 1175,290 L 1180,290" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="relay-main" data-to="ext-stripe"><path d="M 875,166 L 890,166 L 890,100 L 1170,100 L 1170,296 L 1180,296" marker-end="url(#arrow)"></path></g>
+        <text x="700" y="548" class="mono" style="font-size:10px;fill:var(--ink-mute)">create-payment-intent · payment-confirmed (never gated)</text>
 
-        <g class="edge" data-from="relay-daemon" data-to="ext-lastfm"><path d="M 905,358 L 921,358 L 921,340 L 940,340" marker-end="url(#arrow)"></path></g>
-        <g class="edge" data-from="relay-daemon" data-to="ext-gcs"><path d="M 905,374 L 915,374 L 915,404 L 940,404" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="relay-gcsstore" data-to="ext-gcs"><path d="M 865,366 L 875,366 L 875,535 L 1170,535 L 1170,428 L 1180,428" marker-end="url(#arrow)"></path></g>
+
+        <g class="edge" data-from="mac-daemon" data-to="ext-lastfm"><path d="M 1145,182 L 1160,182 L 1160,340 L 1180,340" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="mac-lastfm" data-to="ext-lastfm"><path d="M 1145,238 L 1163,238 L 1163,348 L 1180,348" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="mac-daemon" data-to="ext-gcs"><path d="M 1145,196 L 1168,196 L 1168,410 L 1180,410" marker-end="url(#arrow)"></path></g>
 
         <text x="20" y="565" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">LocalServer talks to Stripe directly only for LAN-mode requests — in internet mode, main.py does it on the host's behalf.</text>
+        <text x="20" y="583" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">gcs_store.py is one file, imported by both main.py (Render) and profile_daemon.py (MacLord) — same repo, two independent runtimes.</text>
+        <text x="20" y="601" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">MacLord never talks to main.py directly — the only shared state between them is what's written to GCS.</text>
       </svg>
     </div>
   </section>
@@ -485,7 +513,11 @@
 
           <tr><td class="plat"><span class="pill relay">Relay</span></td><td>App entry</td><td class="route">main.py</td><td class="route">app = FastAPI(lifespan=lifespan)</td><td>Single-file FastAPI app; mounts <code class="inline">/static</code></td></tr>
           <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Bar state</td><td class="route">main.py</td><td class="route">@dataclass class BarSession</td><td>In-memory, keyed by <code class="inline">jukebar_id</code> in <code class="inline">_bars</code></td></tr>
-          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Genre profiling</td><td class="route">profile_daemon.py / lastfm.py</td><td class="route">fetch_artist_tags() / resolve_artist()</td><td>Separate long-running process, not part of the web dyno; reads <code class="inline">tag_map.json</code></td></tr>
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Map / discovery</td><td class="route">main.py</td><td class="route">map_register(), _load_bar_profiles_sync()</td><td>Writes <code class="inline">map_entries.json</code> on registration; reads <code class="inline">map/&#123;id&#125;/profile.json</code> every <code class="inline">PROFILE_CACHE_TTL</code>s</td></tr>
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>GCS I/O</td><td class="route">gcs_store.py</td><td class="route">read() / write()</td><td>Shared by main.py <b>and</b> profile_daemon.py — same file, imported into two independent runtimes</td></tr>
+
+          <tr><td class="plat"><span class="pill mac">MacLord</span></td><td>Genre profiling</td><td class="route">profile_daemon.py</td><td class="route">LaunchAgent: com.jukebar.profiler.plist</td><td>Polls GCS every <code class="inline">PROFILE_POLL_INTERVAL</code>s (default 300); writes <code class="inline">profile.json</code>, <code class="inline">artist_genres.json</code>, <code class="inline">band_cache.json</code></td></tr>
+          <tr><td class="plat"><span class="pill mac">MacLord</span></td><td>Last.fm client</td><td class="route">lastfm.py</td><td class="route">fetch_artist_tags(), resolve_artist()</td><td>Only process that calls the Last.fm API; main.py only ever reads the results back from GCS</td></tr>
         </tbody>
       </table>
     </div>
@@ -588,6 +620,15 @@
       <div class="step-n">2</div><p>If <code class="inline">accepting_requests</code> is <code>false</code>, both <code class="inline">/request</code> and <code class="inline">/create-payment-intent</code> return <code class="inline">403</code> immediately (within one ~5s poll, the button itself disappears on every customer surface).</p>
       <div class="step-n">3</div><p><code class="inline">payment-confirmed</code> is the one call that is <b>never</b> gated — by the time it fires, Stripe has already charged the card, so the request is honored regardless of the flag. A late straggler gets refunded in cash by the bartender, not by code.</p>
     </div>
+
+    <p class="flow-title"><span class="n">E</span>Genre profiling — the full round trip through GCS and back to the host</p>
+    <div class="flow">
+      <div class="step-n">1</div><p><span class="who">Host</span> calls <code class="inline">POST /api/map/register</code> whenever a bar opts into the public map — playlist name, note, and the artist list (with per-artist song counts). This is separate from the register/sync loop; it only fires on setup or playlist change, not every 5s.</p>
+      <div class="step-n">2</div><p><span class="who">jukebarweb</span>'s <code class="inline">map_register()</code> merges this into <code class="inline">_map_entries</code> and immediately calls <code class="inline">_save_map_entries()</code>, writing the whole table to <code class="inline">map_entries.json</code> on GCS via <code class="inline">gcs_store.py</code> — so far, no Last.fm call and no MacLord involvement at all.</p>
+      <div class="step-n">3</div><p><span class="who">MacLord</span>'s <code class="inline">profile_daemon.py</code>, on its own ~5-minute cycle, reads that same <code class="inline">map_entries.json</code>, diffs it against what it profiled last time, and calls Last.fm for any artist not already in <code class="inline">band_cache.json</code>. It writes the result back to GCS as <code class="inline">map/&#123;bar_id&#125;/profile.json</code> (and a per-bar <code class="inline">artist_genres.json</code> — genre + top tags per artist).</p>
+      <div class="step-n">4</div><p><span class="who">jukebarweb</span> never talks to MacLord directly — it just polls its own GCS read on a timer (<code class="inline">_maybe_refresh_profiles()</code>, every <code class="inline">PROFILE_CACHE_TTL</code>s) and caches the result in <code class="inline">_bar_profiles</code>, which is what <code class="inline">GET /discover</code> and <code class="inline">GET /api/bar/&#123;id&#125;/genres</code> actually serve.</p>
+      <div class="step-n">5</div><p><span class="who">Host</span> fetches <code class="inline">/api/bar/&#123;id&#125;/genres</code> after registering (retrying if profiling isn't done yet) and uses it to color band bubbles in its own catalog browser. That colored genre map then gets folded into the <b>host's own</b> LAN catalog responses and its relay register/sync payload — so a Wi-Fi customer and an internet customer both end up seeing the same colors, but both got them by way of the host, not by asking jukebarweb directly.</p>
+    </div>
   </section>
 
   <section>
@@ -614,7 +655,7 @@
           <tr><td>JukeBar (iOS host app)</td><td>An iPhone/iPad at the bar</td><td>Foreground kiosk app, indefinitely</td></tr>
           <tr><td>spotonjukebar (Android host app)</td><td>An Android tablet at the bar</td><td>Foreground kiosk app + <code class="inline">LanForegroundService</code> keeping the embedded server alive under OEM battery management</td></tr>
           <tr><td>jukebarweb web service</td><td>Render, <code class="inline">uvicorn main:app</code></td><td>Always-on dyno, serves jukebars.com</td></tr>
-          <tr><td>profile_daemon.py</td><td>Separate long-running process (not the web dyno)</td><td>Polls every <code class="inline">PROFILE_POLL_INTERVAL</code> (default 300s)</td></tr>
+          <tr><td>profile_daemon.py</td><td><b>MacLord</b> — a physical always-on Mac at the user's home, not Render</td><td>LaunchAgent (<code class="inline">com.jukebar.profiler.plist</code>), <code class="inline">caffeinate -is</code> keeps it running lid-closed; restarted via <code class="inline">restart_daemon.sh</code> (git pull + reload)</td></tr>
           <tr><td>Stripe, Last.fm, Spotify, Apple Music, GCS</td><td>External, third-party</td><td>Called on demand; nothing polls them continuously except the profiling daemon</td></tr>
         </tbody>
       </table>
