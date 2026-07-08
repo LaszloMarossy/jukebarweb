@@ -254,6 +254,14 @@ async def discover():
     return HTMLResponse((Path("static") / "discover.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
+@app.get("/n3oqrvvzszp3jx5j3zun", response_class=HTMLResponse)
+async def internal_architecture_doc():
+    # Unlisted on purpose — not linked from any page. Keep this path out of
+    # sitemaps/nav; the only distribution channel is sharing the URL directly.
+    headers = {**_NO_CACHE, "X-Robots-Tag": "noindex, nofollow"}
+    return HTMLResponse((Path("docs") / "architecture.html").read_text(encoding="utf-8"), headers=headers)
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}

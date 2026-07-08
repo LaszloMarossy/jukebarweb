@@ -1,0 +1,654 @@
+<title>JukeBar — System Architecture</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --bg: #17151b;
+    --surface: #201d26;
+    --surface-2: #272330;
+    --line: #37323f;
+    --ink: #ece7de;
+    --ink-dim: #beb7c9;
+    --ink-mute: #948da3;
+    --accent: #f4b94a;
+    --accent-ink: #221a08;
+    --ios: #86a9cc;
+    --android: #8bbf72;
+    --ext: #a79fc2;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", serif;
+    --radius: 8px;
+  }
+  :root[data-theme="light"] {
+    --bg: #f3efe6;
+    --surface: #fbf8f2;
+    --surface-2: #f1ecdf;
+    --line: #ddd4bd;
+    --ink: #221f28;
+    --ink-dim: #4a4453;
+    --ink-mute: #6d6577;
+    --accent: #a9720f;
+    --accent-ink: #fff8ea;
+    --ios: #3c6690;
+    --android: #4a7a38;
+    --ext: #675f82;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f3efe6;
+      --surface: #fbf8f2;
+      --surface-2: #f1ecdf;
+      --line: #ddd4bd;
+      --ink: #221f28;
+      --ink-dim: #4a4453;
+      --ink-mute: #6d6577;
+      --accent: #a9720f;
+      --accent-ink: #fff8ea;
+      --ios: #3c6690;
+      --android: #4a7a38;
+      --ext: #675f82;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 56px 28px 100px;
+  }
+
+  h1, h2, h3, .eyebrow, code, .mono, table { font-family: var(--mono); }
+  h1 { text-wrap: balance; }
+
+  header.masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 36px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .dek {
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--ink-dim);
+    max-width: 62ch;
+    margin: 4px 0 0;
+  }
+  .meta-row {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+    margin-top: 6px;
+  }
+  .meta-row span b { color: var(--ink-dim); font-weight: 600; }
+
+  section { margin-bottom: 64px; }
+  section > h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-mute);
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section > h2 .num { color: var(--accent); }
+  section > .lede {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--ink-dim);
+    max-width: 74ch;
+    margin: 0 0 26px;
+  }
+  p { max-width: 72ch; }
+  p.narrow { max-width: 68ch; }
+
+  /* ---- overview cards ---- */
+  .card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-bottom: 8px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .card .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    color: var(--accent-ink);
+  }
+  .card.ios .tag { background: var(--ios); }
+  .card.android .tag { background: var(--android); }
+  .card.relay .tag { background: var(--accent); }
+  .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+  .card p { margin: 0; font-size: 14px; color: var(--ink-dim); max-width: none; }
+
+  /* ---- diagram ---- */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    padding: 8px;
+  }
+  .diagram-wrap svg { display: block; min-width: 980px; }
+  .node rect { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; transition: stroke 0.15s, fill 0.15s; }
+  .node.lane-ios rect { stroke: color-mix(in srgb, var(--ios) 55%, var(--line)); }
+  .node.lane-android rect { stroke: color-mix(in srgb, var(--android) 55%, var(--line)); }
+  .node.lane-relay rect { stroke: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .node.lane-ext rect { stroke: color-mix(in srgb, var(--ext) 55%, var(--line)); }
+  .node[data-hoverable]:hover rect { fill: var(--surface); stroke: var(--ink-mute); }
+  .node .label { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  .node .label b { color: var(--ink); font-weight: 600; }
+  .node .label .sub { color: var(--ink-mute); font-size: 10.5px; }
+  .lane-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink-mute); }
+  .device-frame { fill: none; stroke: var(--line); stroke-dasharray: 3 4; stroke-width: 1.2; rx: 12; }
+  .browser-node rect { fill: var(--surface-2); stroke: var(--line); stroke-dasharray: 2 3; }
+  .edge path { fill: none; stroke: var(--ink-mute); stroke-width: 1.3; opacity: 0.75; }
+  .edge.dimmed path { opacity: 0.18; }
+  .edge.lit path { stroke: var(--accent); opacity: 1; stroke-width: 1.8; }
+  .edge text { font-family: var(--mono); font-size: 10px; fill: var(--ink-mute); }
+  .edge.lit text { fill: var(--accent); }
+  marker path { fill: var(--ink-mute); }
+
+  /* ---- entry point + spec tables ---- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.prose-table { font-family: var(--serif); font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    background: var(--surface-2);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+  td.plat { white-space: nowrap; }
+  .pill { display: inline-block; font-size: 10px; letter-spacing: 0.05em; padding: 1px 7px; border-radius: 20px; font-family: var(--mono); color: var(--accent-ink); }
+  .pill.ios { background: var(--ios); }
+  .pill.android { background: var(--android); }
+  .pill.relay { background: var(--accent); }
+  .pill.ext { background: var(--ext); }
+  code.inline { font-family: var(--mono); font-size: 0.92em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  .route { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  .verb { font-weight: 700; font-size: 10.5px; letter-spacing: 0.03em; margin-right: 8px; padding: 1px 5px; border-radius: 3px; }
+  .verb.get { color: var(--ios); border: 1px solid var(--ios); }
+  .verb.post { color: var(--android); border: 1px solid var(--android); }
+
+  /* ---- route inventory 3-up ---- */
+  .route-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .route-col { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .route-col > .head { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .route-col > .head b { font-size: 13px; }
+  .route-col > .head .sub { display: block; font-family: var(--mono); font-size: 11px; color: var(--ink-mute); margin-top: 2px; }
+  .route-list { padding: 6px 0; max-height: 420px; overflow-y: auto; }
+  .route-item { padding: 7px 16px; font-family: var(--mono); font-size: 12px; border-bottom: 1px dotted var(--line); }
+  .route-item:last-child { border-bottom: none; }
+  .route-item .fn { display: block; color: var(--ink-mute); font-size: 11px; margin-top: 2px; }
+
+  /* ---- flows ---- */
+  .flow { display: grid; grid-template-columns: 30px 1fr; gap: 4px 16px; margin-bottom: 30px; }
+  .flow .step-n {
+    font-family: var(--mono); font-size: 12px; color: var(--accent-ink); background: var(--accent);
+    width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  .flow .step-line { grid-column: 1; justify-self: center; width: 1px; background: var(--line); }
+  .flow-title { font-family: var(--mono); font-size: 14px; font-weight: 600; margin: 0 0 14px; color: var(--ink); }
+  .flow-title .n { color: var(--accent); margin-right: 8px; }
+  .flow p { margin: 2px 0 14px; font-size: 14.5px; }
+  .flow p .who { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="eyebrow">JukeBar &middot; internal reference</span>
+    <h1>System Architecture</h1>
+    <p class="dek">Three codebases, one house rule: the host app is the source of truth. Everything else — relay, browsers, this document — is downstream of whatever iOS or Android says is true right now.</p>
+    <div class="meta-row">
+      <span><b>Repos:</b> JukeBar (iOS) &middot; spotonjukebar (Android) &middot; jukebarweb (Render)</span>
+      <span><b>Updated:</b> 2026-07-08</span>
+      <span><b>Lives at:</b> docs/architecture.html in jukebarweb</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="num">01</span> The three codebases</h2>
+    <p class="lede">Same product, three runtimes. iOS and Android each ship a full host app — playback, an embedded HTTP server, and a kiosk UI — that runs unattended on a device at the bar. jukebarweb is the only piece that isn't installed anywhere; it's a hosted relay that lets the host be reached over the internet instead of just the bar's own Wi-Fi.</p>
+    <div class="card-row">
+      <div class="card ios">
+        <span class="tag">iOS</span>
+        <h3>JukeBar <span class="mono" style="font-size:12px;color:var(--ink-mute)">(~/dev/giffy/JukeBar)</span></h3>
+        <p>Swift / SwiftUI. Embeds <b>Swifter</b> as its HTTP server. Plays back through Apple Music via <code class="inline">MusicService</code>.</p>
+      </div>
+      <div class="card android">
+        <span class="tag">Android</span>
+        <h3>spotonjukebar <span class="mono" style="font-size:12px;color:var(--ink-mute)">(~/dev/giffy/spotonjukebar)</span></h3>
+        <p>Kotlin / Jetpack Compose. Embeds <b>NanoHTTPD</b> as its HTTP server. Plays back through the Spotify Web API via <code class="inline">PlaybackCoordinator</code>.</p>
+      </div>
+      <div class="card relay">
+        <span class="tag">Relay</span>
+        <h3>jukebarweb <span class="mono" style="font-size:12px;color:var(--ink-mute)">(this repo, on Render)</span></h3>
+        <p>Python / FastAPI, single <code class="inline">main.py</code>. Two jobs: relay messages between hosts and internet customers, and run the public jukebars.com community/discovery pages.</p>
+      </div>
+    </div>
+    <p class="narrow">Nothing about a bar's state is stored durably in the relay — <code class="inline">BarSession</code> is an in-memory object that's rebuilt from scratch every time the host re-registers. If jukebarweb restarts, every bar just looks briefly offline until its host's next 5-second sync catches up.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> Map of the system</h2>
+    <p class="lede">Every box below is a real class or file. Arrows are real calls. Hover a node to trace what it talks to.</p>
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 1180 605" xmlns="http://www.w3.org/2000/svg" id="arch-svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z"></path>
+          </marker>
+        </defs>
+
+        <!-- browser annotation nodes -->
+        <g class="node browser-node" data-id="browser-lan">
+          <rect x="20" y="34" width="560" height="46" rx="7"></rect>
+          <foreignObject x="20" y="34" width="560" height="46">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 14px;line-height:1.35">
+              <b>Browser</b> — admin / bartender / customer <span class="sub">LAN mode: Wi-Fi, Hotspot, or Local — talks straight to the host, no relay</span>
+            </div>
+          </foreignObject>
+        </g>
+        <g class="node browser-node" data-id="browser-net">
+          <rect x="600" y="34" width="270" height="46" rx="7"></rect>
+          <foreignObject x="600" y="34" width="270" height="46">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 14px;line-height:1.35">
+              <b>Browser</b> — same 3 roles <span class="sub">Internet mode, via jukebars.com</span>
+            </div>
+          </foreignObject>
+        </g>
+
+        <!-- device frames -->
+        <rect class="device-frame" x="20" y="118" width="280" height="370" rx="12"></rect>
+        <text class="lane-title" x="34" y="140">iPhone — host device</text>
+        <rect class="device-frame" x="320" y="118" width="280" height="370" rx="12"></rect>
+        <text class="lane-title" x="334" y="140">Android tablet — host device</text>
+
+        <!-- iOS nodes: row pitch 62 (48 box + 14 gap), rows at 152/214/276/338/400 -->
+        <g class="node lane-ios" data-id="ios-kiosk" data-hoverable>
+          <rect x="35" y="152" width="250" height="48" rx="6"></rect>
+          <foreignObject x="35" y="152" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>KioskView.swift</b><span class="sub"><br><code>struct KioskView: View</code></span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-ios" data-id="ios-localserver" data-hoverable>
+          <rect x="35" y="214" width="250" height="48" rx="6"></rect>
+          <foreignObject x="35" y="214" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>LocalServer.swift</b><span class="sub"><br><code>final class LocalServer</code> · :8080</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-ios" data-id="ios-appstate" data-hoverable>
+          <rect x="35" y="276" width="250" height="48" rx="6"></rect>
+          <foreignObject x="35" y="276" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>AppState.swift</b><span class="sub"><br><code>class AppState</code> — sync loop</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-ios" data-id="ios-music" data-hoverable>
+          <rect x="35" y="338" width="250" height="48" rx="6"></rect>
+          <foreignObject x="35" y="338" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>MusicService.swift</b><span class="sub"><br><code>class MusicService</code></span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-ios" data-id="ios-webapps" data-hoverable>
+          <rect x="35" y="400" width="250" height="48" rx="6"></rect>
+          <foreignObject x="35" y="400" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>WebApps/*.html</b><span class="sub"><br>admin, bartender, customer</span></div>
+          </foreignObject>
+        </g>
+
+        <!-- Android nodes: same rows as iOS for visual symmetry -->
+        <g class="node lane-android" data-id="and-kiosk" data-hoverable>
+          <rect x="335" y="152" width="250" height="48" rx="6"></rect>
+          <foreignObject x="335" y="152" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>KioskView.kt</b><span class="sub"><br><code>fun KioskView(...)</code></span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-android" data-id="and-localserver" data-hoverable>
+          <rect x="335" y="214" width="250" height="48" rx="6"></rect>
+          <foreignObject x="335" y="214" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>LocalServer.kt</b><span class="sub"><br><code>class LocalServer : NanoHTTPD</code> · :8080</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-android" data-id="and-relay" data-hoverable>
+          <rect x="335" y="276" width="250" height="48" rx="6"></rect>
+          <foreignObject x="335" y="276" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>RelayService.kt</b><span class="sub"><br><code>class RelayService</code> — sync loop</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-android" data-id="and-playback" data-hoverable>
+          <rect x="335" y="338" width="250" height="48" rx="6"></rect>
+          <foreignObject x="335" y="338" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>PlaybackCoordinator.kt</b><span class="sub"><br><code>class PlaybackCoordinator</code></span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-android" data-id="and-assets" data-hoverable>
+          <rect x="335" y="400" width="250" height="48" rx="6"></rect>
+          <foreignObject x="335" y="400" width="250" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>assets/*.html</b><span class="sub"><br>admin, bartender, customer</span></div>
+          </foreignObject>
+        </g>
+
+        <!-- jukebarweb lane -->
+        <rect class="device-frame" x="620" y="118" width="300" height="370" rx="12" style="stroke:color-mix(in srgb, var(--accent) 45%, var(--line))"></rect>
+        <text class="lane-title" x="634" y="140">jukebarweb — Render (jukebars.com)</text>
+        <g class="node lane-relay" data-id="relay-main" data-hoverable>
+          <rect x="635" y="152" width="270" height="48" rx="6"></rect>
+          <foreignObject x="635" y="152" width="270" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>main.py</b><span class="sub"><br><code>app = FastAPI()</code> · /api/host, /api/bar</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-relay" data-id="relay-barsession" data-hoverable>
+          <rect x="635" y="214" width="270" height="40" rx="6"></rect>
+          <foreignObject x="635" y="214" width="270" height="40">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:5px 12px"><b>BarSession</b><span class="sub"><br>in-memory, one per bar</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-relay" data-id="relay-static" data-hoverable>
+          <rect x="635" y="268" width="270" height="60" rx="6"></rect>
+          <foreignObject x="635" y="268" width="270" height="60">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>static/*.html</b><span class="sub"><br>admin, bartender, customer<br>discover, index</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-relay" data-id="relay-daemon" data-hoverable>
+          <rect x="635" y="342" width="270" height="48" rx="6"></rect>
+          <foreignObject x="635" y="342" width="270" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>profile_daemon.py</b><span class="sub"><br>separate worker, polls ~5 min</span></div>
+          </foreignObject>
+        </g>
+        <g class="node lane-relay" data-id="relay-lastfm" data-hoverable>
+          <rect x="635" y="404" width="270" height="48" rx="6"></rect>
+          <foreignObject x="635" y="404" width="270" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>lastfm.py / gcs_store.py</b><span class="sub"><br>resolve_artist() · GCS I/O</span></div>
+          </foreignObject>
+        </g>
+
+        <!-- external lane -->
+        <text class="lane-title" x="944" y="140">External services</text>
+        <g class="node lane-ext" data-id="ext-applemusic" data-hoverable>
+          <rect x="940" y="152" width="220" height="44" rx="6"></rect>
+          <foreignObject x="940" y="152" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Apple Music API</b></div></foreignObject>
+        </g>
+        <g class="node lane-ext" data-id="ext-spotify" data-hoverable>
+          <rect x="940" y="210" width="220" height="44" rx="6"></rect>
+          <foreignObject x="940" y="210" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Spotify Web API</b></div></foreignObject>
+        </g>
+        <g class="node lane-ext" data-id="ext-stripe" data-hoverable>
+          <rect x="940" y="268" width="220" height="44" rx="6"></rect>
+          <foreignObject x="940" y="268" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Stripe API</b></div></foreignObject>
+        </g>
+        <g class="node lane-ext" data-id="ext-lastfm" data-hoverable>
+          <rect x="940" y="326" width="220" height="44" rx="6"></rect>
+          <foreignObject x="940" y="326" width="220" height="44"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:12px 12px"><b>Last.fm API</b></div></foreignObject>
+        </g>
+        <g class="node lane-ext" data-id="ext-gcs" data-hoverable>
+          <rect x="940" y="384" width="220" height="68" rx="6"></rect>
+          <foreignObject x="940" y="384" width="220" height="68"><div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>GCS bucket</b><span class="sub"><br>band_cache · map_entries<br>· per-bar profiles</span></div></foreignObject>
+        </g>
+
+        <!-- edges: cross-lane connections route through the inter-lane gaps and a
+             clear channel below all boxes (y=505/511) so no path crosses a box -->
+        <g class="edge" data-from="browser-lan" data-to="ios-localserver"><path d="M 200,80 L 200,118 L 160,118 L 160,214" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="browser-lan" data-to="and-localserver"><path d="M 400,80 L 400,118 L 460,118 L 460,214" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="browser-net" data-to="relay-main"><path d="M 735,80 L 735,152" marker-end="url(#arrow)"></path></g>
+
+        <g class="edge" data-from="ios-appstate" data-to="relay-main"><path d="M 285,300 L 302,300 L 302,505 L 618,505 L 618,176 L 635,176" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-relay" data-to="relay-main"><path d="M 585,300 L 607,300 L 607,511 L 627,511 L 627,182 L 635,182" marker-end="url(#arrow)"></path></g>
+        <text x="430" y="497" class="mono" style="font-size:10px;fill:var(--ink-mute)">register + sync, ~5s (internet mode)</text>
+
+        <g class="edge" data-from="ios-music" data-to="ext-applemusic"><path d="M 285,362 L 302,362 L 302,505 L 925,505 L 925,168 L 940,168" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-playback" data-to="ext-spotify"><path d="M 585,362 L 607,362 L 607,511 L 920,511 L 920,226 L 940,226" marker-end="url(#arrow)"></path></g>
+
+        <g class="edge" data-from="ios-localserver" data-to="ext-stripe"><path d="M 285,238 L 310,238 L 310,499 L 930,499 L 930,284 L 940,284" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="and-localserver" data-to="ext-stripe"><path d="M 585,238 L 612,238 L 612,517 L 935,517 L 935,290 L 940,290" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="relay-main" data-to="ext-stripe"><path d="M 905,176 L 926,176 L 926,296 L 940,296" marker-end="url(#arrow)"></path></g>
+        <text x="700" y="530" class="mono" style="font-size:10px;fill:var(--ink-mute)">create-payment-intent · payment-confirmed (never gated)</text>
+
+        <g class="edge" data-from="relay-daemon" data-to="ext-lastfm"><path d="M 905,358 L 921,358 L 921,340 L 940,340" marker-end="url(#arrow)"></path></g>
+        <g class="edge" data-from="relay-daemon" data-to="ext-gcs"><path d="M 905,374 L 915,374 L 915,404 L 940,404" marker-end="url(#arrow)"></path></g>
+
+        <text x="20" y="565" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">LocalServer talks to Stripe directly only for LAN-mode requests — in internet mode, main.py does it on the host's behalf.</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> Entry points</h2>
+    <p class="lede">One row per codebase's load-bearing files — the classes that own state or own the network boundary.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>Role</th><th>File</th><th>Type / declaration</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>Kiosk UI</td><td class="route">KioskView.swift</td><td class="route">struct KioskView: View</td><td>On-device screen; renders <code class="inline">UpNextBadge</code>, <code class="inline">ApprovedQueueOverlay</code>, <code class="inline">RequestOptionsSheet</code></td></tr>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>Embedded server</td><td class="route">LocalServer.swift</td><td class="route">final class LocalServer</td><td>Swifter <code class="inline">HttpServer</code> on :8080; see route table &rarr;</td></tr>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>App state / relay client</td><td class="route">AppState.swift</td><td class="route">class AppState: ObservableObject</td><td><code class="inline">hostRegisterOnRelay(catalog:)</code>, <code class="inline">startSyncLoop()</code>, <code class="inline">syncOnce()</code>, <code class="inline">pushPaymentSettings()</code></td></tr>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>Playback</td><td class="route">MusicService.swift</td><td class="route">class MusicService: ObservableObject</td><td>Wraps <code class="inline">MPMusicPlayerController</code></td></tr>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>Config model</td><td class="route">Models.swift</td><td class="route">struct BarConfig / HostConfig / SongRequest</td><td><code class="inline">BarConfig</code> persisted &middot; <code class="inline">HostConfig</code> derived in-memory view</td></tr>
+          <tr><td class="plat"><span class="pill ios">iOS</span></td><td>Admin UI</td><td class="route">AdminView.swift</td><td class="route">struct AdminView: View</td><td>Payments / Requests toggles, session controls</td></tr>
+
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Kiosk UI</td><td class="route">KioskView.kt</td><td class="route">@Composable fun KioskView(...)</td><td>Renders <code class="inline">UpNextBadge</code>, <code class="inline">ApprovedQueueOverlay</code></td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Embedded server</td><td class="route">LocalServer.kt</td><td class="route">class LocalServer : NanoHTTPD</td><td>:8080; kept alive under Samsung Freecess by <code class="inline">LanForegroundService</code></td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Relay client</td><td class="route">RelayService.kt / RelayClient.kt</td><td class="route">class RelayService / class RelayClient</td><td><code class="inline">register()</code>, <code class="inline">sync()</code>, <code class="inline">pushBarDetails()</code></td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Playback</td><td class="route">PlaybackCoordinator.kt</td><td class="route">class PlaybackCoordinator</td><td>Spotify App Remote + local ExoPlayer fallback</td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Config model</td><td class="route">BarDetails.kt</td><td class="route">data class BarDetails</td><td>Single settings object; propagated via <code class="inline">propagateBarDetails()</code> in MainActivity.kt</td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>Admin UI</td><td class="route">AdminScreen.kt</td><td class="route">@Composable fun AdminScreen(...)</td><td>Payments / Requests cards, report generation</td></tr>
+          <tr><td class="plat"><span class="pill android">Android</span></td><td>App entry</td><td class="route">MainActivity.kt</td><td class="route">class MainActivity : ComponentActivity</td><td>Wizard state machine, wires Local/RelayService together</td></tr>
+
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>App entry</td><td class="route">main.py</td><td class="route">app = FastAPI(lifespan=lifespan)</td><td>Single-file FastAPI app; mounts <code class="inline">/static</code></td></tr>
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Bar state</td><td class="route">main.py</td><td class="route">@dataclass class BarSession</td><td>In-memory, keyed by <code class="inline">jukebar_id</code> in <code class="inline">_bars</code></td></tr>
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Genre profiling</td><td class="route">profile_daemon.py / lastfm.py</td><td class="route">fetch_artist_tags() / resolve_artist()</td><td>Separate long-running process, not part of the web dyno; reads <code class="inline">tag_map.json</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> API / route inventory</h2>
+    <p class="lede">Every handler, grouped the way the code groups them.</p>
+    <div class="route-cols">
+      <div class="route-col">
+        <div class="head"><b>jukebarweb — main.py</b><span class="sub">FastAPI, jukebars.com</span></div>
+        <div class="route-list">
+          <div class="route-item"><span class="verb post">POST</span>/api/host/register<span class="fn">host_register() — full re-register, catalog + settings</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/sync<span class="fn">host_sync() — played/approved ids + up_next, every ~5s</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/nowplaying<span class="fn">host_nowplaying()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/unregister<span class="fn">host_unregister()</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/catalog<span class="fn">bar_catalog()</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/display<span class="fn">bar_display() — now-playing + up_next, kiosk/customer poll</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/request<span class="fn">bar_request() — gated by accepting_requests</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/create-payment-intent<span class="fn">bar_create_payment_intent() — gated by accepting_requests</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/payment-confirmed<span class="fn">bar_payment_confirmed() — never gated, charge already happened</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/requests<span class="fn">bartender_requests()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/approve<span class="fn">bartender_approve()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/deny<span class="fn">bartender_deny()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/control<span class="fn">bartender_control() — play/pause/skip</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/settings<span class="fn">bar_settings() — admin toggle, optimistic apply</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/genres<span class="fn">bar_genres()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/map/register<span class="fn">map_register() — /discover listing</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/discover<span class="fn">discover() — community map page</span></div>
+        </div>
+      </div>
+      <div class="route-col">
+        <div class="head"><b>iOS — LocalServer.swift</b><span class="sub">Swifter, :8080</span></div>
+        <div class="route-list">
+          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">catalog + now_playing + requests, one round trip</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">cached via preloadCatalog(index:config:)</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">also carries live payment settings</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">gated by acceptingRequests</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn"></span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn"></span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">gated by acceptingRequests</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">never gated</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn"></span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn"></span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bartender/status<span class="fn"></span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn"></span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() — LAN admin.html live toggle</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn"></span></div>
+        </div>
+      </div>
+      <div class="route-col">
+        <div class="head"><b>Android — LocalServer.kt</b><span class="sub">NanoHTTPD, :8080</span></div>
+        <div class="route-list">
+          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">handleInit() — reuses catalogJson()</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">handleCatalog() — catalogJson()</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">handleNowPlaying() — also carries live settings</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">handleSubmitRequest() — gated by acceptingRequests</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn">handleApproveRequest()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn">handleDenyRequest()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">handleCreatePaymentIntent() — gated</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">handlePaymentConfirmed() — never gated</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn">playerCmd()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn">handleBartenderPair()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn">handleAdminAuth()</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() — LAN admin.html live toggle</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn">handleListReports()</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> How data actually moves</h2>
+    <p class="lede">Four flows worth knowing cold — the rest of the system is variations on these.</p>
+
+    <p class="flow-title"><span class="n">A</span>Host boot &amp; the 5-second sync loop</p>
+    <div class="flow">
+      <div class="step-n">1</div><p><span class="who">Host</span> registers once at launch — <code class="inline">AppState.hostRegisterOnRelay()</code> / <code class="inline">RelayService.register()</code> — sending full catalog, bar details, and settings to <code class="inline">POST /api/host/register</code>.</p>
+      <div class="step-n">2</div><p><span class="who">jukebarweb</span> replaces the bar's <code class="inline">BarSession</code> in <code class="inline">_bars</code> wholesale. Nothing is merged — every register is a clean slate.</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> then calls <code class="inline">POST /api/host/sync</code> every ~5s with played/approved ids and the current up-next queue; the response carries back any <code class="inline">pending_actions</code> queued by an admin.</p>
+    </div>
+
+    <p class="flow-title"><span class="n">B</span>Admin flips a setting</p>
+    <div class="flow">
+      <div class="step-n">1</div><p><span class="who">Admin (LAN)</span> posts straight to the host's own <code class="inline">/api/admin/settings</code> — takes effect immediately, no relay involved. <span class="who">Admin (Internet)</span> instead posts to jukebarweb's <code class="inline">POST /api/bar/&#123;id&#125;/settings</code>, which queues a <code class="inline">pending_action</code> and also optimistically patches its own in-memory <code class="inline">BarSession</code> so the admin page doesn't see a stale value for the next 0–10s.</p>
+      <div class="step-n">2</div><p><span class="who">Host</span> picks up the pending action on its next sync response and updates its local <code class="inline">BarDetails</code> / <code class="inline">HostConfig</code>.</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> re-registers with the new state, which becomes the new canonical value everywhere.</p>
+    </div>
+
+    <p class="flow-title"><span class="n">C</span>A customer requests a song</p>
+    <div class="flow">
+      <div class="step-n">1</div><p><span class="who">Customer</span> submits from whichever surface they're on — kiosk, Wi-Fi page, or jukebars.com — to <code class="inline">/api/request</code> (host) or <code class="inline">/api/bar/&#123;id&#125;/request</code> (relay).</p>
+      <div class="step-n">2</div><p>Approval mode is derived from two flags, never a separate enum: <code class="inline">stripe_enabled</code> and <code class="inline">bartender_enabled</code>. Both off means free and auto-accepted immediately; either on means it lands in the bartender's pending queue.</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> injects approved song ids straight into <code class="inline">PlaybackCoordinator</code> / <code class="inline">MusicService</code>, and reports it back up through the next sync so the relay's up-next queue matches.</p>
+    </div>
+
+    <p class="flow-title"><span class="n">D</span>Stripe payment vs. "stop taking requests"</p>
+    <div class="flow">
+      <div class="step-n">1</div><p><span class="who">Customer</span> hits Pay with Card, which calls <code class="inline">create-payment-intent</code> — no money has moved yet, so this is freely rejectable.</p>
+      <div class="step-n">2</div><p>If <code class="inline">accepting_requests</code> is <code>false</code>, both <code class="inline">/request</code> and <code class="inline">/create-payment-intent</code> return <code class="inline">403</code> immediately (within one ~5s poll, the button itself disappears on every customer surface).</p>
+      <div class="step-n">3</div><p><code class="inline">payment-confirmed</code> is the one call that is <b>never</b> gated — by the time it fires, Stripe has already charged the card, so the request is honored regardless of the flag. A late straggler gets refunded in cash by the bartender, not by code.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> Every surface, by page type</h2>
+    <p class="lede">13 places a person can end up looking at this system. Look and feel are meant to be identical within a row.</p>
+    <div class="table-scroll">
+      <table class="prose-table">
+        <thead><tr><th>Page type</th><th>Kiosk-native</th><th>Wi-Fi-served LAN HTML</th><th>Internet (jukebars.com)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Admin</b></td><td>AdminView.swift &middot; AdminScreen.kt</td><td>WebApps/admin.html &middot; assets/admin.html</td><td rowspan="3" style="vertical-align:middle">static/admin.html · bartender.html · customer.html — one shared page, no iOS/Android branching</td></tr>
+          <tr><td><b>Bartender</b> <span style="color:var(--ink-mute);font-size:12px">(no kiosk — own device)</span></td><td>—</td><td>WebApps/bartender.html &middot; assets/bartender.html</td></tr>
+          <tr><td><b>Customer</b></td><td>KioskView.swift &middot; KioskView.kt + LocalRequestSheet.kt</td><td>WebApps/customer.html &middot; assets/customer.html</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> What's running where</h2>
+    <div class="table-scroll">
+      <table class="prose-table">
+        <thead><tr><th>Process</th><th>Where</th><th>Lifetime</th></tr></thead>
+        <tbody>
+          <tr><td>JukeBar (iOS host app)</td><td>An iPhone/iPad at the bar</td><td>Foreground kiosk app, indefinitely</td></tr>
+          <tr><td>spotonjukebar (Android host app)</td><td>An Android tablet at the bar</td><td>Foreground kiosk app + <code class="inline">LanForegroundService</code> keeping the embedded server alive under OEM battery management</td></tr>
+          <tr><td>jukebarweb web service</td><td>Render, <code class="inline">uvicorn main:app</code></td><td>Always-on dyno, serves jukebars.com</td></tr>
+          <tr><td>profile_daemon.py</td><td>Separate long-running process (not the web dyno)</td><td>Polls every <code class="inline">PROFILE_POLL_INTERVAL</code> (default 300s)</td></tr>
+          <tr><td>Stripe, Last.fm, Spotify, Apple Music, GCS</td><td>External, third-party</td><td>Called on demand; nothing polls them continuously except the profiling daemon</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>docs/architecture.html — kept by hand alongside CLAUDE.md, not generated</span>
+    <span>Source of truth for "what calls what": grep the repos, not this page, if the two disagree</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var svg = document.getElementById('arch-svg');
+  if (!svg) return;
+  var nodes = svg.querySelectorAll('.node[data-hoverable]');
+  var edges = svg.querySelectorAll('.edge');
+  nodes.forEach(function (n) {
+    n.addEventListener('mouseenter', function () {
+      var id = n.getAttribute('data-id');
+      var related = false;
+      edges.forEach(function (e) {
+        if (e.getAttribute('data-from') === id || e.getAttribute('data-to') === id) {
+          e.classList.add('lit');
+          related = true;
+        } else {
+          e.classList.add('dimmed');
+        }
+      });
+    });
+    n.addEventListener('mouseleave', function () {
+      edges.forEach(function (e) { e.classList.remove('lit', 'dimmed'); });
+    });
+  });
+})();
+</script>
