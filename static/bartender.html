@@ -1,3 +1,14 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/bartender.html
+
+  RESPONSIBILITY: Internet-mode bartender page — no kiosk-native equivalent,
+    bartenders use their own device. Approve/deny pending requests, jump
+    queue, now-playing/player controls.
+  CALLED BY: Browser at jukebars.com/bartender/{jukebar_id} — served by
+    bartender_page() in main.py.
+  KEY METHODS: renderRequests() / renderNowPlaying() — poll-driven re-render,
+    same pattern as admin.html and customer.html.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>

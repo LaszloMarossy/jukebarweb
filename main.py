@@ -1,24 +1,24 @@
 """
-JukeBar web — FastAPI relay backend on Render.
+/Users/laszlo/PycharmProjects/jukebarweb/main.py
 
-Map / directory (any connection mode — called once at setup):
-  POST /api/map/register           — register or refresh a bar's map entry (artist names only)
-  GET  /api/map                    — list all registered bars; is_live=true for internet-mode bars
-
-Host (iOS, internet mode only):
-  POST /api/host/register          — startup registration with full catalog + session
-  POST /api/host/sync              — every 5 s: push now_playing_id + played IDs, get pending requests + actions
-
-Customer endpoints (internet mode, session required via ?s=):
-  GET  /api/bar/{id}/catalog       — browse full catalog
-  GET  /api/bar/{id}/nowplaying    — current track
-  POST /api/bar/{id}/request       — submit song request
-  GET  /api/bar/{id}/request/{rid} — check request status
-
-Bartender endpoints (internet mode, session required via ?s=):
-  GET  /api/bar/{id}/requests      — list pending requests
-  POST /api/bar/{id}/approve       — approve a request (jump flag supported)
-  POST /api/bar/{id}/deny          — deny a request
+RESPONSIBILITY: Single-file FastAPI app — the relay between iOS/Android hosts
+  and internet-mode customers/admins/bartenders, plus the public jukebars.com
+  community pages (index, discover). Holds all bar state in memory only
+  (BarSession); nothing here survives a restart except what's mirrored to GCS
+  via gcs_store.py.
+CALLED BY: Hosts (AppState.swift / RelayService.kt) over /api/host/*; browsers
+  over /api/bar/{id}/* and /admin, /bartender, / (Render serves this directly
+  as jukebars.com). Never called by profile_daemon.py — that process only
+  ever shares state with this one through GCS.
+KEY METHODS:
+  - host_register() / host_sync() — full re-register vs. the 5s heartbeat;
+    business logic for what a stale bar looks like lives in _cleanup_loop()
+  - bar_request() / bar_create_payment_intent() / bar_payment_confirmed() —
+    the accepting_requests gate lives in the first two only, never the third
+  - map_register() / _load_bar_profiles_sync() — the map/discovery + genre
+    round-trip through GCS (see docs/architecture.html, flow E)
+  - bar_settings() — optimistic-apply pattern: patches BarSession in memory
+    immediately, then queues a pending_action for the host's next sync
 """
 import asyncio
 import json
@@ -89,9 +89,16 @@ class SongRequest:
 @dataclass
 class BarSession:
     """
-    Full relay session — internet mode only, held in memory.
-    iOS re-registers within 5 s of any restart so memory-only is fine here.
-    The full catalog is kept here for customer browsing; it is NOT stored on disk.
+    main.py, class BarSession
+
+    RESPONSIBILITY: One bar's entire live state — catalog, settings, pending
+      requests, up-next queue — held in memory only, keyed by jukebar_id in
+      the module-level _bars dict. Rebuilt wholesale on every host register(),
+      never merged; if jukebarweb restarts, a bar just looks briefly offline
+      until the host's next sync.
+    CALLED BY: Every /api/bar/{id}/* and /api/host/* handler in this file.
+    KEY METHODS: require_approval (property) — derives approval mode from
+      stripe_enabled/bartender_enabled rather than storing a separate flag.
     """
     jukebar_id: str
     session: str          # playlist_id from iOS — rotates on every app restart

@@ -1,3 +1,16 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/discover.html
+
+  RESPONSIBILITY: Public community/discovery map — every bar that opted in
+    via /api/map/register, with genre pie + colored band bubbles per bar.
+    Not part of the relay/host system at all; reads only from GCS-derived
+    data main.py already cached (_bar_profiles), never touches a live host.
+  CALLED BY: Browser at jukebars.com/discover — served by discover() in
+    main.py; data from GET /api/map.
+  KEY METHODS: genreColor() / genreHexFor() — the single color-lookup
+    helper shared by both the pie chart and band bubbles so they always
+    match; openPanel() — band bubble tap -> raw Last.fm tag popup.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>

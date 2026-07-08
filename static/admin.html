@@ -1,3 +1,14 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/admin.html
+
+  RESPONSIBILITY: Internet-mode admin page (one of 5 surfaces for this page
+    type — see docs/architecture.html section 06). Session PIN auth, live
+    payment/request toggles, pending-request queue, session reports.
+  CALLED BY: Browser at jukebars.com/admin/{jukebar_id} — served by
+    admin_page() in main.py.
+  KEY METHODS: postSetting() — POSTs to /api/bar/{id}/settings, which
+    optimistically patches BarSession before the host even sees the change.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>

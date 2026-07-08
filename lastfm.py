@@ -1,17 +1,21 @@
 """
-Last.fm genre profiling — fetch tags, resolve band/pie, combine playlists.
+/Users/laszlo/PycharmProjects/jukebarweb/lastfm.py
 
-Functions used by profile_daemon.py:
-  fetch_artist_tags(client, artist, api_key) — raw Last.fm top tags
-  resolve_artist(name, song_count, tags, top_n) — band_color + pie_scores
-  compute_playlist_pie(all_pie_scores)       — normalised top-10 pie
-  combine_playlist_pies(pies_with_weights)   — merge multiple playlist pies
+RESPONSIBILITY: The only module that calls the Last.fm API. Fetches raw
+  artist tags and resolves them into a palette genre + weighted pie
+  contribution, using tag_map.json (repo root) as the tag-to-genre lookup.
+CALLED BY: profile_daemon.py, on MacLord, once per unprofiled artist per
+  cycle. main.py never calls this directly — it only ever reads the
+  already-profiled results back from GCS.
+KEY METHODS:
+  - fetch_artist_tags(client, artist, api_key) — raw Last.fm top tags
+  - resolve_artist(name, song_count, tags, top_n) — band_color + pie_scores;
+    this is where a raw tag list becomes one palette genre
+  - compute_playlist_pie(all_pie_scores) — normalised top-10 pie
+  - combine_playlist_pies(pies_with_weights) — merge multiple playlists
+  - profile_artists(artists, api_key) — legacy, kept only for trial_profile.py
 
-Legacy function kept for trial_profile.py:
-  profile_artists(artists, api_key)
-
-Tag mapping lives in tag_map.json at the repo root.
-Edit that file, push, and Render/daemon picks it up on restart.
+Edit tag_map.json, push, and Render/daemon picks it up on restart.
 """
 from __future__ import annotations
 import asyncio

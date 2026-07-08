@@ -1,8 +1,18 @@
 """
-Thin wrapper for reading and writing text files to a GCS bucket.
-Bucket name is read from the GCS_BUCKET environment variable.
-Credentials come from GOOGLE_APPLICATION_CREDENTIALS (path to service account JSON)
-or from the GCS_KEY_JSON environment variable (raw JSON string, for Render).
+/Users/laszlo/PycharmProjects/jukebarweb/gcs_store.py
+
+RESPONSIBILITY: Thin read/write wrapper around one GCS bucket (env var
+  GCS_BUCKET). The only file in this repo that imports the Google Cloud
+  Storage SDK — every other module that needs GCS goes through this one.
+CALLED BY: main.py (Render web service) for map_entries.json and per-bar
+  profile.json; profile_daemon.py (MacLord) for band_cache.json and writing
+  profile.json/artist_genres.json back. Same file, imported into two
+  independent runtimes that never talk to each other directly — GCS is the
+  only thing they share.
+KEY METHODS:
+  - read(path) / write(path, content) — the entire public surface
+  - _client() — picks credentials: GCS_KEY_JSON env var (Render) vs.
+    GOOGLE_APPLICATION_CREDENTIALS file path (MacLord, dev machine)
 """
 import json
 import os

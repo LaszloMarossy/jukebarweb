@@ -185,6 +185,43 @@
   .edge.lit text { fill: var(--accent); }
   marker path { fill: var(--ink-mute); }
 
+  .info-badge circle { fill: var(--surface); stroke: var(--ink-mute); stroke-width: 1; }
+  .info-badge text { fill: var(--ink-mute); font-family: var(--mono); font-size: 9px; font-weight: 700; text-anchor: middle; }
+  .info-badge { cursor: pointer; }
+  .info-badge:hover circle { fill: var(--accent); stroke: var(--accent); }
+  .info-badge:hover text { fill: var(--accent-ink); }
+  .info-badge.active circle { fill: var(--accent); stroke: var(--accent); }
+  .info-badge.active text { fill: var(--accent-ink); }
+
+  /* ---- node info panel: docked below the diagram, expands in place ---- */
+  #node-info-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, margin-top 0.25s ease;
+    margin-top: 0;
+  }
+  #node-info-panel.open { max-height: 420px; margin-top: 14px; }
+  #node-info-panel .panel-inner {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  #node-info-panel .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  #node-info-panel .panel-title { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--ink); }
+  #node-info-panel .panel-close { font-family: var(--mono); background: none; border: none; color: var(--ink-mute); font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 4px; }
+  #node-info-panel .panel-close:hover { color: var(--ink); }
+  #node-info-panel .panel-path { font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute); margin-bottom: 14px; word-break: break-all; }
+  #node-info-panel .panel-field { margin-bottom: 12px; }
+  #node-info-panel .panel-field:last-child { margin-bottom: 0; }
+  #node-info-panel .panel-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  #node-info-panel .panel-body { font-family: var(--serif); font-size: 14px; color: var(--ink-dim); line-height: 1.55; }
+  #node-info-panel .panel-body code { font-family: var(--mono); font-size: 0.9em; background: var(--surface); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  #node-info-panel .panel-body ul { margin: 4px 0 0; padding-left: 18px; }
+  #node-info-panel .panel-body li { margin-bottom: 4px; }
+
   /* ---- entry point + spec tables ---- */
   .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -325,30 +362,35 @@
         <!-- iOS nodes: row pitch 62 (48 box + 14 gap), rows at 152/214/276/338/400 -->
         <g class="node lane-ios" data-id="ios-kiosk" data-hoverable>
           <rect x="35" y="152" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="ios-kiosk" onclick="event.stopPropagation(); showNodeInfo('ios-kiosk')"><circle cx="274.0" cy="163.0" r="7.5"></circle><text x="274.0" y="166.0">i</text></g>
           <foreignObject x="35" y="152" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>KioskView.swift</b><span class="sub"><br><code>struct KioskView: View</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-ios" data-id="ios-localserver" data-hoverable>
           <rect x="35" y="214" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="ios-localserver" onclick="event.stopPropagation(); showNodeInfo('ios-localserver')"><circle cx="274.0" cy="225.0" r="7.5"></circle><text x="274.0" y="228.0">i</text></g>
           <foreignObject x="35" y="214" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>LocalServer.swift</b><span class="sub"><br><code>final class LocalServer</code> · :8080</span></div>
           </foreignObject>
         </g>
         <g class="node lane-ios" data-id="ios-appstate" data-hoverable>
           <rect x="35" y="276" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="ios-appstate" onclick="event.stopPropagation(); showNodeInfo('ios-appstate')"><circle cx="274.0" cy="287.0" r="7.5"></circle><text x="274.0" y="290.0">i</text></g>
           <foreignObject x="35" y="276" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>AppState.swift</b><span class="sub"><br><code>class AppState</code> — sync loop</span></div>
           </foreignObject>
         </g>
         <g class="node lane-ios" data-id="ios-music" data-hoverable>
           <rect x="35" y="338" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="ios-music" onclick="event.stopPropagation(); showNodeInfo('ios-music')"><circle cx="274.0" cy="349.0" r="7.5"></circle><text x="274.0" y="352.0">i</text></g>
           <foreignObject x="35" y="338" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>MusicService.swift</b><span class="sub"><br><code>class MusicService</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-ios" data-id="ios-webapps" data-hoverable>
           <rect x="35" y="400" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="ios-webapps" onclick="event.stopPropagation(); showNodeInfo('ios-webapps')"><circle cx="274.0" cy="411.0" r="7.5"></circle><text x="274.0" y="414.0">i</text></g>
           <foreignObject x="35" y="400" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>WebApps/*.html</b><span class="sub"><br>admin, bartender, customer</span></div>
           </foreignObject>
@@ -357,30 +399,35 @@
         <!-- Android nodes: same rows as iOS for visual symmetry -->
         <g class="node lane-android" data-id="and-kiosk" data-hoverable>
           <rect x="335" y="152" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="and-kiosk" onclick="event.stopPropagation(); showNodeInfo('and-kiosk')"><circle cx="574.0" cy="163.0" r="7.5"></circle><text x="574.0" y="166.0">i</text></g>
           <foreignObject x="335" y="152" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>KioskView.kt</b><span class="sub"><br><code>fun KioskView(...)</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-android" data-id="and-localserver" data-hoverable>
           <rect x="335" y="214" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="and-localserver" onclick="event.stopPropagation(); showNodeInfo('and-localserver')"><circle cx="574.0" cy="225.0" r="7.5"></circle><text x="574.0" y="228.0">i</text></g>
           <foreignObject x="335" y="214" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>LocalServer.kt</b><span class="sub"><br><code>class LocalServer : NanoHTTPD</code> · :8080</span></div>
           </foreignObject>
         </g>
         <g class="node lane-android" data-id="and-relay" data-hoverable>
           <rect x="335" y="276" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="and-relay" onclick="event.stopPropagation(); showNodeInfo('and-relay')"><circle cx="574.0" cy="287.0" r="7.5"></circle><text x="574.0" y="290.0">i</text></g>
           <foreignObject x="335" y="276" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>RelayService.kt</b><span class="sub"><br><code>class RelayService</code> — sync loop</span></div>
           </foreignObject>
         </g>
         <g class="node lane-android" data-id="and-playback" data-hoverable>
           <rect x="335" y="338" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="and-playback" onclick="event.stopPropagation(); showNodeInfo('and-playback')"><circle cx="574.0" cy="349.0" r="7.5"></circle><text x="574.0" y="352.0">i</text></g>
           <foreignObject x="335" y="338" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>PlaybackCoordinator.kt</b><span class="sub"><br><code>class PlaybackCoordinator</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-android" data-id="and-assets" data-hoverable>
           <rect x="335" y="400" width="250" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="and-assets" onclick="event.stopPropagation(); showNodeInfo('and-assets')"><circle cx="574.0" cy="411.0" r="7.5"></circle><text x="574.0" y="414.0">i</text></g>
           <foreignObject x="335" y="400" width="250" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>assets/*.html</b><span class="sub"><br>admin, bartender, customer</span></div>
           </foreignObject>
@@ -391,24 +438,28 @@
         <text class="lane-title" x="634" y="140">jukebarweb — Render (jukebars.com)</text>
         <g class="node lane-relay" data-id="relay-main" data-hoverable>
           <rect x="635" y="152" width="230" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="relay-main" onclick="event.stopPropagation(); showNodeInfo('relay-main')"><circle cx="854.0" cy="163.0" r="7.5"></circle><text x="854.0" y="166.0">i</text></g>
           <foreignObject x="635" y="152" width="230" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>main.py</b><span class="sub"><br><code>app = FastAPI()</code></span></div>
           </foreignObject>
         </g>
         <g class="node lane-relay" data-id="relay-barsession" data-hoverable>
           <rect x="635" y="214" width="230" height="40" rx="6"></rect>
+          <g class="info-badge" data-node="relay-barsession" onclick="event.stopPropagation(); showNodeInfo('relay-barsession')"><circle cx="854.0" cy="225.0" r="7.5"></circle><text x="854.0" y="228.0">i</text></g>
           <foreignObject x="635" y="214" width="230" height="40">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:5px 12px"><b>BarSession</b><span class="sub"><br>in-memory, one per bar</span></div>
           </foreignObject>
         </g>
         <g class="node lane-relay" data-id="relay-static" data-hoverable>
           <rect x="635" y="268" width="230" height="60" rx="6"></rect>
+          <g class="info-badge" data-node="relay-static" onclick="event.stopPropagation(); showNodeInfo('relay-static')"><circle cx="854.0" cy="279.0" r="7.5"></circle><text x="854.0" y="282.0">i</text></g>
           <foreignObject x="635" y="268" width="230" height="60">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>static/*.html</b><span class="sub"><br>admin, bartender, customer<br>discover, index</span></div>
           </foreignObject>
         </g>
         <g class="node lane-relay" data-id="relay-gcsstore" data-hoverable>
           <rect x="635" y="342" width="230" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="relay-gcsstore" onclick="event.stopPropagation(); showNodeInfo('relay-gcsstore')"><circle cx="854.0" cy="353.0" r="7.5"></circle><text x="854.0" y="356.0">i</text></g>
           <foreignObject x="635" y="342" width="230" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>gcs_store.py</b><span class="sub"><br>shared read/write helper</span></div>
           </foreignObject>
@@ -419,12 +470,14 @@
         <text class="lane-title" x="914" y="140">MacLord — always-on Mac (home)</text>
         <g class="node lane-mac" data-id="mac-daemon" data-hoverable>
           <rect x="915" y="152" width="230" height="48" rx="6"></rect>
+          <g class="info-badge" data-node="mac-daemon" onclick="event.stopPropagation(); showNodeInfo('mac-daemon')"><circle cx="1134.0" cy="163.0" r="7.5"></circle><text x="1134.0" y="166.0">i</text></g>
           <foreignObject x="915" y="152" width="230" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>profile_daemon.py</b><span class="sub"><br>LaunchAgent · polls GCS ~5 min</span></div>
           </foreignObject>
         </g>
         <g class="node lane-mac" data-id="mac-lastfm" data-hoverable>
           <rect x="915" y="214" width="230" height="60" rx="6"></rect>
+          <g class="info-badge" data-node="mac-lastfm" onclick="event.stopPropagation(); showNodeInfo('mac-lastfm')"><circle cx="1134.0" cy="225.0" r="7.5"></circle><text x="1134.0" y="228.0">i</text></g>
           <foreignObject x="915" y="214" width="230" height="60">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>lastfm.py</b><span class="sub"><br>fetch_artist_tags()<br>resolve_artist()</span></div>
           </foreignObject>
@@ -484,6 +537,28 @@
         <text x="20" y="583" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">gcs_store.py is one file, imported by both main.py (Render) and profile_daemon.py (MacLord) — same repo, two independent runtimes.</text>
         <text x="20" y="601" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">MacLord never talks to main.py directly — the only shared state between them is what's written to GCS.</text>
       </svg>
+    </div>
+
+    <div id="node-info-panel">
+      <div class="panel-inner">
+        <div class="panel-head">
+          <div class="panel-title" id="panel-title"></div>
+          <button class="panel-close" onclick="closeNodeInfo()" aria-label="Close">✕</button>
+        </div>
+        <div class="panel-path" id="panel-path"></div>
+        <div class="panel-field">
+          <div class="panel-label">Responsibility</div>
+          <div class="panel-body" id="panel-responsibility"></div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Called by</div>
+          <div class="panel-body" id="panel-calledby"></div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Key methods</div>
+          <div class="panel-body" id="panel-keymethods"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -692,4 +767,128 @@
     });
   });
 })();
+
+// Node info panel — content hand-copied from each file's own header comment
+// (RESPONSIBILITY / CALLED BY / KEY METHODS). Source of truth is the file,
+// not this object; re-sync by hand if a header comment changes.
+const NODE_INFO = {
+  'ios-kiosk': {
+    title: 'KioskView.swift', path: '~/dev/giffy/JukeBar/JukeBar/KioskView.swift',
+    responsibility: 'The on-device kiosk screen — now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only iOS surface with no HTML equivalent (its WiFi/internet counterparts are WebApps/customer.html and static/customer.html).',
+    calledBy: "Presented once setup completes (see the app's root view).",
+    keyMethods: '<ul><li><code>allowsLocalRequest</code> (computed) — gates the Request button on acceptingRequests + payment settings</li><li><code>UpNextBadge</code> / <code>ApprovedQueueOverlay</code> — measured per-letter Canvas layout, mirrors customer.html\'s SVG version</li><li><code>qrColumns()</code> — the actual QR image is <code>QRImageView</code> in QRCodeView.swift</li></ul>',
+  },
+  'ios-localserver': {
+    title: 'LocalServer.swift', path: '~/dev/giffy/JukeBar/JukeBar/LocalServer.swift',
+    responsibility: 'The embedded HTTP server (Swifter, :8080) that serves WebApps/ (admin, bartender, customer html) and the LAN API when the host is in Wi-Fi/Hotspot/Local mode.',
+    calledBy: 'AppState.swift (start/stop); browsers on the same LAN for every request/admin/bartender page.',
+    keyMethods: '<ul><li><code>/api/request</code> and <code>/api/create-payment-intent</code> handlers — both gated by <code>cfg.acceptingRequests</code></li><li><code>/api/payment-confirmed</code> — deliberately never gated, the charge already happened</li><li><code>preloadCatalog()</code> — the pre-serialized cache both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
+  },
+  'ios-appstate': {
+    title: 'AppState.swift', path: '~/dev/giffy/JukeBar/JukeBar/AppState.swift',
+    responsibility: 'Owns the register + 5s sync loop with jukebarweb — internet mode only — plus overall app/session state.',
+    calledBy: "The app's root view (environment object); LocalServer.swift reads hostConfig from it for live settings.",
+    keyMethods: '<ul><li><code>hostRegisterOnRelay()</code> — full re-register</li><li><code>startSyncLoop()</code> / <code>syncOnce()</code> — the 5s heartbeat</li><li><code>pushPaymentSettings()</code> — fires an immediate register rather than waiting for the next sync tick</li></ul>',
+  },
+  'ios-music': {
+    title: 'MusicService.swift', path: '~/dev/giffy/JukeBar/JukeBar/MusicService.swift',
+    responsibility: 'Owns actual song playback via Apple Music (MPMusicPlayerController). The only place in the iOS app that talks to Apple Music.',
+    calledBy: 'KioskView.swift (play/pause/skip controls); LocalServer.swift and AppState.swift inject approved request song ids here.',
+    keyMethods: '<ul><li><code>injectRequest()</code> — splices approved songs into the running queue</li><li><code>resume()</code> / <code>pause()</code> / <code>skipToNext()</code> / <code>skipToPrevious()</code> — the player controls surfaced to <code>/api/player/*</code></li></ul>',
+  },
+  'ios-webapps': {
+    title: 'WebApps/*.html', path: '~/dev/giffy/JukeBar/JukeBar/WebApps/{admin,bartender,customer}.html',
+    responsibility: 'WiFi-served LAN pages — same behavior as jukebarweb\'s static/*.html equivalents, served locally instead of over the internet.',
+    calledBy: 'Browser on the same LAN/hotspot as the host — served by LocalServer.swift\'s "/admin", "/bartender", "/" routes.',
+    keyMethods: '<ul><li>customer.html: <code>fetchNowPlaying()</code> carries live payment settings AND accepting_requests; duration arrives as <code>duration_seconds</code> directly</li><li>admin.html: posts to <code>/api/admin/settings</code>, calls back into AppState.swift</li></ul>',
+  },
+  'and-kiosk': {
+    title: 'KioskView.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/ui/KioskView.kt',
+    responsibility: "The on-device kiosk screen — now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only Android surface with no HTML equivalent (its WiFi/internet counterparts are assets/customer.html and static/customer.html).",
+    calledBy: 'MainActivity.kt, once setup is complete.',
+    keyMethods: '<ul><li><code>KioskView()</code> — top-level composable, branches on landscape vs. portrait and isRemoteOnly</li><li><code>UpNextBadge()</code> / <code>ApprovedQueueOverlay()</code> — Canvas-based, measured per-letter layout</li><li><code>upNextRowCount()</code> — screen-height-driven row count, not a device-class assumption</li></ul>',
+  },
+  'and-localserver': {
+    title: 'LocalServer.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/local/LocalServer.kt',
+    responsibility: 'The embedded HTTP server (NanoHTTPD, :8080) that serves assets/ (admin, bartender, customer html) and the LAN API when the host is in Wi-Fi/Hotspot/Local mode. Kept alive under Samsung Freecess by LanForegroundService.',
+    calledBy: 'MainActivity.kt (start/stop); browsers on the same LAN for every request/admin/bartender page.',
+    keyMethods: '<ul><li><code>handleSubmitRequest()</code> / <code>handleCreatePaymentIntent()</code> — both gated by <code>BarDetails.acceptingRequests</code></li><li><code>handlePaymentConfirmed()</code> — deliberately never gated</li><li><code>catalogJson()</code> — the single source both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
+  },
+  'and-relay': {
+    title: 'RelayService.kt / RelayClient.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/relay/{RelayService,RelayClient}.kt',
+    responsibility: 'RelayService owns the register + 5s sync loop (scheduling + state); RelayClient is the raw HTTP client underneath it with no scheduling of its own.',
+    calledBy: 'MainActivity.kt starts/stops RelayService; RelayService is the only caller of RelayClient.',
+    keyMethods: '<ul><li><code>pushBarDetails()</code> — fires an immediate <code>register()</code> rather than waiting for the next sync tick</li><li><code>register()</code> — full re-register (catalog + BarDetails + accepting_requests)</li><li><code>sync()</code> — the 5s heartbeat</li><li><code>registerMap()</code> — the separate <code>/api/map/register</code> call, only sent when a bar opts into the public map</li></ul>',
+  },
+  'and-playback': {
+    title: 'PlaybackCoordinator.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/playback/PlaybackCoordinator.kt',
+    responsibility: 'Owns actual song playback — Spotify App Remote when available, local ExoPlayer as fallback. The only place that talks to the Spotify Web API.',
+    calledBy: 'MainActivity.kt (setup/session lifecycle); LocalServer.kt and RelayService.kt inject approved request song ids here.',
+    keyMethods: '<ul><li><code>playSpotify()</code> / <code>playLocal()</code> — the two playback paths</li><li><code>pollSpotifyEnd()</code> — Spotify App Remote has no reliable track-end callback, so this polls playback position instead</li></ul>',
+  },
+  'and-assets': {
+    title: 'assets/*.html', path: '~/dev/giffy/spotonjukebar/app/src/main/assets/{admin,bartender,customer}.html',
+    responsibility: "WiFi-served LAN pages — same behavior as jukebarweb's static/*.html equivalents, served locally instead of over the internet.",
+    calledBy: 'Browser on the same LAN/hotspot as the host — served by LocalServer.kt\'s "/admin", "/bartender", "/request" routes.',
+    keyMethods: '<ul><li>customer.html: <code>fetchNowPlaying()</code> carries live payment settings AND accepting_requests, unlike jukebarweb\'s single <code>fetchDisplay()</code>; <code>applyMeta()</code> sets initial state from <code>/api/init</code></li><li>admin.html: posts to <code>/api/admin/settings</code>, calls back into MainActivity.kt</li></ul>',
+  },
+  'relay-main': {
+    title: 'main.py', path: '/Users/laszlo/PycharmProjects/jukebarweb/main.py',
+    responsibility: 'Single-file FastAPI app — the relay between iOS/Android hosts and internet-mode customers/admins/bartenders, plus the public jukebars.com community pages. Holds all bar state in memory only (BarSession).',
+    calledBy: 'Hosts (AppState.swift / RelayService.kt) over /api/host/*; browsers over /api/bar/{id}/* and /admin, /bartender, /. Never called by profile_daemon.py.',
+    keyMethods: '<ul><li><code>host_register()</code> / <code>host_sync()</code> — full re-register vs. the 5s heartbeat</li><li><code>bar_request()</code> / <code>bar_create_payment_intent()</code> / <code>bar_payment_confirmed()</code> — the accepting_requests gate lives in the first two only</li><li><code>map_register()</code> / <code>_load_bar_profiles_sync()</code> — the map/discovery + genre round-trip through GCS (see flow E)</li><li><code>bar_settings()</code> — optimistic-apply: patches BarSession immediately, then queues a pending_action</li></ul>',
+  },
+  'relay-barsession': {
+    title: 'class BarSession', path: '/Users/laszlo/PycharmProjects/jukebarweb/main.py',
+    responsibility: "One bar's entire live state — catalog, settings, pending requests, up-next queue — held in memory only, keyed by jukebar_id in the module-level _bars dict. Rebuilt wholesale on every register(), never merged.",
+    calledBy: 'Every /api/bar/{id}/* and /api/host/* handler in main.py.',
+    keyMethods: '<ul><li><code>require_approval</code> (property) — derives approval mode from stripe_enabled/bartender_enabled rather than storing a separate flag</li></ul>',
+  },
+  'relay-static': {
+    title: 'static/*.html', path: '/Users/laszlo/PycharmProjects/jukebarweb/static/{admin,bartender,customer,discover,index}.html',
+    responsibility: 'The five public/internet-mode pages. customer.html has no iOS/Android branching — identical markup regardless of host platform.',
+    calledBy: 'Browser at jukebars.com — served by admin_page() / bartender_page() / bar_page() / discover() / index() in main.py.',
+    keyMethods: '<ul><li>customer.html: <code>fetchDisplay()</code> — the poll loop that also drives the accepting_requests gate</li><li>discover.html: <code>genreColor()</code> — the single color-lookup shared by pie chart and band bubbles</li></ul>',
+  },
+  'relay-gcsstore': {
+    title: 'gcs_store.py', path: '/Users/laszlo/PycharmProjects/jukebarweb/gcs_store.py',
+    responsibility: 'Thin read/write wrapper around one GCS bucket. The only file in this repo that imports the Google Cloud Storage SDK.',
+    calledBy: 'main.py (Render) for map_entries.json and cached profile.json reads; profile_daemon.py (MacLord) for band_cache.json and writing profile.json/artist_genres.json. Same file, two independent runtimes.',
+    keyMethods: '<ul><li><code>read(path)</code> / <code>write(path, content)</code> — the entire public surface</li><li><code>_client()</code> — picks credentials: GCS_KEY_JSON env var (Render) vs. GOOGLE_APPLICATION_CREDENTIALS file (MacLord)</li></ul>',
+  },
+  'mac-daemon': {
+    title: 'profile_daemon.py', path: '~/jukebarweb/profile_daemon.py (on MacLord)',
+    responsibility: 'The genre-profiling loop. Runs on MacLord — a physical always-on Mac at the user\'s home, NOT Render — as a LaunchAgent (com.jukebar.profiler.plist). Reads/writes GCS directly; makes no calls to jukebarweb\'s own API.',
+    calledBy: "Nobody — it's the entry point, started by launchd on boot, kept alive lid-closed via caffeinate -is. Restarted by restart_daemon.sh (git pull + launchctl reload).",
+    keyMethods: '<ul><li>Loads band_cache.json + map_entries.json from GCS</li><li>Re-profiles any playlist where updated_at &gt; profiled_at via lastfm.py, checking band_cache first</li><li>Writes profile.json + artist_genres.json + band_cache.json back to GCS — main.py picks this up later on its own polling timer, never pushed</li></ul>',
+  },
+  'mac-lastfm': {
+    title: 'lastfm.py', path: '~/jukebarweb/lastfm.py (on MacLord; same file as /Users/laszlo/PycharmProjects/jukebarweb/lastfm.py)',
+    responsibility: 'The only module that calls the Last.fm API. Fetches raw artist tags and resolves them into a palette genre + weighted pie contribution, using tag_map.json as the lookup.',
+    calledBy: 'profile_daemon.py, on MacLord, once per unprofiled artist per cycle. main.py never calls this directly.',
+    keyMethods: '<ul><li><code>fetch_artist_tags()</code> — raw Last.fm top tags</li><li><code>resolve_artist()</code> — where a raw tag list becomes one palette genre + pie_scores</li><li><code>compute_playlist_pie()</code> / <code>combine_playlist_pies()</code> — normalise and merge multiple playlists</li></ul>',
+  },
+};
+
+function showNodeInfo(id) {
+  const info = NODE_INFO[id];
+  if (!info) return;
+  document.querySelectorAll('.info-badge').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-node') === id);
+  });
+  document.getElementById('panel-title').textContent = info.title;
+  document.getElementById('panel-path').textContent = info.path;
+  document.getElementById('panel-responsibility').textContent = info.responsibility;
+  document.getElementById('panel-calledby').textContent = info.calledBy;
+  document.getElementById('panel-keymethods').innerHTML = info.keyMethods;
+  const panel = document.getElementById('node-info-panel');
+  panel.classList.add('open');
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+function closeNodeInfo() {
+  document.getElementById('node-info-panel').classList.remove('open');
+  document.querySelectorAll('.info-badge').forEach(function (b) { b.classList.remove('active'); });
+}
 </script>

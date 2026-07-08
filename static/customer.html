@@ -1,3 +1,18 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/customer.html
+
+  RESPONSIBILITY: Internet-mode customer page — browse catalog, build a
+    request, pay (Stripe) or submit to bartender/auto-accept, Up Next badge
+    + Approved Queue overlay. The one page in this repo with no
+    iOS/Android branching — identical markup regardless of host platform.
+  CALLED BY: Browser at jukebars.com/bar/{jukebar_id} — served by
+    bar_page() in main.py; data from GET /api/bar/{id}/display (polled ~5s)
+    and /api/bar/{id}/catalog (once, cached in sessionStorage).
+  KEY METHODS: fetchDisplay() — the poll loop that also drives the
+    accepting_requests gate; renderBasket() — Pay/Submit button visibility;
+    unBadgeMarkup() — the curved-text Up Next badge (JS-measured per-letter
+    placement, not SVG textPath — see DECISIONS.md for why).
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>

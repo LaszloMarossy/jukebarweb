@@ -1,14 +1,23 @@
 """
-JukeBar genre profiling daemon — reads/writes GCS directly, no Render API calls.
+~/jukebarweb/profile_daemon.py on MacLord (same repo as jukebarweb, cloned locally)
 
-Flow:
-  1. Load band_cache.json from GCS (global artist → {pie, band, tags} cache)
-  2. Load map_entries.json from GCS (bar list + playlists with updated_at)
+RESPONSIBILITY: The genre-profiling loop. Runs on MacLord — a physical
+  always-on Mac at the user's home, NOT Render — as a LaunchAgent
+  (com.jukebar.profiler.plist), not as part of the web dyno. Reads/writes
+  GCS directly; makes no calls to jukebarweb's own API at all.
+CALLED BY: Nobody — it's the entry point, started by launchd on boot and
+  kept alive lid-closed via `caffeinate -is` in the plist. Restarted by
+  restart_daemon.sh (git pull + launchctl reload).
+KEY METHODS / flow (top to bottom of main loop):
+  1. Load band_cache.json from GCS (global artist -> {pie, band, tags} cache)
+  2. Load map_entries.json from GCS (bar list + playlists with updated_at,
+     written by main.py's map_register() whenever a host registers)
   3. For each bar, read map/{bar_id}/profile.json from GCS
-  4. For each playlist: if updated_at > profiled_at, re-profile using Last.fm
-     (check band_cache first; only call Last.fm for unknown artists)
+  4. For each playlist: if updated_at > profiled_at, re-profile via Last.fm
+     (lastfm.py) — check band_cache first, only call Last.fm for unknowns
   5. Recombine all profiled playlists' pies into combined_pie
-  6. Write updated map/{bar_id}/profile.json + band_cache.json back to GCS
+  6. Write updated map/{bar_id}/profile.json + band_cache.json back to GCS —
+     main.py picks this up later on its own polling timer, never pushed
 
 Usage:
     python3 profile_daemon.py [--once]
