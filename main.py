@@ -17,8 +17,10 @@ KEY METHODS:
     the accepting_requests gate lives in the first two only, never the third
   - map_register() / _load_bar_profiles_sync() — the map/discovery + genre
     round-trip through GCS (see docs/architecture.html, flow E)
-  - bar_settings() — optimistic-apply pattern: patches BarSession in memory
-    immediately, then queues a pending_action for the host's next sync
+  - bar_settings() / host_sync() — versioned settings confirmation: bar_settings()
+    only queues intent + bumps a per-field version, never patches BarSession
+    directly; host_sync()'s "settings" echo is what actually applies a field,
+    guarded by settings_confirmed_version so a stale echo can't win a race
 """
 import asyncio
 import json
@@ -122,6 +124,9 @@ class BarSession:
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
+    settings_version: dict[str, int] = field(default_factory=dict)             # field -> monotonic counter, bumped by bar_settings()
+    settings_pending: dict[str, int] = field(default_factory=dict)             # field -> version awaiting host confirmation; absent = not pending
+    settings_confirmed_version: dict[str, int] = field(default_factory=dict)   # field -> version of the currently-trusted value; guards stale/out-of-order host echoes
 
     @property
     def require_approval(self) -> bool:
@@ -498,8 +503,8 @@ async def host_nowplaying(body: dict[str, Any]):
 @app.post("/api/host/unregister")
 async def host_unregister(body: dict[str, Any]):
     """
-    Called by iOS when End Session is triggered.
-    Deletes the BarSession immediately so stale admin/bartender URLs get 404.
+    Called by iOS/Android when End Session is triggered.
+    Deletes the BarSession immediately so stale admin/bartender URLs and QR codes get 404.
     Idempotent — returns 200 even if the bar is already gone.
     """
     jukebar_id = body.get("jukebar_id", "")
@@ -516,22 +521,39 @@ async def host_unregister(body: dict[str, Any]):
 @app.post("/api/host/sync")
 async def host_sync(body: dict[str, Any]):
     """
-    Called by Android every 5 s.
+    Called by host every 5 s.
 
-    Android sends:
+    Host sends:
       played_request_ids   — request IDs whose song just became currentSong
       approved_request_ids — request IDs approved by the Android bartender screen
                              (server sets these to "approved" so kiosk Up Next shows them)
+      settings              — optional {field: {value, version}}; the host's current
+                             settings, sent on every call so a dropped sync self-heals on
+                             the next one. Only applied if version is newer than what's
+                             already confirmed - see settings_confirmed_version.
 
     Server returns:
       requests — new customer requests since last sync (status == "pending")
-      actions  — queued bartender approve/deny actions, then clears the queue
+      actions  — queued bartender approve/deny/settings_update actions, then clears the queue
     """
     jukebar_id = body.get("jukebar_id", "")
     session    = body.get("session", "")
     bar = _get_bar(jukebar_id)
     _validate_session(bar, session)
     _touch(bar)
+
+    # Host's settings echo - applied only if newer than what's already confirmed, so a
+    # stale/duplicate echo (arriving out of order, or repeated every heartbeat) can never
+    # regress a value or clear a pending flag for a since-superseded request.
+    for field_name, info in body.get("settings", {}).items():
+        if field_name not in ("bartender_enabled", "stripe_enabled") or not isinstance(info, dict):
+            continue
+        version = int(info.get("version", 0))
+        if version > bar.settings_confirmed_version.get(field_name, 0):
+            setattr(bar, field_name, bool(info.get("value")))
+            bar.settings_confirmed_version[field_name] = version
+            if bar.settings_pending.get(field_name, -1) <= version:
+                bar.settings_pending.pop(field_name, None)
 
     # Android bartender screen: IDs approved natively on the device
     for rid in body.get("approved_request_ids", []):
@@ -599,7 +621,6 @@ async def bartender_page(jukebar_id: str):
 async def admin_page(jukebar_id: str):
     return HTMLResponse((Path("static") / "admin.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
-
 @app.get("/api/bar/{jukebar_id}/catalog")
 async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
@@ -615,6 +636,7 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
             "accepting_requests":     bar.accepting_requests,
+            "settings_pending":       list(bar.settings_pending.keys()),
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -876,7 +898,8 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
     return {"bar_name": bar.bar_name, "requests": pending, "now_playing": bar.now_playing,
             "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
             "currency": bar.currency, "require_approval": bar.require_approval,
-            "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled}
+            "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
+            "settings_pending": list(bar.settings_pending.keys())}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
@@ -960,19 +983,23 @@ async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
 @app.post("/api/bar/{jukebar_id}/settings")
 async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
-    Admin-only: queue a payment-settings change for the host to pick up on the next sync,
-    and optimistically apply it to the BarSession so subsequent catalog/display reads
-    reflect the new value immediately (without waiting for the host to re-register).
+    Admin/bartender: queue a payment-settings change for the host to pick up on its next
+    sync. Does NOT touch bar.bartender_enabled/stripe_enabled directly - the host is the
+    only thing that can confirm a change actually took effect (see host_sync()'s
+    "settings" echo handling). Each field gets a bumped version number so the relay can
+    tell a genuine confirmation apart from a stale echo of a since-superseded request;
+    concurrent requests for the same field are queued in arrival order (last one wins),
+    not rejected.
     """
     bar = _customer_bar(jukebar_id, s)
     action: dict[str, Any] = {"type": "settings_update"}
-    if "bartender_enabled" in body:
-        v = bool(body["bartender_enabled"])
-        action["bartender_enabled"] = v
-        bar.bartender_enabled = v
-    if "stripe_enabled" in body:
-        v = bool(body["stripe_enabled"])
-        action["stripe_enabled"] = v
-        bar.stripe_enabled = v
+    for field_name in ("bartender_enabled", "stripe_enabled"):
+        if field_name in body:
+            v = bool(body[field_name])
+            version = bar.settings_version.get(field_name, 0) + 1
+            bar.settings_version[field_name] = version
+            bar.settings_pending[field_name] = version
+            action[field_name] = v
+            action[f"{field_name}_version"] = version
     bar.pending_actions.append(action)
     return {"ok": True}

@@ -1,4 +1,4 @@
-<title>JukeBar — System Architecture</title>
+<title>JukeBar - System Architecture</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
   :root {
@@ -185,7 +185,7 @@
   .edge.lit text { fill: var(--accent); }
   marker path { fill: var(--ink-mute); }
 
-  /* edge captions: free-floating text that describes a group of edges —
+  /* edge captions: free-floating text that describes a group of edges -
      dim by default (there's no line connecting them to what they describe),
      lit gold + bold when a node at either end of one of their edges is
      hovered, faded further when a different, unrelated node is hovered. */
@@ -258,6 +258,7 @@
   .verb { font-weight: 700; font-size: 10.5px; letter-spacing: 0.03em; margin-right: 8px; padding: 1px 5px; border-radius: 3px; }
   .verb.get { color: var(--ios); border: 1px solid var(--ios); }
   .verb.post { color: var(--android); border: 1px solid var(--android); }
+  .verb.delete { color: var(--ext); border: 1px solid var(--ext); }
 
   /* ---- route inventory 3-up ---- */
   .route-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
@@ -296,40 +297,48 @@
   <header class="masthead">
     <span class="eyebrow">JukeBar &middot; internal reference</span>
     <h1>System Architecture</h1>
-    <p class="dek">Three codebases, one house rule: the host app is the source of truth. Everything else — relay, browsers, this document — is downstream of whatever iOS or Android says is true right now.</p>
+    <p class="dek">Three codebases, one guiding architectural principle: the host app is the source of truth. Everything else -  host display, HTML served by host or relay through browsers - is downstream of whatever iOS or Android says is the true state right now.</p>
     <div class="meta-row">
       <span><b>Repos:</b> JukeBar (iOS) &middot; spotonjukebar (Android) &middot; jukebarweb (Render)</span>
-      <span><b>Updated:</b> 2026-07-08</span>
-      <span><b>Lives at:</b> docs/architecture.html in jukebarweb</span>
+      <span><b>Updated:</b> 2026-07-11</span>
+      <span><b>This doc lives at:</b> docs/architecture.html in jukebarweb</span>
     </div>
   </header>
 
   <section>
     <h2><span class="num">01</span> Three codebases, four runtimes</h2>
-    <p class="lede">iOS and Android each ship a full host app — playback, an embedded HTTP server, and a kiosk UI — that runs unattended on a device at the bar. jukebarweb is the only piece that isn't installed anywhere a customer can see; it runs twice, in two different places, for two different reasons.</p>
+    <p class="lede">iOS and Android each ship a full host app - playback, an embedded HTTP server to serve client devices through WIFI or Hotspot, and a kiosk UI for requests on the host device. </p>
+    <p class="lede">The hosts can run unattended on a device at the bar, either in interactive mode (when customers can make requests right on the host device), in a remote mode (where customers make requests on their own devices after photographing a QR code displayed on the host screen), or in a mixed mode (being able to do either of the previous). </p>
+    <p class="lede">jukebarweb is the only codebase that isn't installed anywhere a customer can see; it runs scripts twice a day to interact with external APIs (on a home mac, to collect genre profiling for the uploaded playlists), and it also serves the community pages for JukeBars (on jukebars.com).</p>
     <div class="card-row">
       <div class="card ios">
         <span class="tag">iOS</span>
         <h3>JukeBar <span class="mono" style="font-size:12px;color:var(--ink-mute)">(~/dev/giffy/JukeBar)</span></h3>
-        <p>Swift / SwiftUI. Embeds <b>Swifter</b> as its HTTP server. Plays back through Apple Music via <code class="inline">MusicService</code>.</p>
+        <p>Swift / SwiftUI.
+          Embeds <b>Swifter</b> as its HTTP server that serve the Admin/Bartender/Customer pages; plays back Apple Music via <code class="inline">MusicService</code>;
+          manages incoming requests from and serves updates to all its Admin/Bartender/Customer all clients; answers <i>Now Playing</i> and <i>Up Next</i> information to client polls.
+        </p>
       </div>
       <div class="card android">
         <span class="tag">Android</span>
         <h3>spotonjukebar <span class="mono" style="font-size:12px;color:var(--ink-mute)">(~/dev/giffy/spotonjukebar)</span></h3>
-        <p>Kotlin / Jetpack Compose. Embeds <b>NanoHTTPD</b> as its HTTP server. Plays back through the Spotify Web API via <code class="inline">PlaybackCoordinator</code>.</p>
+        <p>Kotlin / Jetpack Compose.
+          Embeds <b>NanoHTTPD</b> as its HTTP server that serve the Admin/Bartender/Customer pages; Plays back Spotify through its Web API via <code class="inline">PlaybackCoordinator</code>;
+          manages incoming requests from and serves updates to all its Admin/Bartender/Customer clients; answers <i>Now Playing</i> and <i>Up Next</i> information to client polls.
+        </p>
       </div>
       <div class="card relay">
         <span class="tag">Relay</span>
-        <h3>jukebarweb <span class="mono" style="font-size:12px;color:var(--ink-mute)">(this repo, on Render)</span></h3>
-        <p>Python / FastAPI, single <code class="inline">main.py</code>. Relays messages between hosts and internet customers, and runs the public jukebars.com community/discovery pages.</p>
+        <h3>jukebarweb<span class="mono" style="font-size:12px;color:var(--ink-mute)">(this repo, on Render)</span></h3>
+        <p>Python / FastAPI, single <code class="inline">main.py</code>. Houses the customer/admin/bartender pages and accommodates their requests in internet mode; serves the public jukebars.com community/discovery pages and APIs; the same codebase houses the scripts to run last-fm related scripts (for now being run on a dedicated home Mac)</p>
       </div>
       <div class="card" style="border-color:color-mix(in srgb, var(--mac) 45%, var(--line))">
         <span class="tag" style="background:var(--mac)">Home Mac Server</span>
-        <h3>same repo, second runtime <span class="mono" style="font-size:12px;color:var(--ink-mute)">(profile_daemon.py)</span></h3>
-        <p>Not Render. A physical always-on Mac at the user's home, running the genre-profiling loop as a LaunchAgent. It never talks to main.py directly — only to GCS.</p>
+        <h3>some of the code on jukebarweb repo - <span class="mono" style="font-size:12px;color:var(--ink-mute)">(profile_daemon.py)</span></h3>
+        <p>are now being run on a physical Mac at home (genre-profiling loop as a LaunchAgent - it never talks to main.py but to GCS directly); this part of the code can be run independently of the rest of the codebase, on any environment. The home Mac now runs other jobs for other projects as well...</p>
       </div>
     </div>
-    <p class="narrow">Nothing about a bar's state is stored durably in the relay — <code class="inline">BarSession</code> is an in-memory object that's rebuilt from scratch every time the host re-registers. If jukebarweb restarts, every bar just looks briefly offline until its host's next 5-second sync catches up. Genre data is the exception: it lives in GCS, outside both processes, which is exactly why two independent runtimes can share it without ever calling each other.</p>
+    <p class="narrow">Nothing about a bar's state is stored durably in the relay - <code class="inline">BarSession</code> is an in-memory object that's rebuilt from scratch every time the host re-registers. If jukebarweb restarts, every bar just looks briefly offline until its host's next 5-second sync catches up. The bar's last three uploaded playlists, and its profiled genre data is the exception: it lives in GCS, outside both processes, which is exactly why two independent runtimes can share/work on it without ever calling each other.</p>
   </section>
 
   <section>
@@ -348,7 +357,7 @@
           <rect x="20" y="34" width="560" height="46" rx="7"></rect>
           <foreignObject x="20" y="34" width="560" height="46">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 14px;line-height:1.35">
-              <b>Browser</b> — admin / bartender / customer <span class="sub">LAN mode: Wi-Fi, Hotspot, or Local — talks straight to the host, no relay</span>
+              <b>Browser</b> - admin / bartender / customer <span class="sub">LAN mode (Wi-Fi/Hotspot) pages, or Local kiosk views on the host (talks straight to the host - never touches GCS itself; the only thing that writes to GCS is the host's own <code class="inline">map_register()</code> opt-in call, flow E, which fires the same way regardless of whether the bar is kiosk-only, LAN-only, or internet mode)</span>
             </div>
           </foreignObject>
         </g>
@@ -356,16 +365,16 @@
           <rect x="600" y="34" width="270" height="46" rx="7"></rect>
           <foreignObject x="600" y="34" width="270" height="46">
             <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 14px;line-height:1.35">
-              <b>Browser</b> — same 3 roles <span class="sub">Internet mode, via jukebars.com</span>
+              <b>Browser</b> - same 3 roles <span class="sub">Internet mode, via jukebars.com</span>
             </div>
           </foreignObject>
         </g>
 
         <!-- device frames -->
         <rect class="device-frame" x="20" y="118" width="280" height="370" rx="12"></rect>
-        <text class="lane-title" x="34" y="140">iPhone — host device</text>
+        <text class="lane-title" x="34" y="140">iPhone - host device</text>
         <rect class="device-frame" x="320" y="118" width="280" height="370" rx="12"></rect>
-        <text class="lane-title" x="334" y="140">Android tablet — host device</text>
+        <text class="lane-title" x="334" y="140">Android tablet - host device</text>
 
         <!-- iOS nodes: row pitch 62 (48 box + 14 gap), rows at 152/214/276/338/400 -->
         <g class="node lane-ios" data-id="ios-kiosk" data-hoverable>
@@ -385,7 +394,7 @@
         <g class="node lane-ios" data-id="ios-appstate" data-hoverable>
           <rect x="35" y="276" width="250" height="48" rx="6"></rect>
           <foreignObject x="35" y="276" width="250" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>AppState.swift</b><span class="sub"><br><code>class AppState</code> — sync loop</span></div>
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>AppState.swift</b><span class="sub"><br><code>class AppState</code> - sync loop</span></div>
           </foreignObject>
           <g class="info-badge" data-node="ios-appstate" onclick="event.stopPropagation(); showNodeInfo('ios-appstate')"><circle cx="274.0" cy="287.0" r="7.5"></circle><text x="274.0" y="290.0">i</text></g>
         </g>
@@ -422,7 +431,7 @@
         <g class="node lane-android" data-id="and-relay" data-hoverable>
           <rect x="335" y="276" width="250" height="48" rx="6"></rect>
           <foreignObject x="335" y="276" width="250" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>RelayService.kt</b><span class="sub"><br><code>class RelayService</code> — sync loop</span></div>
+            <div xmlns="http://www.w3.org/1999/xhtml" class="label" style="padding:6px 12px"><b>RelayService.kt</b><span class="sub"><br><code>class RelayService</code> - sync loop</span></div>
           </foreignObject>
           <g class="info-badge" data-node="and-relay" onclick="event.stopPropagation(); showNodeInfo('and-relay')"><circle cx="574.0" cy="287.0" r="7.5"></circle><text x="574.0" y="290.0">i</text></g>
         </g>
@@ -441,9 +450,9 @@
           <g class="info-badge" data-node="and-assets" onclick="event.stopPropagation(); showNodeInfo('and-assets')"><circle cx="574.0" cy="411.0" r="7.5"></circle><text x="574.0" y="414.0">i</text></g>
         </g>
 
-        <!-- jukebarweb lane: main.py's own responsibilities only — profiling moved to Home Mac Server -->
+        <!-- jukebarweb lane: main.py's own responsibilities only - profiling moved to Home Mac Server -->
         <rect class="device-frame" x="620" y="118" width="260" height="370" rx="12" style="stroke:color-mix(in srgb, var(--accent) 45%, var(--line))"></rect>
-        <text class="lane-title" x="634" y="140">jukebarweb — Render (jukebars.com)</text>
+        <text class="lane-title" x="634" y="140">jukebarweb - Render (jukebars.com)</text>
         <g class="node lane-relay" data-id="relay-main" data-hoverable>
           <rect x="635" y="152" width="230" height="48" rx="6"></rect>
           <foreignObject x="635" y="152" width="230" height="48">
@@ -498,7 +507,7 @@
 
         <!-- Home Mac Server lane: a real physical Mac, not part of Render -->
         <rect class="device-frame" x="1140" y="118" width="260" height="370" rx="12" style="stroke:color-mix(in srgb, var(--mac) 45%, var(--line))"></rect>
-        <text class="lane-title" x="1154" y="140">Home Mac Server — always-on, not Render</text>
+        <text class="lane-title" x="1154" y="140">Home Mac Server - always-on, not Render</text>
         <g class="node lane-mac" data-id="mac-daemon" data-hoverable>
           <rect x="1155" y="152" width="230" height="48" rx="6"></rect>
           <foreignObject x="1155" y="152" width="230" height="48">
@@ -513,7 +522,7 @@
           </foreignObject>
           <g class="info-badge" data-node="mac-lastfm" onclick="event.stopPropagation(); showNodeInfo('mac-lastfm')"><circle cx="1374.0" cy="225.0" r="7.5"></circle><text x="1374.0" y="228.0">i</text></g>
         </g>
-        <text x="1155" y="298" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">same repo, cloned locally on this Mac —</text>
+        <text x="1155" y="298" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">same repo, cloned locally on this Mac -</text>
         <text x="1155" y="312" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">restart_daemon.sh: git pull + reload</text>
         <text x="1155" y="334" class="mono" style="font-size:10.5px;fill:var(--ink-mute)">kept awake via caffeinate -is, lid closed</text>
 
@@ -541,9 +550,9 @@
         <g class="edge" data-from="mac-lastfm" data-to="ext-lastfm"><path d="M 1155,238 L 1148,238 L 1148,348 L 1120,348" marker-end="url(#arrow)"></path></g>
         <g class="edge" data-from="mac-daemon" data-to="ext-gcs"><path d="M 1155,196 L 1152,196 L 1152,410 L 1120,410" marker-end="url(#arrow)"></path></g>
 
-        <text x="20" y="565" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">LocalServer talks to Stripe directly only for LAN-mode requests — in internet mode, main.py does it on the host's behalf.</text>
-        <text x="20" y="583" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">gcs_store.py is one file, imported by both main.py (Render) and profile_daemon.py (Home Mac Server) — same repo, two independent runtimes.</text>
-        <text x="20" y="601" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">Home Mac Server never talks to main.py directly — the only shared state between them is what's written to GCS.</text>
+        <text x="20" y="565" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">LocalServer talks to Stripe directly only for LAN-mode requests - in internet mode, main.py does it on the host's behalf.</text>
+        <text x="20" y="583" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">gcs_store.py is one file, imported by both main.py (Render) and profile_daemon.py (Home Mac Server) - same repo, two independent runtimes.</text>
+        <text x="20" y="601" class="lane-title" style="fill:var(--ink-mute);text-transform:none;letter-spacing:0">Home Mac Server never talks to main.py directly - the only shared state between them is what's written to GCS; it queries bands from unprofiled playlists and gets Last FM genres on them for their profiling.</text>
       </svg>
     </div>
 
@@ -572,7 +581,7 @@
 
   <section>
     <h2><span class="num">03</span> Entry points</h2>
-    <p class="lede">One row per codebase's load-bearing files — the classes that own state or own the network boundary.</p>
+    <p class="lede">One row per codebase's load-bearing files - the classes that own state or own the network boundary.</p>
     <div class="table-scroll">
       <table>
         <thead>
@@ -597,7 +606,7 @@
           <tr><td class="plat"><span class="pill relay">Relay</span></td><td>App entry</td><td class="route">main.py</td><td class="route">app = FastAPI(lifespan=lifespan)</td><td>Single-file FastAPI app; mounts <code class="inline">/static</code></td></tr>
           <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Bar state</td><td class="route">main.py</td><td class="route">@dataclass class BarSession</td><td>In-memory, keyed by <code class="inline">jukebar_id</code> in <code class="inline">_bars</code></td></tr>
           <tr><td class="plat"><span class="pill relay">Relay</span></td><td>Map / discovery</td><td class="route">main.py</td><td class="route">map_register(), _load_bar_profiles_sync()</td><td>Writes <code class="inline">map_entries.json</code> on registration; reads <code class="inline">map/&#123;id&#125;/profile.json</code> every <code class="inline">PROFILE_CACHE_TTL</code>s</td></tr>
-          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>GCS I/O</td><td class="route">gcs_store.py</td><td class="route">read() / write()</td><td>Shared by main.py <b>and</b> profile_daemon.py — same file, imported into two independent runtimes</td></tr>
+          <tr><td class="plat"><span class="pill relay">Relay</span></td><td>GCS I/O</td><td class="route">gcs_store.py</td><td class="route">read() / write()</td><td>Shared by main.py <b>and</b> profile_daemon.py - same file, imported into two independent runtimes</td></tr>
 
           <tr><td class="plat"><span class="pill mac">Home Mac Server</span></td><td>Genre profiling</td><td class="route">profile_daemon.py</td><td class="route">LaunchAgent: com.jukebar.profiler.plist</td><td>Polls GCS every <code class="inline">PROFILE_POLL_INTERVAL</code>s (default 300); writes <code class="inline">profile.json</code>, <code class="inline">artist_genres.json</code>, <code class="inline">band_cache.json</code></td></tr>
           <tr><td class="plat"><span class="pill mac">Home Mac Server</span></td><td>Last.fm client</td><td class="route">lastfm.py</td><td class="route">fetch_artist_tags(), resolve_artist()</td><td>Only process that calls the Last.fm API; main.py only ever reads the results back from GCS</td></tr>
@@ -611,62 +620,72 @@
     <p class="lede">Every handler, grouped the way the code groups them.</p>
     <div class="route-cols">
       <div class="route-col">
-        <div class="head"><b>jukebarweb — main.py</b><span class="sub">FastAPI, jukebars.com</span></div>
+        <div class="head"><b>jukebarweb - main.py</b><span class="sub">FastAPI, jukebars.com</span></div>
         <div class="route-list">
-          <div class="route-item"><span class="verb post">POST</span>/api/host/register<span class="fn">host_register() — full re-register, catalog + settings</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/host/sync<span class="fn">host_sync() — played/approved ids + up_next, every ~5s</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/host/nowplaying<span class="fn">host_nowplaying()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/host/unregister<span class="fn">host_unregister()</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/catalog<span class="fn">bar_catalog()</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/display<span class="fn">bar_display() — now-playing + up_next, kiosk/customer poll</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/request<span class="fn">bar_request() — gated by accepting_requests</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/create-payment-intent<span class="fn">bar_create_payment_intent() — gated by accepting_requests</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/payment-confirmed<span class="fn">bar_payment_confirmed() — never gated, charge already happened</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/requests<span class="fn">bartender_requests()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/approve<span class="fn">bartender_approve()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/deny<span class="fn">bartender_deny()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/control<span class="fn">bartender_control() — play/pause/skip</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/settings<span class="fn">bar_settings() — admin toggle, optimistic apply</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/genres<span class="fn">bar_genres()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/map/register<span class="fn">map_register() — /discover listing</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/discover<span class="fn">discover() — community map page</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/register<span class="fn">host_register() - full re-register, catalog (playlist bands) + settings</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/sync<span class="fn">host_sync() - played/approved song ids + up_next + settings echo (versioned confirmation, flow B), called every ~5s</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/nowplaying<span class="fn">host_nowplaying() - the currently playing song by the host</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/unregister<span class="fn">host_unregister() - when End Session is triggered; invalidates session</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/catalog<span class="fn">bar_catalog() - customer.html/admin.html fetch the full browsable catalog + live settings on page load</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/display<span class="fn">bar_display() - now-playing + up_next, kiosk/customer poll</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/request<span class="fn">bar_request() - customer.html submits a request; always lands "pending" here, gated by accepting_requests - the host is the one that actually approves/auto-injects it on its next sync</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/create-payment-intent<span class="fn">bar_create_payment_intent() - customer.html "Pay with Card"; relay holds the Stripe secret key and opens the PaymentIntent server-side, gated by accepting_requests, no charge yet</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/payment-confirmed<span class="fn">bar_payment_confirmed() - customer.html calls this right after Stripe confirms client-side; relay re-verifies with Stripe, then creates a paid=True request for the host to auto-inject, never gated, charge already happened</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/requests<span class="fn">bartender_requests() - bartender.html and admin.html both poll this for the pending/approved queue to display</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/approve<span class="fn">bartender_approve() - bartender.html/admin.html "Accept"; only queues a pending_action, doesn't mark approved itself - the host confirms via up_next on its next sync</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/deny<span class="fn">bartender_deny() - bartender.html/admin.html "Deny"/cancel button, called when canceling someone's request</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/control<span class="fn">bartender_control() - play/pause/skip of host player controls - relaying intent to host</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bar/&#123;id&#125;/settings<span class="fn">bar_settings() - admin.html and bartender.html payment-toggle switches; queues intent + bumps version, does not patch BarSession itself (see flow B)</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/genres<span class="fn">bar_genres() - customer.html colors band bubbles by genre; same data Home Mac Server profiled, served from the GCS cache instead of the host's memory</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/map/register<span class="fn">map_register() - /discover listing</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/discover<span class="fn">discover() - community map page</span></div>
         </div>
       </div>
       <div class="route-col">
-        <div class="head"><b>iOS — LocalServer.swift</b><span class="sub">Swifter, :8080</span></div>
+        <div class="head"><b>iOS - LocalServer.swift</b><span class="sub">Swifter, :8080</span></div>
         <div class="route-list">
-          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">catalog + now_playing + requests, one round trip</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">cached via preloadCatalog(index:config:)</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">also carries live payment settings</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">gated by acceptingRequests</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn"></span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn"></span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">gated by acceptingRequests</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">never gated</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn"></span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn"></span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/bartender/status<span class="fn"></span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn"></span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() — LAN admin.html live toggle</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn"></span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">catalog + now_playing + requests, one round trip - called by customer/bartender/admin LAN pages on load, instead of 3 separate fetches</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">cached via preloadCatalog(index:config:) - catalog only; used before a session exists yet, and as the disk-fallback if the cache isn't warm</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">also carries live payment settings - polled continuously by every LAN surface to refresh Now Playing + button visibility without a full catalog re-fetch</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">gated by acceptingRequests - customer submits; auto-approved + injected immediately if both stripeEnabled and bartenderEnabled are off, otherwise stays pending for bartender/admin</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn">bartender.html/admin.html "Accept" (or kiosk bartender screen); marks approved and injects into MusicService</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn">same actor as approve; cancels a request - a refund on an already-paid one is manual/cash by the bartender, not automatic</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">gated by acceptingRequests - customer "Pay with Card"; opens the Stripe PaymentIntent, no charge yet</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">never gated - customer calls this right after Stripe confirms client-side; charge already happened by the time it fires</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn">admin.html transport buttons over LAN (Wi-Fi/Hotspot); relayed straight into MusicService</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn">bartender.html login screen; PIN-gated, first pairer on a fresh session becomes admin automatically</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bartender/status<span class="fn">polled by bartender.html to see whether this bartender_id has been approved/denied yet</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn">admin.html PIN gate; returns a settings snapshot on success, tracks failed attempts/lockout</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() - LAN admin.html live toggle; applies immediately in-process, no relay round trip</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn">admin.html Reports tab; lists generated session CSVs for download</span></div>
         </div>
       </div>
       <div class="route-col">
-        <div class="head"><b>Android — LocalServer.kt</b><span class="sub">NanoHTTPD, :8080</span></div>
+        <div class="head"><b>Android - LocalServer.kt</b><span class="sub">NanoHTTPD, :8080</span></div>
         <div class="route-list">
-          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">handleInit() — reuses catalogJson()</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">handleCatalog() — catalogJson()</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">handleNowPlaying() — also carries live settings</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">handleSubmitRequest() — gated by acceptingRequests</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn">handleApproveRequest()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn">handleDenyRequest()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">handleCreatePaymentIntent() — gated</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">handlePaymentConfirmed() — never gated</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn">playerCmd()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn">handleBartenderPair()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn">handleAdminAuth()</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() — LAN admin.html live toggle</span></div>
-          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn">handleListReports()</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/init<span class="fn">handleInit() - catalog only via catalogJson(); unlike iOS this does NOT also bundle now_playing/requests in the same round trip</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/catalog<span class="fn">handleCatalog() - catalogJson(), the same source /api/init reads from</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying<span class="fn">handleNowPlaying() - also carries live payment settings - polled continuously by every LAN surface to refresh Now Playing + button visibility</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/nowplaying/artwork<span class="fn">handleArtwork() - separate binary fetch so polling now-playing metadata doesn't re-transfer image bytes every cycle</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/genres<span class="fn">handleGenres() - band-bubble colors for WiFi customer pages, same shape as iOS's /api/genres</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request<span class="fn">handleSubmitRequest() - gated by BarDetails.acceptingRequests; auto-approved + injected immediately if requireApproval is false (both stripe/bartender off), otherwise stays pending</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/requests<span class="fn">handleListRequests() - bartender.html/admin.html poll this for the pending/approved queue, optionally filtered by ?status=</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/request/&#123;id&#125;<span class="fn">handleGetRequest() - single request lookup, e.g. for a customer polling their own submission's status</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/approve<span class="fn">handleApproveRequest() - bartender.html/admin.html "Accept"; marks approved and injects into PlaybackCoordinator</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/request/deny<span class="fn">handleDenyRequest() - same actor as approve; cancels a request</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/create-payment-intent<span class="fn">handleCreatePaymentIntent() - gated by acceptingRequests; customer "Pay with Card", opens the Stripe PaymentIntent, no charge yet</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/payment-confirmed<span class="fn">handlePaymentConfirmed() - never gated; customer calls this right after Stripe confirms client-side</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/player/play, /pause, /next, /prev<span class="fn">playerCmd() - admin.html transport buttons over LAN; relayed straight into PlaybackCoordinator</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/bartender/pair<span class="fn">handleBartenderPair() - bartender.html login screen, PIN-gated; unlike iOS there's no pending-approval queue - anyone with the correct PIN pairs as "approved" immediately, isAdmin only marks the first pairer</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bartender/status<span class="fn">handleBartenderStatus() - polled by bartender.html; always reports "approved" once paired, since Android has no pending-bartender state to wait on</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/bartender/list<span class="fn">stub - always returns an empty array; the pending-bartender-approval UI this would back doesn't exist on Android (see /api/bartender/pair)</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/auth<span class="fn">handleAdminAuth() - admin.html PIN gate; returns a settings snapshot on success, tracks failed attempts/lockout, same shape as iOS</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/stop<span class="fn">handleAdminStop() - admin.html "End Session"; invokes onStopSession() to pause playback and return to the setup wizard</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/admin/settings<span class="fn">handleAdminSettings() - LAN admin.html live toggle; applies immediately via the onSettingsUpdate callback into MainActivity.kt, no relay round trip</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/reports<span class="fn">handleListReports() - admin.html Reports tab; lists generated session CSVs for download</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/reports/generate<span class="fn">handleGenerateReport() - archives the current session to a new CSV, then returns the refreshed list</span></div>
+          <div class="route-item"><span class="verb get">GET</span>/api/reports/&#123;filename&#125;<span class="fn">handleDownloadReport() - streams one report's CSV bytes</span></div>
+          <div class="route-item"><span class="verb delete">DELETE</span>/api/reports/&#123;filename&#125;<span class="fn">handleDeleteReport() - removes one report file</span></div>
         </div>
       </div>
     </div>
@@ -674,43 +693,43 @@
 
   <section>
     <h2><span class="num">05</span> How data actually moves</h2>
-    <p class="lede">Four flows worth knowing cold — the rest of the system is variations on these.</p>
+    <p class="lede">Four flows worth knowing cold - the rest of the system is variations on these.</p>
 
     <p class="flow-title"><span class="n">A</span>Host boot &amp; the 5-second sync loop</p>
     <div class="flow">
-      <div class="step-n">1</div><p><span class="who">Host</span> registers once at launch — <code class="inline">AppState.hostRegisterOnRelay()</code> / <code class="inline">RelayService.register()</code> — sending full catalog, bar details, and settings to <code class="inline">POST /api/host/register</code>.</p>
-      <div class="step-n">2</div><p><span class="who">jukebarweb</span> replaces the bar's <code class="inline">BarSession</code> in <code class="inline">_bars</code> wholesale. Nothing is merged — every register is a clean slate.</p>
-      <div class="step-n">3</div><p><span class="who">Host</span> then calls <code class="inline">POST /api/host/sync</code> every ~5s with played/approved ids and the current up-next queue; the response carries back any <code class="inline">pending_actions</code> queued by an admin.</p>
+      <div class="step-n">1</div><p><span class="who">Host</span> registers once at launch - <code class="inline">AppState.hostRegisterOnRelay()</code> / <code class="inline">RelayService.register()</code> - sending full catalog, bar details, and settings to <code class="inline">POST /api/host/register</code>. This is strictly the internet-relay registration that lets jukebars.com customers browse/request - it's separate from the community-map opt-in (<code class="inline">POST /api/map/register</code>, flow E below), which any bar can call regardless of connection mode.</p>
+      <div class="step-n">2</div><p><span class="who">jukebarweb</span> replaces the bar's <code class="inline">BarSession</code> in <code class="inline">_bars</code> wholesale. Nothing is merged - every register is a clean slate. (The "keep the 3 most recent, same-name refreshes" playlist logic you may be picturing is a different thing entirely - that lives in <code class="inline">map_register()</code>'s <code class="inline">_map_entries</code>/GCS, not here; see flow E.)</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> then calls <code class="inline">POST /api/host/sync</code> every ~5s - this is the main two-way channel. <b>Host&rarr;relay:</b> <code class="inline">played_request_ids</code>, <code class="inline">approved_request_ids</code> (Android bartender-screen approvals), and the authoritative <code class="inline">up_next</code> queue. <b>Relay&rarr;host:</b> <code class="inline">requests</code> (new pending customer requests since last sync) and <code class="inline">actions</code> (queued <code class="inline">pending_actions</code> - <code class="inline">approve</code>/<code class="inline">deny</code>/<code class="inline">control</code>/<code class="inline">settings_update</code>/<code class="inline">stop_session</code> - which are cleared from the queue once sent).</p>
     </div>
 
-    <p class="flow-title"><span class="n">B</span>Admin flips a setting</p>
+    <p class="flow-title"><span class="n">B</span>Admin flips a setting <span class="sub">(any admin surface - kiosk-native, LAN, or Internet)</span></p>
     <div class="flow">
-      <div class="step-n">1</div><p><span class="who">Admin (LAN)</span> posts straight to the host's own <code class="inline">/api/admin/settings</code> — takes effect immediately, no relay involved. <span class="who">Admin (Internet)</span> instead posts to jukebarweb's <code class="inline">POST /api/bar/&#123;id&#125;/settings</code>, which queues a <code class="inline">pending_action</code> and also optimistically patches its own in-memory <code class="inline">BarSession</code> so the admin page doesn't see a stale value for the next 0–10s.</p>
-      <div class="step-n">2</div><p><span class="who">Host</span> picks up the pending action on its next sync response and updates its local <code class="inline">BarDetails</code> / <code class="inline">HostConfig</code>.</p>
-      <div class="step-n">3</div><p><span class="who">Host</span> re-registers with the new state, which becomes the new canonical value everywhere.</p>
+      <div class="step-n">1</div><p><span class="who">Admin (LAN)</span> posts straight to the host's own <code class="inline">/api/admin/settings</code> - takes effect immediately, no relay involved. <span class="who">Admin (Internet)</span> instead posts to jukebarweb's <code class="inline">POST /api/bar/&#123;id&#125;/settings</code>, which only queues a <code class="inline">pending_action</code> (tagged with a bumped per-field version number in <code class="inline">BarSession.settings_version</code>) - it does <b>not</b> patch <code class="inline">bar.stripe_enabled</code>/<code class="inline">bartender_enabled</code> itself; the field is marked pending in <code class="inline">settings_pending</code> until the host confirms. <code class="inline">admin.html</code>/<code class="inline">bartender.html</code> lock that toggle (dimmed, unclickable, "&middot;&middot;&middot; updating") the instant they click, and every other Internet client polling the same bar sees the same lock via <code class="inline">settings_pending</code> in <code class="inline">bar_catalog()</code>/<code class="inline">bartender_requests()</code> - concurrent changes to the same field are queued, not rejected (last one applied wins). <span class="who">Admin (kiosk-native)</span> - <code class="inline">AdminView.swift</code> / <code class="inline">AdminScreen.kt</code> - skips HTTP entirely and writes the local config in-process.</p>
+      <div class="step-n">2</div><p><span class="who">Host</span> picks up the pending request for an action from its next sync response and updates its local <code class="inline">BarDetails</code> / <code class="inline">HostConfig</code>, remembering the action's version tag. (Kiosk-native admin already did this in step 1, so this step is a no-op for that path.)</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> echoes its current settings + the version tag back on <b>every</b> <code class="inline">POST /api/host/sync</code> call from now on, unconditionally - not a one-shot confirmation. <span class="who">jukebarweb</span> only applies an incoming echo if its version is newer than <code class="inline">settings_confirmed_version</code>, then clears <code class="inline">settings_pending</code> for that field. This makes a single dropped sync self-heal on the next one 5s later (no ack handshake needed) and makes a stale echo for a since-superseded request harmless (its version is too low to win). Separately, <code class="inline">pushPaymentSettings()</code> / <code class="inline">propagateBarDetails()</code> still refreshes the host's own local <code class="inline">/api/catalog</code>/<code class="inline">/api/nowplaying</code> cache immediately for LAN/kiosk pollers, and re-registers with <code class="inline">POST /api/host/register</code> if in internet mode.</p>
     </div>
 
-    <p class="flow-title"><span class="n">C</span>A customer requests a song</p>
+    <p class="flow-title"><span class="n">C</span>A customer requests a song, free or pay-to-bartender <span class="sub">(the Stripe/CC path is flow D - it skips the pending queue entirely)</span></p>
     <div class="flow">
-      <div class="step-n">1</div><p><span class="who">Customer</span> submits from whichever surface they're on — kiosk, Wi-Fi page, or jukebars.com — to <code class="inline">/api/request</code> (host) or <code class="inline">/api/bar/&#123;id&#125;/request</code> (relay).</p>
-      <div class="step-n">2</div><p>Approval mode is derived from two flags, never a separate enum: <code class="inline">stripe_enabled</code> and <code class="inline">bartender_enabled</code>. Both off means free and auto-accepted immediately; either on means it lands in the bartender's pending queue.</p>
-      <div class="step-n">3</div><p><span class="who">Host</span> injects approved song ids straight into <code class="inline">PlaybackCoordinator</code> / <code class="inline">MusicService</code>, and reports it back up through the next sync so the relay's up-next queue matches.</p>
+      <div class="step-n">1</div><p><span class="who">Customer</span> submits from whichever surface they're on - kiosk, Wi-Fi/hotspot page, or jukebars.com - to <code class="inline">/api/request</code> (host) or <code class="inline">/api/bar/&#123;id&#125;/request</code> (relay).</p>
+      <div class="step-n">2</div><p>Approval mode is derived from the combination of two flags: <code class="inline">stripe_enabled</code> and <code class="inline">bartender_enabled</code>. Both off means free and auto-accepted immediately; either on means it lands in the bartender's pending queue. This only describes the free/pay-to-bartender path - a Stripe/CC request never goes through this pending queue at all, regardless of these flags (see flow D: <code class="inline">payment-confirmed</code> creates an already-<code class="inline">paid=True</code> request that the host auto-injects on sight).</p>
+      <div class="step-n">3</div><p><span class="who">Host</span> when requests are either approved by bartender, OR are paid with CC, the code injects approved song ids straight into <code class="inline">PlaybackCoordinator</code> / <code class="inline">MusicService</code>, and reports it back up through the next sync so the relay's up-next queue matches. The same in-process update also flows into the host's own LAN <code class="inline">/api/nowplaying</code> / <code class="inline">/api/init</code> responses immediately, so Wi-Fi/hotspot clients see it on their next poll without waiting on the relay round trip.</p>
     </div>
 
     <p class="flow-title"><span class="n">D</span>Stripe payment vs. "stop taking requests"</p>
     <div class="flow">
-      <div class="step-n">1</div><p><span class="who">Customer</span> hits Pay with Card, which calls <code class="inline">create-payment-intent</code> — no money has moved yet, so this is freely rejectable.</p>
-      <div class="step-n">2</div><p>If <code class="inline">accepting_requests</code> is <code>false</code>, both <code class="inline">/request</code> and <code class="inline">/create-payment-intent</code> return <code class="inline">403</code> immediately (within one ~5s poll, the button itself disappears on every customer surface).</p>
-      <div class="step-n">3</div><p><code class="inline">payment-confirmed</code> is the one call that is <b>never</b> gated — by the time it fires, Stripe has already charged the card, so the request is honored regardless of the flag. A late straggler gets refunded in cash by the bartender, not by code.</p>
+      <div class="step-n">1</div><p><span class="who">Customer</span> hits Pay with Card, which calls <code class="inline">create-payment-intent</code> - no money has moved yet, so this is freely rejectable.</p>
+      <div class="step-n">2</div><p>If <code class="inline">accepting_requests</code> becomes <code>false</code> in the meantime, both <code class="inline">/request</code> and <code class="inline">/create-payment-intent</code> return <code class="inline">403</code> immediately (within one ~5s poll, the button itself disappears on every customer surface).</p>
+      <div class="step-n">3</div><p><code class="inline">payment-confirmed</code> is the one call that is <b>never</b> gated - by the time it fires, Stripe has already charged the card, so the request is honored regardless of the flag. If the bartender insists and can not let those late songs play out, the late straggler can get refunded in cash by the bartender, not by code (bartender still sees auto-approved CC requests coming in on its admin screen).</p>
     </div>
 
-    <p class="flow-title"><span class="n">E</span>Genre profiling — the full round trip through GCS and back to the host</p>
+    <p class="flow-title"><span class="n">E</span>Genre profiling - the full round trip through GCS and back to the host</p>
     <div class="flow">
-      <div class="step-n">1</div><p><span class="who">Host</span> calls <code class="inline">POST /api/map/register</code> whenever a bar opts into the public map — playlist name, note, and the artist list (with per-artist song counts). This is separate from the register/sync loop; it only fires on setup or playlist change, not every 5s.</p>
-      <div class="step-n">2</div><p><span class="who">jukebarweb</span>'s <code class="inline">map_register()</code> merges this into <code class="inline">_map_entries</code> and immediately calls <code class="inline">_save_map_entries()</code>, writing the whole table to <code class="inline">map_entries.json</code> on GCS via <code class="inline">gcs_store.py</code> — so far, no Last.fm call and no Home Mac Server involvement at all.</p>
-      <div class="step-n">3</div><p><span class="who">Home Mac Server</span>'s <code class="inline">profile_daemon.py</code>, on its own ~5-minute cycle, reads that same <code class="inline">map_entries.json</code>, diffs it against what it profiled last time, and calls Last.fm for any artist not already in <code class="inline">band_cache.json</code>. It writes the result back to GCS as <code class="inline">map/&#123;bar_id&#125;/profile.json</code> (and a per-bar <code class="inline">artist_genres.json</code> — genre + top tags per artist).</p>
-      <div class="step-n">4</div><p><span class="who">jukebarweb</span> never talks to Home Mac Server directly — it just polls its own GCS read on a timer (<code class="inline">_maybe_refresh_profiles()</code>, every <code class="inline">PROFILE_CACHE_TTL</code>s) and caches the result in <code class="inline">_bar_profiles</code>, which is what <code class="inline">GET /discover</code> and <code class="inline">GET /api/bar/&#123;id&#125;/genres</code> actually serve.</p>
-      <div class="step-n">5</div><p><span class="who">Host</span> fetches <code class="inline">/api/bar/&#123;id&#125;/genres</code> after registering (retrying if profiling isn't done yet) and uses it to color band bubbles in its own catalog browser. That colored genre map then gets folded into the <b>host's own</b> LAN catalog responses and its relay register/sync payload — so a Wi-Fi customer and an internet customer both end up seeing the same colors, but both got them by way of the host, not by asking jukebarweb directly.</p>
+      <div class="step-n">1</div><p><span class="who">Host</span> calls <code class="inline">POST /api/map/register</code> whenever a bar opts into their bar and their latest 3 playlists (bands only) being seen on the public map - playlist name, note, and the 2 list (with per-artist song counts). This is separate from the register/sync loop; it only fires on setup or playlist change, not every 5s.</p>
+      <div class="step-n">2</div><p><span class="who">jukebarweb</span>'s <code class="inline">map_register()</code> merges this into <code class="inline">_map_entries</code> and immediately calls <code class="inline">_save_map_entries()</code>, writing the whole table to <code class="inline">map_entries.json</code> on GCS via <code class="inline">gcs_store.py</code> - so far, no Last.fm call and no Home Mac Server involvement at all.</p>
+      <div class="step-n">3</div><p><span class="who">Home Mac Server</span>'s <code class="inline">profile_daemon.py</code>, on its own ~5-minute cycle, reads that same <code class="inline">map_entries.json</code>, diffs it against what it profiled last time, and calls Last.fm for any artist not already in <code class="inline">band_cache.json</code>. It writes the result back to GCS as <code class="inline">map/&#123;bar_id&#125;/profile.json</code> (and a per-bar <code class="inline">artist_genres.json</code> - genre + top tags per artist).</p>
+      <div class="step-n">4</div><p><span class="who">jukebarweb</span> never talks to Home Mac Server directly - it just polls its own GCS read on a timer (<code class="inline">_maybe_refresh_profiles()</code>, every <code class="inline">PROFILE_CACHE_TTL</code>s) and caches the result in <code class="inline">_bar_profiles</code>, which is what <code class="inline">GET /discover</code> and <code class="inline">GET /api/bar/&#123;id&#125;/genres</code> actually serve.</p>
+      <div class="step-n">5</div><p><span class="who">Host</span> fetches <code class="inline">/api/bar/&#123;id&#125;/genres</code> after registering (retrying if profiling isn't done yet) and uses it to color band bubbles in its own catalog browser. That colored genre map then gets folded into the <b>host's own</b> LAN catalog responses and its relay register/sync payload - so a Wi-Fi customer and an internet customer both end up seeing the same colors, but both got them by way of the host, not by asking jukebarweb directly.</p>
     </div>
   </section>
 
@@ -721,8 +740,8 @@
       <table class="prose-table">
         <thead><tr><th>Page type</th><th>Kiosk-native</th><th>Wi-Fi-served LAN HTML</th><th>Internet (jukebars.com)</th></tr></thead>
         <tbody>
-          <tr><td><b>Admin</b></td><td>AdminView.swift &middot; AdminScreen.kt</td><td>WebApps/admin.html &middot; assets/admin.html</td><td rowspan="3" style="vertical-align:middle">static/admin.html · bartender.html · customer.html — one shared page, no iOS/Android branching</td></tr>
-          <tr><td><b>Bartender</b> <span style="color:var(--ink-mute);font-size:12px">(no kiosk — own device)</span></td><td>—</td><td>WebApps/bartender.html &middot; assets/bartender.html</td></tr>
+          <tr><td><b>Admin</b></td><td>AdminView.swift &middot; AdminScreen.kt</td><td>WebApps/admin.html &middot; assets/admin.html</td><td rowspan="3" style="vertical-align:middle">static/admin.html · bartender.html · customer.html - one shared page, no iOS/Android branching</td></tr>
+          <tr><td><b>Bartender</b> <span style="color:var(--ink-mute);font-size:12px">(no kiosk - own device)</span></td><td>-</td><td>WebApps/bartender.html &middot; assets/bartender.html</td></tr>
           <tr><td><b>Customer</b></td><td>KioskView.swift &middot; KioskView.kt + LocalRequestSheet.kt</td><td>WebApps/customer.html &middot; assets/customer.html</td></tr>
         </tbody>
       </table>
@@ -736,17 +755,17 @@
         <thead><tr><th>Process</th><th>Where</th><th>Lifetime</th></tr></thead>
         <tbody>
           <tr><td>JukeBar (iOS host app)</td><td>An iPhone/iPad at the bar</td><td>Foreground kiosk app, indefinitely</td></tr>
-          <tr><td>spotonjukebar (Android host app)</td><td>An Android tablet at the bar</td><td>Foreground kiosk app + <code class="inline">LanForegroundService</code> keeping the embedded server alive under OEM battery management</td></tr>
-          <tr><td>jukebarweb web service</td><td>Render, <code class="inline">uvicorn main:app</code></td><td>Always-on dyno, serves jukebars.com</td></tr>
-          <tr><td>profile_daemon.py</td><td><b>Home Mac Server</b> — a physical always-on Mac at the user's home, not Render</td><td>LaunchAgent (<code class="inline">com.jukebar.profiler.plist</code>), <code class="inline">caffeinate -is</code> keeps it running lid-closed; restarted via <code class="inline">restart_daemon.sh</code> (git pull + reload)</td></tr>
-          <tr><td>Stripe, Last.fm, Spotify, Apple Music, GCS</td><td>External, third-party</td><td>Called on demand; nothing polls them continuously except the profiling daemon</td></tr>
+          <tr><td>spotonjukebar (Android host app)</td><td>An Android phone/tablet at the bar</td><td>Foreground kiosk app + <code class="inline">LanForegroundService</code> keeping the embedded server alive under OEM battery management</td></tr>
+          <tr><td>jukebarweb web service</td><td>Render, <code class="inline">uvicorn main:app</code></td><td>Always-on dyno; hosts pages for remote access through Internet option (admin/bartender/customer); also serves jukebars.com</td></tr>
+          <tr><td>profile_daemon.py</td><td><b>Home Mac Server</b> - a physical always-on Mac at the system owner's home, not Render</td><td>LaunchAgent (<code class="inline">com.jukebar.profiler.plist</code>), <code class="inline">caffeinate -is</code> keeps it running lid-closed; restarted via <code class="inline">restart_daemon.sh</code> (git pull + reload); the same job can run anywhere else too, like on Render (but sparing the processing for now)</td></tr>
+          <tr><td>Stripe, Last.fm, Spotify, Apple Music, GCS</td><td>External, third-party</td><td>Called on demand; nothing polls them continuously except the profiling daemon, IF it finds new bands to profile in playlists</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <footer>
-    <span>docs/architecture.html — kept by hand alongside CLAUDE.md, not generated</span>
+    <span>docs/architecture.html - kept by hand alongside CLAUDE.md, not generated</span>
     <span>Source of truth for "what calls what": grep the repos, not this page, if the two disagree</span>
   </footer>
 </div>
@@ -784,105 +803,105 @@
   });
 })();
 
-// Node info panel — content hand-copied from each file's own header comment
+// Node info panel - content hand-copied from each file's own header comment
 // (RESPONSIBILITY / CALLED BY / KEY METHODS). Source of truth is the file,
 // not this object; re-sync by hand if a header comment changes.
 const NODE_INFO = {
   'ios-kiosk': {
     title: 'KioskView.swift', path: '~/dev/giffy/JukeBar/JukeBar/KioskView.swift',
-    responsibility: 'The on-device kiosk screen — now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only iOS surface with no HTML equivalent (its WiFi/internet counterparts are WebApps/customer.html and static/customer.html).',
+    responsibility: 'The on-device kiosk screen - now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only iOS surface with no HTML equivalent (its WiFi/internet counterparts are WebApps/customer.html and static/customer.html).',
     calledBy: "Presented once setup completes (see the app's root view).",
-    keyMethods: '<ul><li><code>allowsLocalRequest</code> (computed) — gates the Request button on acceptingRequests + payment settings</li><li><code>UpNextBadge</code> / <code>ApprovedQueueOverlay</code> — measured per-letter Canvas layout, mirrors customer.html\'s SVG version</li><li><code>qrColumns()</code> — the actual QR image is <code>QRImageView</code> in QRCodeView.swift</li></ul>',
+    keyMethods: '<ul><li><code>allowsLocalRequest</code> (computed) - gates the Request button on acceptingRequests + payment settings</li><li><code>UpNextBadge</code> / <code>ApprovedQueueOverlay</code> - measured per-letter Canvas layout, mirrors customer.html\'s SVG version</li><li><code>qrColumns()</code> - the actual QR image is <code>QRImageView</code> in QRCodeView.swift</li></ul>',
   },
   'ios-localserver': {
     title: 'LocalServer.swift', path: '~/dev/giffy/JukeBar/JukeBar/LocalServer.swift',
     responsibility: 'The embedded HTTP server (Swifter, :8080) that serves WebApps/ (admin, bartender, customer html) and the LAN API when the host is in Wi-Fi/Hotspot/Local mode.',
     calledBy: 'AppState.swift (start/stop); browsers on the same LAN for every request/admin/bartender page.',
-    keyMethods: '<ul><li><code>/api/request</code> and <code>/api/create-payment-intent</code> handlers — both gated by <code>cfg.acceptingRequests</code></li><li><code>/api/payment-confirmed</code> — deliberately never gated, the charge already happened</li><li><code>preloadCatalog()</code> — the pre-serialized cache both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
+    keyMethods: '<ul><li><code>/api/request</code> and <code>/api/create-payment-intent</code> handlers - both gated by <code>cfg.acceptingRequests</code></li><li><code>/api/payment-confirmed</code> - deliberately never gated, the charge already happened</li><li><code>preloadCatalog()</code> - the pre-serialized cache both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
   },
   'ios-appstate': {
     title: 'AppState.swift', path: '~/dev/giffy/JukeBar/JukeBar/AppState.swift',
-    responsibility: 'Owns the register + 5s sync loop with jukebarweb — internet mode only — plus overall app/session state.',
+    responsibility: 'Owns the register + 5s sync loop with jukebarweb - internet mode only - plus overall app/session state.',
     calledBy: "The app's root view (environment object); LocalServer.swift reads hostConfig from it for live settings.",
-    keyMethods: '<ul><li><code>hostRegisterOnRelay()</code> — full re-register</li><li><code>startSyncLoop()</code> / <code>syncOnce()</code> — the 5s heartbeat</li><li><code>pushPaymentSettings()</code> — fires an immediate register rather than waiting for the next sync tick</li></ul>',
+    keyMethods: '<ul><li><code>hostRegisterOnRelay()</code> - full re-register</li><li><code>startSyncLoop()</code> / <code>syncOnce()</code> - the 5s heartbeat, also echoes current settings + a per-field version tag every call so the relay can confirm a pending admin toggle (see flow B)</li><li><code>processIncomingActions()</code> - applies inbound settings_update actions and records their version tags into settingsVersions</li><li><code>pushPaymentSettings()</code> - fires an immediate register rather than waiting for the next sync tick</li></ul>',
   },
   'ios-music': {
     title: 'MusicService.swift', path: '~/dev/giffy/JukeBar/JukeBar/MusicService.swift',
     responsibility: 'Owns actual song playback via Apple Music (MPMusicPlayerController). The only place in the iOS app that talks to Apple Music.',
     calledBy: 'KioskView.swift (play/pause/skip controls); LocalServer.swift and AppState.swift inject approved request song ids here.',
-    keyMethods: '<ul><li><code>injectRequest()</code> — splices approved songs into the running queue</li><li><code>resume()</code> / <code>pause()</code> / <code>skipToNext()</code> / <code>skipToPrevious()</code> — the player controls surfaced to <code>/api/player/*</code></li></ul>',
+    keyMethods: '<ul><li><code>injectRequest()</code> - splices approved songs into the running queue</li><li><code>resume()</code> / <code>pause()</code> / <code>skipToNext()</code> / <code>skipToPrevious()</code> - the player controls surfaced to <code>/api/player/*</code></li></ul>',
   },
   'ios-webapps': {
     title: 'WebApps/*.html', path: '~/dev/giffy/JukeBar/JukeBar/WebApps/{admin,bartender,customer}.html',
-    responsibility: 'WiFi-served LAN pages — same behavior as jukebarweb\'s static/*.html equivalents, served locally instead of over the internet.',
-    calledBy: 'Browser on the same LAN/hotspot as the host — served by LocalServer.swift\'s "/admin", "/bartender", "/" routes.',
+    responsibility: 'WiFi-served LAN pages - same behavior as jukebarweb\'s static/*.html equivalents, served locally instead of over the internet.',
+    calledBy: 'Browser on the same LAN/hotspot as the host - served by LocalServer.swift\'s "/admin", "/bartender", "/" routes.',
     keyMethods: '<ul><li>customer.html: <code>fetchNowPlaying()</code> carries live payment settings AND accepting_requests; duration arrives as <code>duration_seconds</code> directly</li><li>admin.html: posts to <code>/api/admin/settings</code>, calls back into AppState.swift</li></ul>',
   },
   'and-kiosk': {
     title: 'KioskView.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/ui/KioskView.kt',
-    responsibility: "The on-device kiosk screen — now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only Android surface with no HTML equivalent (its WiFi/internet counterparts are assets/customer.html and static/customer.html).",
+    responsibility: "The on-device kiosk screen - now-playing, Up Next badge + Approved Queue overlay, Request/Pay buttons, QR codes. The only Android surface with no HTML equivalent (its WiFi/internet counterparts are assets/customer.html and static/customer.html).",
     calledBy: 'MainActivity.kt, once setup is complete.',
-    keyMethods: '<ul><li><code>KioskView()</code> — top-level composable, branches on landscape vs. portrait and isRemoteOnly</li><li><code>UpNextBadge()</code> / <code>ApprovedQueueOverlay()</code> — Canvas-based, measured per-letter layout</li><li><code>upNextRowCount()</code> — screen-height-driven row count, not a device-class assumption</li></ul>',
+    keyMethods: '<ul><li><code>KioskView()</code> - top-level composable, branches on landscape vs. portrait and isRemoteOnly</li><li><code>UpNextBadge()</code> / <code>ApprovedQueueOverlay()</code> - Canvas-based, measured per-letter layout</li><li><code>upNextRowCount()</code> - screen-height-driven row count, not a device-class assumption</li></ul>',
   },
   'and-localserver': {
     title: 'LocalServer.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/local/LocalServer.kt',
     responsibility: 'The embedded HTTP server (NanoHTTPD, :8080) that serves assets/ (admin, bartender, customer html) and the LAN API when the host is in Wi-Fi/Hotspot/Local mode. Kept alive under Samsung Freecess by LanForegroundService.',
     calledBy: 'MainActivity.kt (start/stop); browsers on the same LAN for every request/admin/bartender page.',
-    keyMethods: '<ul><li><code>handleSubmitRequest()</code> / <code>handleCreatePaymentIntent()</code> — both gated by <code>BarDetails.acceptingRequests</code></li><li><code>handlePaymentConfirmed()</code> — deliberately never gated</li><li><code>catalogJson()</code> — the single source both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
+    keyMethods: '<ul><li><code>handleSubmitRequest()</code> / <code>handleCreatePaymentIntent()</code> - both gated by <code>BarDetails.acceptingRequests</code></li><li><code>handlePaymentConfirmed()</code> - deliberately never gated</li><li><code>catalogJson()</code> - the single source both <code>/api/init</code> and <code>/api/catalog</code> serve from</li></ul>',
   },
   'and-relay': {
     title: 'RelayService.kt / RelayClient.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/relay/{RelayService,RelayClient}.kt',
     responsibility: 'RelayService owns the register + 5s sync loop (scheduling + state); RelayClient is the raw HTTP client underneath it with no scheduling of its own.',
     calledBy: 'MainActivity.kt starts/stops RelayService; RelayService is the only caller of RelayClient.',
-    keyMethods: '<ul><li><code>pushBarDetails()</code> — fires an immediate <code>register()</code> rather than waiting for the next sync tick</li><li><code>register()</code> — full re-register (catalog + BarDetails + accepting_requests)</li><li><code>sync()</code> — the 5s heartbeat</li><li><code>registerMap()</code> — the separate <code>/api/map/register</code> call, only sent when a bar opts into the public map</li></ul>',
+    keyMethods: '<ul><li><code>pushBarDetails()</code> - fires an immediate <code>register()</code> rather than waiting for the next sync tick</li><li><code>register()</code> - full re-register (catalog + BarDetails + accepting_requests)</li><li><code>sync()</code> - the 5s heartbeat, also echoes current settings + a per-field version tag every call (RelayService\'s settingsVersions map) so the relay can confirm a pending admin toggle (see flow B)</li><li><code>registerMap()</code> - the separate <code>/api/map/register</code> call, only sent when a bar opts into the public map</li></ul>',
   },
   'and-playback': {
     title: 'PlaybackCoordinator.kt', path: '~/dev/giffy/spotonjukebar/app/src/main/java/com/giffy/spotonjukebar/playback/PlaybackCoordinator.kt',
-    responsibility: 'Owns actual song playback — Spotify App Remote when available, local ExoPlayer as fallback. The only place that talks to the Spotify Web API.',
+    responsibility: 'Owns actual song playback - Spotify App Remote when available, local ExoPlayer as fallback. The only place that talks to the Spotify Web API.',
     calledBy: 'MainActivity.kt (setup/session lifecycle); LocalServer.kt and RelayService.kt inject approved request song ids here.',
-    keyMethods: '<ul><li><code>playSpotify()</code> / <code>playLocal()</code> — the two playback paths</li><li><code>pollSpotifyEnd()</code> — Spotify App Remote has no reliable track-end callback, so this polls playback position instead</li></ul>',
+    keyMethods: '<ul><li><code>playSpotify()</code> / <code>playLocal()</code> - the two playback paths</li><li><code>pollSpotifyEnd()</code> - Spotify App Remote has no reliable track-end callback, so this polls playback position instead</li></ul>',
   },
   'and-assets': {
     title: 'assets/*.html', path: '~/dev/giffy/spotonjukebar/app/src/main/assets/{admin,bartender,customer}.html',
-    responsibility: "WiFi-served LAN pages — same behavior as jukebarweb's static/*.html equivalents, served locally instead of over the internet.",
-    calledBy: 'Browser on the same LAN/hotspot as the host — served by LocalServer.kt\'s "/admin", "/bartender", "/request" routes.',
+    responsibility: "WiFi-served LAN pages - same behavior as jukebarweb's static/*.html equivalents, served locally instead of over the internet.",
+    calledBy: 'Browser on the same LAN/hotspot as the host - served by LocalServer.kt\'s "/admin", "/bartender", "/request" routes.',
     keyMethods: '<ul><li>customer.html: <code>fetchNowPlaying()</code> carries live payment settings AND accepting_requests, unlike jukebarweb\'s single <code>fetchDisplay()</code>; <code>applyMeta()</code> sets initial state from <code>/api/init</code></li><li>admin.html: posts to <code>/api/admin/settings</code>, calls back into MainActivity.kt</li></ul>',
   },
   'relay-main': {
     title: 'main.py', path: '/Users/laszlo/PycharmProjects/jukebarweb/main.py',
-    responsibility: 'Single-file FastAPI app — the relay between iOS/Android hosts and internet-mode customers/admins/bartenders, plus the public jukebars.com community pages. Holds all bar state in memory only (BarSession).',
+    responsibility: 'Single-file FastAPI app - the relay between iOS/Android hosts and internet-mode customers/admins/bartenders, plus the public jukebars.com community pages. Holds all bar state in memory only (BarSession).',
     calledBy: 'Hosts (AppState.swift / RelayService.kt) over /api/host/*; browsers over /api/bar/{id}/* and /admin, /bartender, /. Never called by profile_daemon.py.',
-    keyMethods: '<ul><li><code>host_register()</code> / <code>host_sync()</code> — full re-register vs. the 5s heartbeat</li><li><code>bar_request()</code> / <code>bar_create_payment_intent()</code> / <code>bar_payment_confirmed()</code> — the accepting_requests gate lives in the first two only</li><li><code>map_register()</code> / <code>_load_bar_profiles_sync()</code> — the map/discovery + genre round-trip through GCS (see flow E)</li><li><code>bar_settings()</code> — optimistic-apply: patches BarSession immediately, then queues a pending_action</li></ul>',
+    keyMethods: '<ul><li><code>host_register()</code> / <code>host_sync()</code> - full re-register vs. the 5s heartbeat</li><li><code>bar_request()</code> / <code>bar_create_payment_intent()</code> / <code>bar_payment_confirmed()</code> - the accepting_requests gate lives in the first two only</li><li><code>map_register()</code> / <code>_load_bar_profiles_sync()</code> - the map/discovery + genre round-trip through GCS (see flow E)</li><li><code>bar_settings()</code> / <code>host_sync()</code> - versioned settings confirmation: bar_settings() only queues intent, host_sync()\'s settings echo is what actually applies a field (see flow B)</li></ul>',
   },
   'relay-barsession': {
     title: 'class BarSession', path: '/Users/laszlo/PycharmProjects/jukebarweb/main.py',
-    responsibility: "One bar's entire live state — catalog, settings, pending requests, up-next queue — held in memory only, keyed by jukebar_id in the module-level _bars dict. Rebuilt wholesale on every register(), never merged.",
+    responsibility: "One bar's entire live state - catalog, settings, pending requests, up-next queue - held in memory only, keyed by jukebar_id in the module-level _bars dict. Rebuilt wholesale on every register(), never merged.",
     calledBy: 'Every /api/bar/{id}/* and /api/host/* handler in main.py.',
-    keyMethods: '<ul><li><code>require_approval</code> (property) — derives approval mode from stripe_enabled/bartender_enabled rather than storing a separate flag</li></ul>',
+    keyMethods: '<ul><li><code>require_approval</code> (property) - derives approval mode from stripe_enabled/bartender_enabled rather than storing a separate flag</li><li><code>settings_version</code> / <code>settings_pending</code> / <code>settings_confirmed_version</code> - per-field version bookkeeping for the settings lock-until-confirmed mechanism (see flow B); bar_settings() only writes the first two, host_sync()\'s echo handling is what writes bar.stripe_enabled/bartender_enabled themselves</li></ul>',
   },
   'relay-static': {
     title: 'static/*.html', path: '/Users/laszlo/PycharmProjects/jukebarweb/static/{admin,bartender,customer,discover,index}.html',
-    responsibility: 'The five public/internet-mode pages. customer.html has no iOS/Android branching — identical markup regardless of host platform.',
-    calledBy: 'Browser at jukebars.com — served by admin_page() / bartender_page() / bar_page() / discover() / index() in main.py.',
-    keyMethods: '<ul><li>customer.html: <code>fetchDisplay()</code> — the poll loop that also drives the accepting_requests gate</li><li>discover.html: <code>genreColor()</code> — the single color-lookup shared by pie chart and band bubbles</li></ul>',
+    responsibility: 'The five public/internet-mode pages. customer.html has no iOS/Android branching - identical markup regardless of host platform.',
+    calledBy: 'Browser at jukebars.com - served by admin_page() / bartender_page() / bar_page() / discover() / index() in main.py.',
+    keyMethods: '<ul><li>customer.html: <code>fetchDisplay()</code> - the poll loop that also drives the accepting_requests gate</li><li>admin.html / bartender.html: <code>togglePayment()</code> / <code>toggleBtPayment()</code> - lock the clicked toggle (dimmed, unclickable) immediately, don\'t predict the new value, unlock only once <code>settings_pending</code> (from bar_catalog()/bartender_requests()) drops that field (see flow B)</li><li>discover.html: <code>genreColor()</code> - the single color-lookup shared by pie chart and band bubbles</li></ul>',
   },
   'relay-gcsstore': {
     title: 'gcs_store.py', path: '/Users/laszlo/PycharmProjects/jukebarweb/gcs_store.py',
     responsibility: 'Thin read/write wrapper around one GCS bucket. The only file in this repo that imports the Google Cloud Storage SDK.',
     calledBy: 'main.py (Render) for map_entries.json and cached profile.json reads; profile_daemon.py (Home Mac Server) for band_cache.json and writing profile.json/artist_genres.json. Same file, two independent runtimes.',
-    keyMethods: '<ul><li><code>read(path)</code> / <code>write(path, content)</code> — the entire public surface</li><li><code>_client()</code> — picks credentials: GCS_KEY_JSON env var (Render) vs. GOOGLE_APPLICATION_CREDENTIALS file (Home Mac Server)</li></ul>',
+    keyMethods: '<ul><li><code>read(path)</code> / <code>write(path, content)</code> - the entire public surface</li><li><code>_client()</code> - picks credentials: GCS_KEY_JSON env var (Render) vs. GOOGLE_APPLICATION_CREDENTIALS file (Home Mac Server)</li></ul>',
   },
   'mac-daemon': {
     title: 'profile_daemon.py', path: '~/jukebarweb/profile_daemon.py (on Home Mac Server)',
-    responsibility: 'The genre-profiling loop. Runs on Home Mac Server — a physical always-on Mac at the user\'s home, NOT Render — as a LaunchAgent (com.jukebar.profiler.plist). Reads/writes GCS directly; makes no calls to jukebarweb\'s own API.',
-    calledBy: "Nobody — it's the entry point, started by launchd on boot, kept alive lid-closed via caffeinate -is. Restarted by restart_daemon.sh (git pull + launchctl reload).",
-    keyMethods: '<ul><li>Loads band_cache.json + map_entries.json from GCS</li><li>Re-profiles any playlist where updated_at &gt; profiled_at via lastfm.py, checking band_cache first</li><li>Writes profile.json + artist_genres.json + band_cache.json back to GCS — main.py picks this up later on its own polling timer, never pushed</li></ul>',
+    responsibility: 'The genre-profiling loop. Runs on Home Mac Server - a physical always-on Mac at the user\'s home, NOT Render - as a LaunchAgent (com.jukebar.profiler.plist). Reads/writes GCS directly; makes no calls to jukebarweb\'s own API.',
+    calledBy: "Nobody - it's the entry point, started by launchd on boot, kept alive lid-closed via caffeinate -is. Restarted by restart_daemon.sh (git pull + launchctl reload).",
+    keyMethods: '<ul><li>Loads band_cache.json + map_entries.json from GCS</li><li>Re-profiles any playlist where updated_at &gt; profiled_at via lastfm.py, checking band_cache first</li><li>Writes profile.json + artist_genres.json + band_cache.json back to GCS - main.py picks this up later on its own polling timer, never pushed</li></ul>',
   },
   'mac-lastfm': {
     title: 'lastfm.py', path: '~/jukebarweb/lastfm.py (on Home Mac Server; same file as /Users/laszlo/PycharmProjects/jukebarweb/lastfm.py)',
     responsibility: 'The only module that calls the Last.fm API. Fetches raw artist tags and resolves them into a palette genre + weighted pie contribution, using tag_map.json as the lookup.',
     calledBy: 'profile_daemon.py, on Home Mac Server, once per unprofiled artist per cycle. main.py never calls this directly.',
-    keyMethods: '<ul><li><code>fetch_artist_tags()</code> — raw Last.fm top tags</li><li><code>resolve_artist()</code> — where a raw tag list becomes one palette genre + pie_scores</li><li><code>compute_playlist_pie()</code> / <code>combine_playlist_pies()</code> — normalise and merge multiple playlists</li></ul>',
+    keyMethods: '<ul><li><code>fetch_artist_tags()</code> - raw Last.fm top tags</li><li><code>resolve_artist()</code> - where a raw tag list becomes one palette genre + pie_scores</li><li><code>compute_playlist_pie()</code> / <code>combine_playlist_pies()</code> - normalise and merge multiple playlists</li></ul>',
   },
 };
 

@@ -6,8 +6,9 @@
     payment/request toggles, pending-request queue, session reports.
   CALLED BY: Browser at jukebars.com/admin/{jukebar_id} — served by
     admin_page() in main.py.
-  KEY METHODS: postSetting() — POSTs to /api/bar/{id}/settings, which
-    optimistically patches BarSession before the host even sees the change.
+  KEY METHODS: postSetting() — POSTs to /api/bar/{id}/settings, which only
+    queues intent; togglePayment() locks that row (opacity + no-click) until
+    a later poll reports the field is no longer in settings_pending.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -212,6 +213,8 @@
       width: 18px; height: 18px; border-radius: 50%; background: #666; transition: transform .2s, background .2s;
     }
     .toggle-track.on .toggle-thumb { transform: translateX(18px); background: #fbbe84; }
+    .toggle-track.pending { cursor: default; pointer-events: none; opacity: .5; }
+    .pay-row.pending .pay-label::after { content: ' \00b7\00b7\00b7 updating'; font-size: 11px; color: var(--muted); font-style: italic; }
     .pay-warning { font-size: 11px; color: #fbbf24; margin-top: 8px; display: none; }
     .pay-warning.show { display: block; }
 
@@ -400,11 +403,11 @@
   <div id="pane-actions" class="tab-pane">
     <div class="payment-card" style="margin-top:4px">
       <div class="payment-title">Payments</div>
-      <div class="pay-row">
+      <div class="pay-row" id="row-stripe">
         <span class="pay-label">Stripe 💳</span>
         <div class="toggle-track" id="tog-stripe" onclick="togglePayment('stripe')"><div class="toggle-thumb"></div></div>
       </div>
-      <div class="pay-row">
+      <div class="pay-row" id="row-bartender">
         <span class="pay-label">Pay to bartender</span>
         <div class="toggle-track" id="tog-bartender" onclick="togglePayment('bartender')"><div class="toggle-thumb"></div></div>
       </div>
@@ -414,7 +417,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [] };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
@@ -506,7 +509,7 @@ async function verifyPin() {
 }
 
 async function startMain() {
-  await Promise.all([poll(), fetchNowPlaying(), loadReports(), loadPaymentState()]);
+  await Promise.all([poll(), fetchNowPlaying(), loadReports()]);
   showScreen('s-main');
   const titleEl = $('bar-name');
   colorize(titleEl, 'JukeBar');
@@ -563,20 +566,19 @@ function switchTab(name) {
 }
 
 // ── Payment / Actions toggles ─────────────────────────────────────────────────
-async function loadPaymentState() {
-  try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/catalog?s=${enc(S.session)}`);
-    if (!res.ok) return;
-    const d = await res.json();
-    S.stripeEnabled    = !!d.stripe_enabled;
-    S.bartenderEnabled = d.bartender_enabled !== false;
-    updatePaymentUI();
-  } catch {}
-}
-
+// Settings state (S.stripeEnabled / S.bartenderEnabled / S.settingsPending) is refreshed
+// every 5s from poll()'s /requests response — same one used for the request queue — so
+// there's no separate fetch loop here. A field name in S.settingsPending means: relay
+// has queued a change for it but hasn't yet heard the host's confirmation back; the row
+// stays locked (see updatePaymentUI) until it drops out of that list.
 function updatePaymentUI() {
+  const pending = S.settingsPending || [];
   $('tog-stripe')?.classList.toggle('on', S.stripeEnabled);
+  $('tog-stripe')?.classList.toggle('pending', pending.includes('stripe_enabled'));
+  $('row-stripe')?.classList.toggle('pending', pending.includes('stripe_enabled'));
   $('tog-bartender')?.classList.toggle('on', S.bartenderEnabled);
+  $('tog-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
+  $('row-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
   const warn = $('pay-warning');
   if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled);
 }
@@ -586,19 +588,23 @@ async function postSetting(body) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (res.ok) setTimeout(loadPaymentState, 12000);
   return res.ok;
 }
 
 async function togglePayment(which) {
+  const field = which === 'stripe' ? 'stripe_enabled' : 'bartender_enabled';
+  if ((S.settingsPending || []).includes(field)) return;   // already locked, ignore extra clicks
   const newVal = which === 'stripe' ? !S.stripeEnabled : !S.bartenderEnabled;
   const body   = which === 'stripe' ? { stripe_enabled: newVal } : { bartender_enabled: newVal };
+  S.settingsPending = [...(S.settingsPending || []), field];
+  updatePaymentUI();
   try {
-    if (!await postSetting(body)) return;
-    if (which === 'stripe') S.stripeEnabled = newVal;
-    else S.bartenderEnabled = newVal;
+    if (!await postSetting(body)) throw new Error('post failed');
+  } catch {
+    // Nothing was actually queued server-side - unlock so the bartender can retry.
+    S.settingsPending = S.settingsPending.filter(f => f !== field);
     updatePaymentUI();
-  } catch {}
+  }
 }
 
 // ── Poll (requests) ──────────────────────────────────────────────────────────
@@ -618,6 +624,10 @@ async function poll() {
     S.pricePerSong  = d.price_per_song  || 0;
     S.priceForThree = d.price_for_three || 0;
     S.currency      = d.currency        || '';
+    S.stripeEnabled    = !!d.stripe_enabled;
+    S.bartenderEnabled = d.bartender_enabled !== false;
+    S.settingsPending  = d.settings_pending || [];
+    updatePaymentUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch {}

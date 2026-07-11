@@ -131,3 +131,25 @@ Added Leaflet.markercluster (1.5.3 via CDN). Nearby bars now collapse into a sin
 
 **Map persistence policy (Android fix):**
 Android was calling `unregisterMap` in both `restartSession()` and `resetSetup()`, causing bars to vanish from the map on every app restart. Removed those calls — `MapEntry` records are now long-lived on the server (GCS-persisted). A bar shows as dormant with its last-active date after the 5-min `BAR_TIMEOUT_SECONDS` expires. This matches iOS behaviour. `unregisterMap` should only be called when the user explicitly disables the map listing in the wizard.
+
+---
+
+### 2026-07-10 — architecture.html: resolved `@todo` review comments
+
+**Context:** User dropped ~20 `@todo` comments into `docs/architecture.html` (route inventory, flow diagrams) asking "who calls this, for what, what does it do" for handlers whose purpose wasn't obvious from the diagram alone.
+
+**Resolved by reading `main.py`, iOS `LocalServer.swift`/`AppState.swift`/`AdminView.swift`, and the `static/*.html` fetch call sites:** filled in caller + purpose for every `/api/bar/{id}/*` route and the iOS `LocalServer.swift` route column (which previously had bare function names while the Android column already had descriptions); expanded flow A step 3 into an explicit two-way payload list for `/api/host/sync`; clarified that flow C (free/pay-to-bartender) and flow D (Stripe/CC) are disjoint paths — a paid request never touches the pending-approval queue described in flow C step 2; clarified that `host_register()` (flow A) and `map_register()` (flow E, community map opt-in) are independent registrations that happen to both carry "playlist" data, which was the source of one mix-up.
+
+**Answered live, not written into the doc (per explicit instruction not to change that passage):** yes, the relay's optimistic-apply in `bar_settings()` — patching `BarSession` in memory before the host re-registers — is still exactly what's in `main.py` today (also documented in this repo's `CLAUDE.md`); there's no "wait for host propagation before displaying" branch in the current code, so there are no coded exceptions to it right now.
+
+---
+
+### 2026-07-10 — Confirmed: "pending, locked, awaiting host confirmation" UI exists only on request approve/deny, not on payment toggles
+
+**Context:** User recalled fixing host/admin-screen desync by queuing intent, locking the acted UI element (uneditable, recolored) until the host's confirmation came back, and asked (via git research, no code change) whether this landed on all Render (internet-mode) clients — noting it was never a problem on the LAN/kiosk WiFi-hotspot pages.
+
+**Found via `git log -p -- static/admin.html static/bartender.html`:** commit `a85e852` (2026-06-29, "bartender/admin: color and disable acted request cards immediately") added this to **both** `static/admin.html` and `static/bartender.html` — on Approve/Deny/Play-next click the clicked button relabels to "✓ Sent"/"↑ Sent"/"✗ Sent", siblings fade to `opacity:0.15` + `pointer-events:none`, and an `actedRequests` Map keeps that locked badge showing across every ~5s poll until the request's status stops being `"pending"` (i.e. the host actually confirmed it via `up_next`/`/api/host/sync`).
+
+**Not applied to the payment/settings toggles** (Stripe/Bartender/Auto) in either file — those still flip instantly client-side and just re-fetch true state after a fixed 12s delay (`loadPaymentState`, commit `1977145`), no locked/greyed visual in between. `customer.html` has no equivalent list to lock; its own submit/pay button just does a simpler one-shot "Sending…/Processing…" disable.
+
+**Confirmed absent on the LAN-served variants** (`JukeBar/WebApps/{admin,bartender}.html`, spotonjukebar `assets/{admin,bartender}.html`) — no `actedRequests`/acted-badge code there, consistent with there being no relay round-trip to wait out on those pages.
