@@ -1,0 +1,298 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/ios.html
+
+  RESPONSIBILITY: jukebars.com iOS-specific documentation page — setup guide, network setup,
+    FAQ, and privacy notes that are specific to the iOS/Apple Music version of JukeBar. Static —
+    no polling, no API calls, no host/bar-specific state. Skeleton only; sections below are stubs,
+    see docs/hub_split_plan.md for what goes where.
+  CALLED BY: Browser at jukebars.com/ios — served by ios_docs() in main.py (route not yet wired up).
+  KEY METHODS: none; plain markup.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JukeBar for iOS — Setup, Network &amp; FAQ</title>
+  <meta name="description"
+        content="JukeBar for iOS: setup guide, network configuration, and FAQ for running a bar jukebox on iPhone/iPad with Apple Music.">
+  <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2072%2072'%3E%3Ccircle%20cx='36'%20cy='36'%20r='34'%20fill='%23fbbe84'%20stroke='%23dc7955'%20stroke-width='1.5'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='29'%20fill='%23ffffff'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='24'%20fill='%23fda185'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='12'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='60'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='60'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='12'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+  <style>
+    /* Copied verbatim from static/index.html — keep in sync if the hub's design system changes. */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1a1a1a; --bg2: #111111; --bg3: #222222; --fg: #ffffff; --dim: #888888;
+      --coral: #fda185; --orange: #fbbe84; --yellow: #ffc24a; --brown: #dc7955;
+      --red: #e8406a; --divider: #333333;
+    }
+    body { background: var(--bg); color: var(--fg); font-family: Helvetica, Arial, sans-serif; min-height: 100vh; line-height: 1.65; }
+    a { color: var(--coral); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: var(--bg2); border-bottom: 2px solid var(--divider); padding: 16px 24px; display: flex; align-items: center; gap: 18px; }
+    .logo-svg { flex-shrink: 0; }
+    h1 { font-size: clamp(1.8rem, 5vw, 3rem); line-height: 1.1; }
+    h2 { font-size: clamp(1.3rem, 4vw, 2.1rem); color: var(--coral); margin-bottom: 16px; }
+    h3 { font-size: clamp(0.8rem, 5vw, 1.5); line-height: 1.1; margin: 20px 0 6px; }
+    .tagline { color: var(--dim); font-size: clamp(0.85rem, 2vw, 1rem); margin-top: 2px; }
+    nav { background: var(--bg2); border-bottom: 1px solid var(--divider); padding: 10px 24px; display: flex; gap: 6px; flex-wrap: wrap; }
+    nav a { color: var(--dim); font-size: 0.85rem; padding: 4px 10px; border-radius: 4px; white-space: nowrap; transition: color 0.15s, background 0.15s; }
+    nav a:hover { color: var(--fg); background: var(--bg3); text-decoration: none; }
+    .page { max-width: 740px; margin: 0 auto; padding: 0 20px 60px; }
+    section { padding: 40px 0 0; }
+    section + section { border-top: 1px solid var(--divider); margin-top: 40px; }
+    p { margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+    .tip { background: #1c1a13; border-left: 4px solid var(--yellow); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.93rem; }
+    .tip .tip-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--yellow); font-weight: bold; margin-bottom: 6px; }
+    .tip p { color: var(--dim); margin: 0; }
+    .tip p + p { margin-top: 8px; }
+    .tip strong { color: var(--fg); }
+    .warn { background: #1c1313; border-left-color: var(--red); }
+    .warn .tip-label { color: var(--red); }
+    .steps { list-style: none; counter-reset: steps; padding: 0; }
+    .steps li { counter-increment: steps; display: flex; gap: 16px; margin-bottom: 18px; align-items: flex-start; }
+    .steps li::before { content: counter(steps); flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--brown); color: #fff; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+    .steps li .step-body { flex: 1; }
+    .steps li .step-body strong { color: var(--fg); }
+    .steps li .step-body p { color: var(--dim); font-size: 0.92rem; margin-top: 2px; }
+    .faq { margin-top: 8px; }
+    details { border-bottom: 1px solid var(--divider); padding: 14px 0; }
+    details:first-child { border-top: 1px solid var(--divider); }
+    summary { cursor: pointer; font-weight: bold; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--coral); font-size: 1.2rem; flex-shrink: 0; transition: transform 0.2s; }
+    details[open] summary::after { transform: rotate(45deg); }
+    details .answer { padding-top: 12px; color: var(--dim); font-size: 0.93rem; }
+    details .answer p + p { margin-top: 8px; }
+    details .answer code { background: var(--bg3); border-radius: 4px; padding: 1px 5px; font-family: monospace; font-size: 0.88em; color: var(--orange); }
+    .privacy-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9rem; }
+    .privacy-table th { text-align: left; color: var(--dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 12px; border-bottom: 1px solid var(--divider); }
+    .privacy-table td { padding: 10px 12px; border-bottom: 1px solid var(--divider); vertical-align: top; }
+    .privacy-table tr:last-child td { border-bottom: none; }
+    .check { color: #4ade80; font-weight: bold; }
+    .cross { color: var(--red); }
+    footer { border-top: 1px solid var(--divider); padding: 24px 24px; text-align: center; font-size: 0.85rem; color: var(--dim); margin-top: 60px; }
+    footer a { color: var(--coral); }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg class="logo-svg" width="56" height="56" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#dc7955" stroke-width="1.5"/>
+    <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+    <circle cx="36" cy="36" r="24" fill="#fda185"/>
+    <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+  </svg>
+  <div>
+    <h1>JukeBar <span style="color:var(--dim); font-size:0.5em;">for iOS</span></h1>
+    <div class="tagline">Apple Music bar jukebox — setup, network &amp; FAQ</div>
+  </div>
+</header>
+
+<nav>
+  <a href="/" style="color:var(--coral);font-weight:bold">← All platforms</a>
+  <a href="/android">🤖 Android guide</a>
+  <a href="/discover">🗺 JukeBars on map</a>
+  <a href="#setup">Setup guide</a>
+  <a href="#network">Network setup</a>
+  <a href="#faq">FAQ</a>
+  <a href="#privacy">Privacy</a>
+</nav>
+
+<div class="page">
+
+  <!-- ── Intro ─────────────────────────────────────────────────────────── -->
+  <section id="intro" style="padding-top:32px;">
+    <h2>JukeBar for iOS</h2>
+    <p>JukeBar turns an iPhone or iPad into the whole jukebox: it plays your Apple Music playlist,
+      runs the QR-code request system, and serves the admin/bartender screens — all from one device,
+      no other hardware required. This page is the full manual: first-run setup, network options,
+      troubleshooting, and the Apple Music-specific privacy notes. For the general pitch and pricing
+      model, see the <a href="/">overview page</a>.</p>
+    <div class="tip">
+      <div class="tip-label">Good fit for</div>
+      <p>Bars that already run their music through Apple Music (subscription streaming, or your own
+        purchased/uploaded tracks) and want the whole setup to live on one iPhone or iPad, including
+        offline nights when there's no house WiFi at all.</p>
+    </div>
+  </section>
+
+  <!-- ── Setup guide ────────────────────────────────────────────────────── -->
+  <section id="setup">
+    <h2>Setup guide</h2>
+    <p>JukeBar walks through three screens on first launch (and again any time you use
+      <strong>End Session</strong> from the admin panel — nothing here is a one-time, unchangeable
+      choice).</p>
+
+    <h3>1. Pick a kiosk mode</h3>
+    <p>The very first screen asks how the kiosk should work:</p>
+    <ul class="steps" style="list-style:disc; padding-left:20px;">
+      <li style="display:list-item; margin-bottom:10px;"><strong>Local Only</strong> — requests are
+        entered directly on this device. No customer phones, no QR code, no network needed at all.
+      </li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Remote Only</strong> — customers
+        connect from their own phones after scanning the QR code shown on the kiosk.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Local + Remote</strong> — both at
+        once: some customers can request right on the kiosk, others scan the QR code from their own
+        phone.</li>
+    </ul>
+
+    <h3>2. Pick how customers connect (skipped in Local Only mode)</h3>
+    <p>If you chose Remote Only or Local + Remote, the next screen picks the network type:</p>
+    <ul class="steps" style="list-style:disc; padding-left:20px;">
+      <li style="display:list-item; margin-bottom:10px;"><strong>Bar WiFi</strong> — customers join
+        the same router you're already on.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>iPhone Hotspot</strong> — your iPhone
+        becomes the router (enable first under Settings → Personal Hotspot); customers join your
+        phone's hotspot directly, no external router involved.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Internet / Relay</strong> — customers
+        connect over the internet from anywhere, via a QR link that works off any network. The iPhone
+        still plays the music locally; only requests/approvals/now-playing pass through the relay.</li>
+    </ul>
+
+    <h3>3. The main setup wizard</h3>
+    <ul class="steps">
+      <li><div class="step-body"><strong>Access Apple Music</strong>
+        <p>Grant JukeBar permission to read your Apple Music library and play songs.</p></div></li>
+      <li><div class="step-body"><strong>Pick a playlist</strong>
+        <p>Choose the Apple Music playlist to use as the jukebox source.</p></div></li>
+      <li><div class="step-body"><strong>Name your jukebox &amp; discovery</strong>
+        <p>Give this JukeBar instance a name (useful if you run more than one venue/room). Optionally
+          toggle <strong>"List on JukeBar map"</strong> — this publishes the bar name, an address you
+          type in for the map marker, and the band names from your playlists to the
+          <a href="/discover">JukeBar discovery map</a>. Off by default, changeable any time via
+          End Session.</p></div></li>
+      <li><div class="step-body"><strong>Set the admin PIN</strong>
+        <p>4–6 digits, entered twice to confirm. Leave blank on a re-run to keep the existing PIN.</p></div></li>
+      <li><div class="step-body"><strong>Choose payment methods</strong>
+        <p>Two independent toggles — <strong>💳 Stripe (Pay Online)</strong> and
+          <strong>💵 Pay to bartender</strong> — enable one, both, or neither. Leave both off and
+          every request is free and auto-approved, no bartender action needed. Stripe requires an
+          internet connection, so it's unavailable in Local Only mode.</p></div></li>
+      <li><div class="step-body"><strong>Set prices</strong>
+        <p>Per-song price and a discounted 3-song bundle price, plus your Stripe key if Stripe is
+          enabled. Skip entirely if both payment toggles are off.</p></div></li>
+    </ul>
+
+    <div class="tip">
+      <div class="tip-label">Admin controls</div>
+      <p>Once running, <strong>long-press the bar name</strong> on the kiosk screen and enter your PIN
+        to reach admin controls: playback, catalog refresh, approval-mode toggle, and
+        <strong>End Session</strong> — which is also how you change kiosk mode, network mode, playlist,
+        or any other setup-wizard choice later.</p>
+    </div>
+
+    <h3>Downloading songs</h3>
+    <p>JukeBar plays songs that are downloaded to the device (or streams them if the device has
+      internet and an active Apple Music subscription). In the Apple Music app, open your playlist,
+      tap the download button (⬇), and confirm before starting a session — a cloud icon means a track
+      isn't downloaded yet.</p>
+
+    <h3>Bartender pairing</h3>
+    <p>Share the bartender URL shown in admin settings with your bartender. They open it in any browser
+      on the same network, enter their name and the bar PIN, and are ready to approve requests. The
+      first person to pair becomes session admin; additional bartenders need admin approval.</p>
+  </section>
+
+  <!-- ── Network setup ──────────────────────────────────────────────────── -->
+  <section id="network">
+    <h2>Network setup</h2>
+    <p>The network mode you pick during setup is exactly the three options from the wizard above —
+      this section goes deeper on each.</p>
+
+    <h3>Bar WiFi</h3>
+    <p>Connect the iPhone and all customer/bartender devices to the same router.</p>
+    <div class="tip warn">
+      <div class="tip-label">Common issue — AP isolation</div>
+      <p>Most venue routers have <strong>client isolation</strong> ("AP Isolation") on by default on
+        guest networks — it blocks devices from reaching each other even though they can all reach the
+        internet. <strong>Fix:</strong> disable "Isolate WiFi clients" in the router's guest-network
+        settings and <strong>reboot the router</strong> — many routers need a restart for the change to
+        take effect.</p>
+    </div>
+
+    <h3>iPhone Hotspot</h3>
+    <p>Enable Personal Hotspot in iOS Settings first. Customers and bartenders join the iPhone's
+      hotspot directly — no external router, no isolation issues. Requires a cellular plan that
+      supports hotspot.</p>
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>The most reliable option if you don't control the venue's router settings — the iPhone handles
+        everything itself.</p>
+    </div>
+
+    <h3>Internet / Relay</h3>
+    <p>JukeBar connects to the <strong>jukebars.com</strong> relay over the internet. Customers use a
+      shareable QR link that works on any network; bartenders can approve from anywhere with internet
+      access. The iPhone still plays the music locally — only requests, approvals, and now-playing
+      state pass through the relay, no song audio or personal data included.</p>
+  </section>
+
+  <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
+  <section id="faq">
+    <h2>FAQ — iOS &amp; Apple Music specific</h2>
+    <p>For network, PIN, reports, and other questions common to both platforms, see the
+      <a href="/#faq">general FAQ</a> on the overview page.</p>
+
+    <div class="faq">
+      <details>
+        <summary>Songs aren't playing / "playlist not found" error</summary>
+        <div class="answer">
+          <p>Make sure every song in your Apple Music playlist is downloaded — songs with a cloud icon
+            aren't. Open the Music app, find your playlist, and tap the download button.</p>
+          <p>If you recently added songs, use <strong>Refresh Catalog</strong> in admin settings to
+            reload the playlist.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Can I change kiosk mode or network mode after setup?</summary>
+        <div class="answer">
+          <p>Yes — open admin controls (long-press bar name → PIN) and choose
+            <strong>End Session</strong>. This runs the setup wizard again from the kiosk-mode screen,
+            with everything pre-filled from your last session.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Does the community map use my exact GPS location?</summary>
+        <div class="answer">
+          <p>JukeBar captures the device's approximate location once, at the point you enable
+            "List on JukeBar map," to place your marker — separately, you also type in a
+            display address shown on the marker itself. Both are only sent if you opt in; disabling
+            the toggle stops future updates.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ── Privacy (iOS-specific addendum) ──────────────────────────────────── -->
+  <section id="privacy">
+    <h2>Privacy — Apple Music</h2>
+    <p>See the <a href="/#privacy">full privacy table</a> on the overview page for the complete
+      picture — this section covers the one iOS-specific detail.</p>
+    <p>Playback uses Apple's MediaPlayer framework and your existing Apple Music subscription. JukeBar
+      only <em>reads</em> your library to build the on-device catalog — it does not access your
+      listening history, purchase history, or Apple ID account information, and none of that ever
+      leaves the device. Apple's own privacy policy governs how Apple Music itself handles your data
+      at the OS level.</p>
+  </section>
+
+</div><!-- /page -->
+
+<footer>
+  JukeBar for iOS · <a href="/">All platforms</a> · <a href="mailto:marossy@gmail.com">marossy@gmail.com</a>
+</footer>
+
+</body>
+</html>

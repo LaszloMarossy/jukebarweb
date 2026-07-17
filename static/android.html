@@ -1,0 +1,290 @@
+<!--
+  /Users/laszlo/PycharmProjects/jukebarweb/static/android.html
+
+  RESPONSIBILITY: jukebars.com Android-specific documentation page — setup guide, network setup,
+    FAQ, and privacy notes that are specific to the Android/Spotify version of JukeBar (Spot On!
+    JukeBar). Static — no polling, no API calls, no host/bar-specific state. Skeleton only; sections
+    below are stubs, see docs/hub_split_plan.md for what goes where.
+  CALLED BY: Browser at jukebars.com/android — served by android_docs() in main.py (route not yet wired up).
+  KEY METHODS: none; plain markup.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spot On! JukeBar for Android — Setup, Network &amp; FAQ</title>
+  <meta name="description"
+        content="Spot On! JukeBar for Android: setup guide, network configuration, and FAQ for running a bar jukebox on Android with Spotify or local MP3s.">
+  <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2072%2072'%3E%3Ccircle%20cx='36'%20cy='36'%20r='34'%20fill='%23fbbe84'%20stroke='%23dc7955'%20stroke-width='1.5'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='29'%20fill='%23ffffff'/%3E%3Ccircle%20cx='36'%20cy='36'%20r='24'%20fill='%23fda185'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='12'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='60'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='52.97'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='36'%20y2='60'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='52.97'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='12'%20y2='36'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3Cline%20x1='36'%20y1='36'%20x2='19.03'%20y2='19.03'%20stroke='white'%20stroke-width='0.8'%20opacity='0.6'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+  <style>
+    /* Copied verbatim from static/index.html — keep in sync if the hub's design system changes. */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1a1a1a; --bg2: #111111; --bg3: #222222; --fg: #ffffff; --dim: #888888;
+      --coral: #fda185; --orange: #fbbe84; --yellow: #ffc24a; --brown: #dc7955;
+      --red: #e8406a; --divider: #333333;
+    }
+    body { background: var(--bg); color: var(--fg); font-family: Helvetica, Arial, sans-serif; min-height: 100vh; line-height: 1.65; }
+    a { color: var(--coral); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: var(--bg2); border-bottom: 2px solid var(--divider); padding: 16px 24px; display: flex; align-items: center; gap: 18px; }
+    .logo-svg { flex-shrink: 0; }
+    h1 { font-size: clamp(1.8rem, 5vw, 3rem); line-height: 1.1; }
+    h2 { font-size: clamp(1.3rem, 4vw, 2.1rem); color: var(--coral); margin-bottom: 16px; }
+    h3 { font-size: clamp(0.8rem, 5vw, 1.5); line-height: 1.1; margin: 20px 0 6px; }
+    .tagline { color: var(--dim); font-size: clamp(0.85rem, 2vw, 1rem); margin-top: 2px; }
+    nav { background: var(--bg2); border-bottom: 1px solid var(--divider); padding: 10px 24px; display: flex; gap: 6px; flex-wrap: wrap; }
+    nav a { color: var(--dim); font-size: 0.85rem; padding: 4px 10px; border-radius: 4px; white-space: nowrap; transition: color 0.15s, background 0.15s; }
+    nav a:hover { color: var(--fg); background: var(--bg3); text-decoration: none; }
+    .page { max-width: 740px; margin: 0 auto; padding: 0 20px 60px; }
+    section { padding: 40px 0 0; }
+    section + section { border-top: 1px solid var(--divider); margin-top: 40px; }
+    p { margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+    .tip { background: #1c1a13; border-left: 4px solid var(--yellow); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.93rem; }
+    .tip .tip-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--yellow); font-weight: bold; margin-bottom: 6px; }
+    .tip p { color: var(--dim); margin: 0; }
+    .tip p + p { margin-top: 8px; }
+    .tip strong { color: var(--fg); }
+    .warn { background: #1c1313; border-left-color: var(--red); }
+    .warn .tip-label { color: var(--red); }
+    .steps { list-style: none; counter-reset: steps; padding: 0; }
+    .steps li { counter-increment: steps; display: flex; gap: 16px; margin-bottom: 18px; align-items: flex-start; }
+    .steps li::before { content: counter(steps); flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--brown); color: #fff; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+    .steps li .step-body { flex: 1; }
+    .steps li .step-body strong { color: var(--fg); }
+    .steps li .step-body p { color: var(--dim); font-size: 0.92rem; margin-top: 2px; }
+    .faq { margin-top: 8px; }
+    details { border-bottom: 1px solid var(--divider); padding: 14px 0; }
+    details:first-child { border-top: 1px solid var(--divider); }
+    summary { cursor: pointer; font-weight: bold; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--coral); font-size: 1.2rem; flex-shrink: 0; transition: transform 0.2s; }
+    details[open] summary::after { transform: rotate(45deg); }
+    details .answer { padding-top: 12px; color: var(--dim); font-size: 0.93rem; }
+    details .answer p + p { margin-top: 8px; }
+    details .answer code { background: var(--bg3); border-radius: 4px; padding: 1px 5px; font-family: monospace; font-size: 0.88em; color: var(--orange); }
+    .privacy-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9rem; }
+    .privacy-table th { text-align: left; color: var(--dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 12px; border-bottom: 1px solid var(--divider); }
+    .privacy-table td { padding: 10px 12px; border-bottom: 1px solid var(--divider); vertical-align: top; }
+    .privacy-table tr:last-child td { border-bottom: none; }
+    .check { color: #4ade80; font-weight: bold; }
+    .cross { color: var(--red); }
+    footer { border-top: 1px solid var(--divider); padding: 24px 24px; text-align: center; font-size: 0.85rem; color: var(--dim); margin-top: 60px; }
+    footer a { color: var(--coral); }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg class="logo-svg" width="56" height="56" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="36" cy="36" r="34" fill="#fbbe84" stroke="#dc7955" stroke-width="1.5"/>
+    <circle cx="36" cy="36" r="29" fill="#ffffff"/>
+    <circle cx="36" cy="36" r="24" fill="#fda185"/>
+    <line x1="36" y1="36" x2="36" y2="12" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="60" y2="36" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="52.97" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="36" y2="60" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="52.97" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="12" y2="36" stroke="white" stroke-width="0.8" opacity="0.6"/>
+    <line x1="36" y1="36" x2="19.03" y2="19.03" stroke="white" stroke-width="0.8" opacity="0.6"/>
+  </svg>
+  <div>
+    <h1>Spot On! JukeBar <span style="color:var(--dim); font-size:0.4em;">for Android</span></h1>
+    <div class="tagline">Spotify / local-MP3 bar jukebox — setup, network &amp; FAQ</div>
+  </div>
+</header>
+
+<nav>
+  <a href="/" style="color:var(--coral);font-weight:bold">← All platforms</a>
+  <a href="/ios">🍎 iOS guide</a>
+  <a href="/discover">🗺 JukeBars on map</a>
+  <a href="#setup">Setup guide</a>
+  <a href="#network">Network setup</a>
+  <a href="#faq">FAQ</a>
+  <a href="#privacy">Privacy</a>
+</nav>
+
+<div class="page">
+
+  <!-- ── Intro ─────────────────────────────────────────────────────────── -->
+  <section id="intro" style="padding-top:32px;">
+    <h2>Spot On! JukeBar for Android</h2>
+    <p>Spot On! JukeBar turns an Android phone or tablet into the whole jukebox: it plays a Spotify
+      playlist or your own uploaded MP3s, runs the QR-code request system, and serves the admin/
+      bartender screens — all from one device. This page is the full manual: first-run setup, network
+      options, troubleshooting, and Spotify/local-file privacy notes. For the general pitch and pricing
+      model, see the <a href="/">overview page</a>.</p>
+    <div class="tip">
+      <div class="tip-label">Good fit for</div>
+      <p>Bars that run their music through Spotify, or that want to mix a Spotify streaming playlist
+        with their own uploaded MP3s on one device — including offline nights on local files only,
+        with no internet or Spotify subscription needed for that part of the catalog.</p>
+    </div>
+  </section>
+
+  <!-- ── Setup guide ────────────────────────────────────────────────────── -->
+  <section id="setup">
+    <h2>Setup guide</h2>
+    <p>The setup wizard runs on first launch and again any time you use <strong>End Session</strong>
+      from the admin screen — every choice below is changeable later, nothing is locked in.</p>
+
+    <h3>1. Pick a kiosk mode</h3>
+    <ul class="steps" style="list-style:disc; padding-left:20px;">
+      <li style="display:list-item; margin-bottom:10px;"><strong>Local Only</strong> — requests are
+        entered directly on this device. No customer phones, no QR code, no network needed.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Remote Only</strong> — customers
+        connect from their own phones after scanning the kiosk's QR code.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Local + Remote</strong> — both at
+        once.</li>
+    </ul>
+
+    <h3>2. Pick how customers connect (skipped in Local Only mode)</h3>
+    <ul class="steps" style="list-style:disc; padding-left:20px;">
+      <li style="display:list-item; margin-bottom:10px;"><strong>Bar WiFi</strong> — customers join
+        the same router you're on.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Android Hotspot</strong> — your
+        Android device becomes the router; customers connect to your hotspot directly, no external
+        router needed.</li>
+      <li style="display:list-item; margin-bottom:10px;"><strong>Internet / Relay</strong> — customers
+        connect over the internet from anywhere via a QR link that works off any network. The device
+        still plays the music locally; only requests/approvals/now-playing pass through the relay.</li>
+    </ul>
+
+    <h3>3. Music source</h3>
+    <ul class="steps">
+      <li><div class="step-body"><strong>Local MP3 folder (optional)</strong>
+        <p>Pick a folder of local audio files on the device to use as (part of) the catalog — skip
+          this step entirely if you're Spotify-only.</p></div></li>
+      <li><div class="step-body"><strong>Spotify device</strong>
+        <p>Sign in via Spotify (browser-based login) and select the Spotify playback device — skip to
+          go local-files-only.</p></div></li>
+      <li><div class="step-body"><strong>Spotify playlist</strong>
+        <p>Choose the Spotify playlist to use as the streaming source. Local files and a Spotify
+          playlist can be used together — JukeBar intermixes them; the Spotify portion needs internet
+          + an active Spotify subscription, the local-file portion works fully offline.</p></div></li>
+    </ul>
+
+    <h3>4. Bar details &amp; admin</h3>
+    <ul class="steps">
+      <li><div class="step-body"><strong>Name your jukebox &amp; discovery</strong>
+        <p>Give this instance a name. Optionally toggle <strong>"List on JukeBar map"</strong> to
+          publish the bar name, an address you type in for the map marker, and playlist band names to
+          the <a href="/discover">JukeBar discovery map</a>. Off by default, changeable any time via
+          End Session.</p></div></li>
+      <li><div class="step-body"><strong>Set the admin PIN</strong>
+        <p>4–6 digits, entered twice to confirm.</p></div></li>
+      <li><div class="step-body"><strong>Choose payment methods</strong>
+        <p>Two independent toggles — <strong>Stripe — Pay Online</strong> and
+          <strong>Pay to bartender</strong> — enable one, both, or neither. Leave both off and every
+          request is free and auto-approved. Stripe requires an internet connection, so it's
+          unavailable in Local Only mode.</p></div></li>
+      <li><div class="step-body"><strong>Set prices</strong>
+        <p>Per-song and 3-song bundle pricing, plus your Stripe key if enabled.</p></div></li>
+    </ul>
+
+    <div class="tip">
+      <div class="tip-label">Admin controls</div>
+      <p>Once running, open the admin screen and enter your PIN for playback controls, catalog
+        refresh, approval-mode toggle, and <strong>End Session</strong> — the same screen that lets
+        you change kiosk mode, network mode, music source, or PIN later.</p>
+    </div>
+
+    <h3>Bartender pairing</h3>
+    <p>Share the bartender URL shown in admin settings with your bartender. They open it in any browser
+      on the same network, enter their name and the bar PIN, and are ready to approve requests. The
+      first person to pair becomes session admin; additional bartenders need admin approval.</p>
+  </section>
+
+  <!-- ── Network setup ──────────────────────────────────────────────────── -->
+  <section id="network">
+    <h2>Network setup</h2>
+    <p>These are the same three options from the setup wizard above, in more detail.</p>
+
+    <h3>Bar WiFi</h3>
+    <p>Connect the Android device and all customer/bartender devices to the same router.</p>
+    <div class="tip warn">
+      <div class="tip-label">Common issue — AP isolation</div>
+      <p>Most venue routers have <strong>client isolation</strong> ("AP Isolation") on by default on
+        guest networks — it blocks devices from reaching each other even though they can all reach the
+        internet. <strong>Fix:</strong> disable "Isolate WiFi clients" in the router's guest-network
+        settings and <strong>reboot the router</strong> afterward.</p>
+    </div>
+
+    <h3>Android Hotspot</h3>
+    <p>Enable the hotspot in Android Settings first (usually under Network &amp; Internet → Hotspot &amp;
+      tethering). Customers and bartenders join your device's hotspot directly — no external router, no
+      isolation issues.</p>
+    <div class="tip">
+      <div class="tip-label">Tip</div>
+      <p>The most reliable option if you don't control the venue's router settings — the device handles
+        everything itself.</p>
+    </div>
+
+    <h3>Internet / Relay</h3>
+    <p>Connects to the <strong>jukebars.com</strong> relay over the internet. Customers use a shareable
+      QR link that works on any network; bartenders can approve from anywhere with internet access. The
+      device still plays the music locally — only requests, approvals, and now-playing state pass
+      through the relay.</p>
+  </section>
+
+  <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
+  <section id="faq">
+    <h2>FAQ — Android &amp; Spotify specific</h2>
+    <p>For network, PIN, reports, and other questions common to both platforms, see the
+      <a href="/#faq">general FAQ</a> on the overview page.</p>
+
+    <div class="faq">
+      <details>
+        <summary>Spotify isn't playing / no sound</summary>
+        <div class="answer">
+          <p>Confirm the Spotify device selected during setup is still active — reopening the setup
+            wizard's Spotify device step and re-selecting it re-establishes the connection. Make sure
+            the device has an active Spotify Premium subscription and an internet connection.</p>
+        </div>
+      </details>
+      <details>
+        <summary>My local MP3 folder isn't showing tracks</summary>
+        <div class="answer">
+          <p>Confirm the app has storage/media permission (Android will prompt for this the first time
+            you pick a folder). Only audio files directly inside the selected folder are picked up —
+            check you selected the right sub-folder, not a parent folder with no files directly in it.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Can I change kiosk mode or network mode after setup?</summary>
+        <div class="answer">
+          <p>Yes — open the admin screen, enter your PIN, and choose <strong>End Session</strong>. This
+            re-runs the setup wizard from the kiosk-mode screen, pre-filled from your last session.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ── Privacy (Android-specific addendum) ──────────────────────────────── -->
+  <section id="privacy">
+    <h2>Privacy — Spotify &amp; local files</h2>
+    <p>See the <a href="/#privacy">full privacy table</a> on the overview page for the complete
+      picture — this section covers the two Android-specific details.</p>
+    <p><strong>Spotify:</strong> sign-in uses Spotify's own browser-based login (PKCE) — JukeBar never
+      sees or stores your Spotify password. Only playback control and playlist-reading access are
+      used; JukeBar does not access your Spotify listening history or account details beyond what's
+      needed to play the selected playlist.</p>
+    <p><strong>Local files:</strong> audio files are read directly from the device's storage to build
+      the on-device catalog. Nothing about your local file library is transmitted anywhere.</p>
+  </section>
+
+</div><!-- /page -->
+
+<footer>
+  Spot On! JukeBar for Android · <a href="/">All platforms</a> · <a href="mailto:marossy@gmail.com">marossy@gmail.com</a>
+</footer>
+
+</body>
+</html>

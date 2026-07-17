@@ -261,6 +261,16 @@ async def index():
     return (Path("static") / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/ios", response_class=HTMLResponse)
+async def ios_docs():
+    return (Path("static") / "ios.html").read_text(encoding="utf-8")
+
+
+@app.get("/android", response_class=HTMLResponse)
+async def android_docs():
+    return (Path("static") / "android.html").read_text(encoding="utf-8")
+
+
 @app.get("/discover", response_class=HTMLResponse)
 async def discover():
     return HTMLResponse((Path("static") / "discover.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
