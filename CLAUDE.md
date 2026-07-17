@@ -54,6 +54,34 @@ JukeBar has three codebases — iOS (`~/dev/giffy/JukeBar`), Android (`~/dev/gif
 | WiFi-served LAN HTML | `JukeBar/WebApps/customer.html` | `assets/customer.html` |
 | Internet (Render), shared | `static/customer.html` — this repo | same |
 
+### Kiosk-native customer surface — confirmed cross-cutting invariants (verified 2026-07-17)
+
+Kiosk-native (`JukeBar/JukeBar/KioskView.swift`, `spotonjukebar/.../ui/KioskView.kt` +
+`ui/LocalRequestSheet.kt`) is a separate implementation from `customer.html` (LAN and Internet), not a
+shared codepath — see the matrix above. Three behaviors that are easy to assume are "web-only" are
+**already implemented on kiosk-native too, on both platforms**, confirmed by direct source read:
+
+1. **`accepting_requests` gates local request submission, not just the web pages.** iOS:
+   `allowsLocalRequest` in `KioskView.swift` checks `cfg?.acceptingRequests`. Android:
+   `showLocalRequestButton` in `KioskView.kt` checks `barDetails?.acceptingRequests`. When off, the
+   kiosk still shows now-playing/QR (people can still see what's playing) but hides/disables the
+   Request button — it does not silently keep accepting local requests.
+2. **`requesterName` is the field name kiosk-native uses too**, not a legacy `customerName`. iOS:
+   `CatalogBrowseView.swift`'s local-request sheet (`requesterName` state var, passed through to both
+   the relay post and the local `SongRequest`). Android: `LocalRequestSheet.kt` (`requesterName` state
+   var → `onSubmit(requesterName, ...)`).
+3. **Up Next has kiosk-native equivalents of the web badge behavior**, not the same HTML/CSS but the
+   same intent: a small always-visible preview strip (row count driven by screen height, iOS
+   `upNextRowCount()` / Android `upNextRowCount()`), plus a tap-to-expand full-queue overlay that
+   **self-dismisses after 15s of no interaction** (iOS `ApprovedQueueOverlay.resetIdleTimer()`, Android
+   `LaunchedEffect(...) { delay(15_000) }` in the queue overlay) — both re-verified identical between
+   platforms.
+
+**Why this note exists:** these three were flagged as unverified "does kiosk need the same treatment?"
+open questions in a testing checklist before being checked against source — they were already correct,
+but nothing had documented that a kiosk parity check should look here first before assuming a gap. Save
+the re-investigation next time: check these three call sites before treating kiosk-native as behind.
+
 ## Key decisions
 
 **Single currency field** — one ISO currency code for both bartender cash display and Stripe processing. No separate "display currency" vs "Stripe currency".
