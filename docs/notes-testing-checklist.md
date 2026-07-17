@@ -108,6 +108,20 @@ implementation, not the same HTML — see below)
 
 ---
 
-## Not yet built (nothing to test)
+## 6. Genre coloring in native catalog browse
 
-- Genre coloring in native catalog browse (bubbles by Last.fm genre) — per memory this was still at "what needs building" as of ~15 days ago; relay `GET /api/bar/{id}/genres` endpoint and iOS/Android bubble coloring not showing up in recent commits. Confirm it's still pending, not silently shipped.
+Correction (2026-07-17): earlier project memory said this was still "what needs building" — that was
+stale. Verified in source on both platforms: relay `GET /api/bar/{jukebar_id}/genres` (`main.py`) is
+live; iOS (`AppState.swift` fetches it into `artistGenres`, `CatalogBrowseView.swift` colors bubbles via
+`genreSwiftColor()` and shows long-press tag detail via `TagOverlayCard`); Android (`RelayClient.fetchGenres()`
+→ `MainActivity.artistGenres` → `LocalRequestSheet.kt` colors bubbles via `genreColor()` and shows tags
+on long-press via `combinedClickable(onLongClick)`). User confirmed working live on iOS already.
+
+**Surfaces:** iOS kiosk catalog browse, Android kiosk/LAN catalog browse (bubble coloring propagates to
+`LocalServer.kt` too per source) — this is genuinely native-app-only, no relay-page equivalent to check.
+
+- [x] iOS: bubble colors match playlist genre profile, confirmed working live by user
+- [ ] iOS: long-press a bubble → up to 4 raw Last.fm tags shown correctly
+- [ ] Android: bubble colors match playlist genre profile (source-verified, not yet live-tested)
+- [ ] Android: long-press a bubble → raw tags shown correctly
+- [ ] Both: bar that hasn't opted into the map (no GCS profile) shows plain/ungenred bubbles, not an error
