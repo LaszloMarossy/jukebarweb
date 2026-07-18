@@ -13,16 +13,23 @@ Surface key (13-surface matrix, see CLAUDE.md):
 - **C-L-i / C-L-a** = Customer LAN HTML
 - **C-N** = Customer Internet/relay
 
-Coverage matrix (which surfaces each feature touches):
+Coverage matrix (which features touch each surface):
 
-| Feature | A-K-i | A-K-a | A-L-i | A-L-a | A-N | B-L-i | B-L-a | B-N | C-K-i | C-K-a | C-L-i | C-L-a | C-N |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1. End Session / shutdown | X | X | | | | | | | | | | | |
-| 1b. accepting_requests block | | | | | | | | | X | X | X | X | X |
-| 2. Versioned settings lock | | | X | X | X | X | X | X | | | | | |
-| 3. Payment-mode raw flags | X | X | X | X | X | X | X | X | X | X | X | X | X |
-| 4. requester_name | | | | | | X | X | X | X | X | X | X | X |
-| 5. Up Next circle badge | | | | | | | | | X | X | X | X | X |
+| Surface | 1. End Session/shutdown | 1b. accepting_requests | 2. Settings lock | 3. Payment-mode flags | 4. requester_name | 5. Up Next badge |
+|---|---|---|---|---|---|---|
+| A-K-i | X | | | X | | |
+| A-K-a | X | | | X | | |
+| A-L-i | | | X | X | | |
+| A-L-a | | | X | X | | |
+| A-N | | | X | X | | |
+| B-L-i | | | X | X | X | |
+| B-L-a | | | X | X | X | |
+| B-N | | | X | X | X | |
+| C-K-i | | X | | X | X | X |
+| C-K-a | | X | | X | X | X |
+| C-L-i | | X | | X | X | X |
+| C-L-a | | X | | X | X | X |
+| C-N | | X | | X | X | X |
 
 Kiosk-native columns (C-K-i / C-K-a) for rows 1b/4/5 were flagged `?` originally, then verified against
 source on 2026-07-17 — all three are already implemented on kiosk-native, not web-only. See

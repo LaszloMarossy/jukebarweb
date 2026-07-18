@@ -31,6 +31,17 @@ The Android/iOS host app owns all state. The relay is a message-passing layer:
 
 **Versioned settings confirmation (replaces the old optimistic-apply hack):** `POST /api/bar/{id}/settings` no longer patches `BarSession` directly — it only queues the intent and bumps a per-field version number, marking the field `settings_pending`. `admin.html`/`bartender.html` lock that toggle (dimmed, unclickable) the instant it's clicked, for every client polling that bar, not just the one that clicked. The host echoes its current settings + version tag back on *every* `POST /api/host/sync` call unconditionally; the relay only applies an echo whose version is newer than what it's already confirmed, then clears the pending flag. This makes a dropped sync self-heal on the next 5s heartbeat and makes a stale echo for a since-superseded request harmless — no ack handshake, no timeout needed. Concurrent changes to the same field are queued (last one applied wins), never rejected. See `docs/architecture.html` flow B.
 
+Covers three fields today: `stripe_enabled`, `bartender_enabled`, `accepting_requests` (added 2026-07-18 —
+previously `accepting_requests` was host-native/LAN-toggle-only with no Internet-mode UI at all; see
+`bar_settings()`/`host_sync()` in `main.py`, `AppState.swift`'s `settingsEcho`, and `RelayClient.kt`'s
+`sync()` for the pattern). **Any new admin/bartender toggle needs to be added to all of**: `bar_settings()`
+field tuple, `host_sync()`'s echo-application allow-list, the `/api/bar/{id}/requests` response, both
+relay HTML files' Actions tab, iOS `AppState.swift` (echo + action handling) + `LocalServer.swift`
+(`/api/admin/settings`) + both LAN HTML files, and Android `RelayClient.kt`/`RelayService.kt`
+(echo + action handling) + `LocalServer.kt` (`handleAdminSettings`) + both LAN HTML files — missing any
+one of these silently breaks only that surface, which is exactly how `accepting_requests` went
+unnoticed for ten days.
+
 ## UI surface matrix (13 surfaces, all must stay in sync)
 JukeBar has three codebases — iOS (`~/dev/giffy/JukeBar`), Android (`~/dev/giffy/spotonjukebar`), and this relay (jukebarweb). Every page type exists across multiple delivery surfaces and (except Bartender) both host platforms. Any task touching admin/bartender/customer UI or behavior should be checked against every relevant cell below, not just the one surface mentioned. Look and feel should be near-identical (ideally identical) across all surfaces of a given page type. The Render (internet) cell is a single shared page regardless of which platform is hosting — there is no iOS/Android branching in `static/*.html` or `main.py`.
 

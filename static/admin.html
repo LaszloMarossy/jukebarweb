@@ -413,6 +413,14 @@
       </div>
       <div class="pay-warning" id="pay-warning">Both off — all requests auto-accepted for free</div>
     </div>
+    <div class="payment-card" style="margin-top:14px">
+      <div class="payment-title">Requests</div>
+      <div class="pay-row" id="row-accepting">
+        <span class="pay-label">Accepting requests</span>
+        <div class="toggle-track" id="tog-accepting" onclick="togglePayment('accepting')"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="pay-warning show" id="accepting-warning" style="display:none">Off — customers can't submit new requests; the device keeps shuffling its current playlist</div>
+    </div>
   </div>
 </div>
 
@@ -579,8 +587,13 @@ function updatePaymentUI() {
   $('tog-bartender')?.classList.toggle('on', S.bartenderEnabled);
   $('tog-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
   $('row-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
+  $('tog-accepting')?.classList.toggle('on', S.acceptingRequests);
+  $('tog-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
+  $('row-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
   const warn = $('pay-warning');
   if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled);
+  const acceptWarn = $('accepting-warning');
+  if (acceptWarn) acceptWarn.style.display = S.acceptingRequests ? 'none' : 'block';
 }
 
 async function postSetting(body) {
@@ -592,10 +605,11 @@ async function postSetting(body) {
 }
 
 async function togglePayment(which) {
-  const field = which === 'stripe' ? 'stripe_enabled' : 'bartender_enabled';
+  const field   = which === 'stripe' ? 'stripe_enabled' : which === 'bartender' ? 'bartender_enabled' : 'accepting_requests';
+  const current = which === 'stripe' ? S.stripeEnabled  : which === 'bartender' ? S.bartenderEnabled  : S.acceptingRequests;
   if ((S.settingsPending || []).includes(field)) return;   // already locked, ignore extra clicks
-  const newVal = which === 'stripe' ? !S.stripeEnabled : !S.bartenderEnabled;
-  const body   = which === 'stripe' ? { stripe_enabled: newVal } : { bartender_enabled: newVal };
+  const newVal = !current;
+  const body    = { [field]: newVal };
   S.settingsPending = [...(S.settingsPending || []), field];
   updatePaymentUI();
   try {
@@ -624,9 +638,10 @@ async function poll() {
     S.pricePerSong  = d.price_per_song  || 0;
     S.priceForThree = d.price_for_three || 0;
     S.currency      = d.currency        || '';
-    S.stripeEnabled    = !!d.stripe_enabled;
-    S.bartenderEnabled = d.bartender_enabled !== false;
-    S.settingsPending  = d.settings_pending || [];
+    S.stripeEnabled      = !!d.stripe_enabled;
+    S.bartenderEnabled   = d.bartender_enabled !== false;
+    S.acceptingRequests  = d.accepting_requests !== false;
+    S.settingsPending    = d.settings_pending || [];
     updatePaymentUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;

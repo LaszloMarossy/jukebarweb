@@ -292,6 +292,13 @@
       <div class="lan-toggle" id="lan-tog-bartender" onclick="toggleBtPayment('bartender')"><div class="lan-thumb"></div></div>
     </div>
     <div class="lan-pay-warn" id="lan-pay-warn" style="display:none">Both off — requests are free and auto-accepted.</div>
+
+    <div class="cfg-title" style="margin-top:16px">Requests</div>
+    <div class="cfg-row" id="lan-row-accepting">
+      <span class="cfg-label">Accepting requests</span>
+      <div class="lan-toggle" id="lan-tog-accepting" onclick="toggleBtPayment('accepting')"><div class="lan-thumb"></div></div>
+    </div>
+    <div class="lan-pay-warn" id="lan-accepting-warn" style="display:none">Off — customers can't submit new requests; the device keeps shuffling its current playlist.</div>
   </div>
 
   <div id="requests-pane">
@@ -316,9 +323,10 @@
 const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 let currentTab = 'requests';
-let btStripeEnabled    = false;
-let btBartenderEnabled = true;
-let btSettingsPending  = []; // field names still awaiting the host's confirmation - see updatePaymentToggleUI
+let btStripeEnabled     = false;
+let btBartenderEnabled  = true;
+let btAcceptingRequests = true;
+let btSettingsPending   = []; // field names still awaiting the host's confirmation - see updatePaymentToggleUI
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -430,9 +438,10 @@ async function poll() {
     S.pricePerSong     = d.price_per_song   || 0;
     S.priceForThree    = d.price_for_three  || 0;
     S.currency         = d.currency         || '';
-    btStripeEnabled    = !!d.stripe_enabled;
-    btBartenderEnabled = d.bartender_enabled !== false;
-    btSettingsPending  = d.settings_pending || [];
+    btStripeEnabled     = !!d.stripe_enabled;
+    btBartenderEnabled  = d.bartender_enabled !== false;
+    btAcceptingRequests = d.accepting_requests !== false;
+    btSettingsPending   = d.settings_pending || [];
     updatePaymentToggleUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -566,17 +575,22 @@ function updatePaymentToggleUI() {
   $('lan-tog-bartender')?.classList.toggle('on', btBartenderEnabled);
   $('lan-tog-bartender')?.classList.toggle('pending', btSettingsPending.includes('bartender_enabled'));
   $('lan-row-bartender')?.classList.toggle('pending', btSettingsPending.includes('bartender_enabled'));
+  $('lan-tog-accepting')?.classList.toggle('on', btAcceptingRequests);
+  $('lan-tog-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
+  $('lan-row-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
   const warn = $('lan-pay-warn');
   if (warn) warn.style.display = (!btStripeEnabled && !btBartenderEnabled) ? '' : 'none';
+  const acceptWarn = $('lan-accepting-warn');
+  if (acceptWarn) acceptWarn.style.display = btAcceptingRequests ? 'none' : '';
 }
 
 async function toggleBtPayment(which) {
-  const field = which === 'stripe' ? 'stripe_enabled' : 'bartender_enabled';
+  const field = which === 'stripe' ? 'stripe_enabled' : which === 'bartender' ? 'bartender_enabled' : 'accepting_requests';
   if (btSettingsPending.includes(field)) return;   // already locked, ignore extra clicks
   const togEl = $('lan-tog-' + which);
   if (!togEl) return;
   const newOn = !togEl.classList.contains('on');
-  const body  = which === 'stripe' ? { stripe_enabled: newOn } : { bartender_enabled: newOn };
+  const body  = { [field]: newOn };
   btSettingsPending = [...btSettingsPending, field];
   updatePaymentToggleUI();
   try {

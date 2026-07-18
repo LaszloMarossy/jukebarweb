@@ -556,7 +556,7 @@ async def host_sync(body: dict[str, Any]):
     # stale/duplicate echo (arriving out of order, or repeated every heartbeat) can never
     # regress a value or clear a pending flag for a since-superseded request.
     for field_name, info in body.get("settings", {}).items():
-        if field_name not in ("bartender_enabled", "stripe_enabled") or not isinstance(info, dict):
+        if field_name not in ("bartender_enabled", "stripe_enabled", "accepting_requests") or not isinstance(info, dict):
             continue
         version = int(info.get("version", 0))
         if version > bar.settings_confirmed_version.get(field_name, 0):
@@ -909,6 +909,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
             "currency": bar.currency, "require_approval": bar.require_approval,
             "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
+            "accepting_requests": bar.accepting_requests,
             "settings_pending": list(bar.settings_pending.keys())}
 
 
@@ -993,17 +994,17 @@ async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
 @app.post("/api/bar/{jukebar_id}/settings")
 async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
-    Admin/bartender: queue a payment-settings change for the host to pick up on its next
-    sync. Does NOT touch bar.bartender_enabled/stripe_enabled directly - the host is the
-    only thing that can confirm a change actually took effect (see host_sync()'s
-    "settings" echo handling). Each field gets a bumped version number so the relay can
-    tell a genuine confirmation apart from a stale echo of a since-superseded request;
-    concurrent requests for the same field are queued in arrival order (last one wins),
-    not rejected.
+    Admin/bartender: queue a settings change for the host to pick up on its next
+    sync. Does NOT touch bar.bartender_enabled/stripe_enabled/accepting_requests directly -
+    the host is the only thing that can confirm a change actually took effect (see
+    host_sync()'s "settings" echo handling). Each field gets a bumped version number so the
+    relay can tell a genuine confirmation apart from a stale echo of a since-superseded
+    request; concurrent requests for the same field are queued in arrival order (last one
+    wins), not rejected.
     """
     bar = _customer_bar(jukebar_id, s)
     action: dict[str, Any] = {"type": "settings_update"}
-    for field_name in ("bartender_enabled", "stripe_enabled"):
+    for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
         if field_name in body:
             v = bool(body[field_name])
             version = bar.settings_version.get(field_name, 0) + 1
