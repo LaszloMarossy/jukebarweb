@@ -498,7 +498,9 @@ function requestCard(r, showActions) {
   const price = S.pricePerSong > 0
     ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
     : 0;
-  const priceHtml = price > 0 ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
+  // Gate on this specific request's payment_method, not the bar's current mode — a free
+  // request's price is 0 regardless of what the bar happens to be configured for right now.
+  const priceHtml = (r.payment_method !== 'free' && price > 0) ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
   const actedLabel = actedRequests.get(r.id);
   const acts = actedLabel
     ? `<span class="req-badge acted">${actedLabel}</span>`
