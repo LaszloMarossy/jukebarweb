@@ -147,9 +147,11 @@
     .btn-approve { background: #166534; color: #4ade80; padding: 8px 44px; }
     .btn-jump    { background: #713f12; color: #fde047; }
     .btn-deny    { background: #7f1d1d; color: #f87171; }
+    .btn-cancel  { background: #7f1d1d; color: #f87171; padding: 4px 12px; font-size: 12px; margin-left: 6px; }
     .req-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
     .req-badge.approved { background: #166534; color: #4ade80; }
     .req-badge.acted    { background: #1f2937; color: #6b7280; border: 1px dashed #374151; font-style: italic; }
+    .req-free-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #1f2937; color: #9ca3af; }
     .req-time   { font-size: 10px; color: var(--muted); white-space: nowrap; }
     .req-device { font-size: 11px; color: var(--text); font-weight: 600; white-space: nowrap; margin-left: auto; }
 
@@ -506,7 +508,10 @@ function requestCard(r, showActions) {
           <button class="btn-act btn-jump"    onclick="approve('${esc(r.id)}',true,this)">Play next</button>
           <button class="btn-act btn-deny"    onclick="deny('${esc(r.id)}',this)">✗</button>
          </span>`
-      : `<span class="req-badge approved">In queue</span>`;
+      : (r.payment_method === 'free'
+          ? `<span class="req-badge approved">In queue</span>
+             <button class="btn-act btn-cancel" onclick="deny('${esc(r.id)}',this)">Cancel</button>`
+          : `<span class="req-badge approved">In queue</span>`);
   const songRows = (r.song_details || []).map(s =>
     `<div class="song-row">
       <span class="song-col song-artist">${esc(s.artist)}</span>
@@ -516,9 +521,12 @@ function requestCard(r, showActions) {
   ).join('') || (r.song_titles || []).map(t =>
     `<div class="song-row"><span class="song-col song-artist" style="grid-column:1/-1">${esc(t)}</span></div>`
   ).join('');
+  const payBadge = r.payment_method === 'stripe'    ? ' <span title="Paid online (card)">💳</span>'
+                  : r.payment_method === 'bartender' ? ' <span title="Paid at the bar">💵</span>'
+                  : ' <span class="req-free-badge" title="Free — not paid">Free</span>';
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
   <div class="req-row1">
-    <span class="req-name">${esc(r.requester_name || 'Guest')}</span>
+    <span class="req-name">${esc(r.requester_name || 'Guest')}${payBadge}</span>
     ${priceHtml}${acts}
     ${devId ? `<span class="req-device">(${esc(devId)})</span>` : ''}
     ${time ? `<span class="req-time">${time}</span>` : ''}
@@ -543,14 +551,20 @@ async function approve(requestId, jump, btn) {
 }
 
 async function deny(requestId, btn) {
-  actedRequests.set(requestId, '✗ Sent');
-  markActed(btn, '✗ Sent');
+  const label = btn.classList.contains('btn-cancel') ? 'Cancelled' : '✗ Sent';
+  actedRequests.set(requestId, label);
+  markActed(btn, label);
   try {
-    await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}`, {
+    const res = await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ request_id: requestId }),
     });
+    if (!res.ok) {
+      // Most likely a stale-UI race — e.g. it was already paid for by the time this landed.
+      actedRequests.delete(requestId);
+      alert('Could not cancel — it may already have a payment attached.');
+    }
   } catch {}
 }
 

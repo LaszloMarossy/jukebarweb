@@ -88,6 +88,10 @@ class SongRequest:
     created_at: float = field(default_factory=time.time)
     approved_at: float = 0.0
     paid: bool = False
+    # "free" (auto-accepted, no payment) | "bartender" (cash/card collected in person, bartender
+    # approval IS the payment confirmation) | "stripe" (paid online). paid is true for both
+    # bartender and stripe - only "free" means no payment happened at all.
+    payment_method: str = "free"
 
 
 @dataclass
@@ -906,6 +910,7 @@ async def bar_payment_confirmed(
         jump=False,
         status="pending",   # host picks this up via new_requests (paid=True → auto-inject)
         paid=True,
+        payment_method="stripe",
     )
     bar.requests[rid] = req
     return {"request_id": rid, "status": "approved"}
@@ -937,6 +942,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "jump": r.jump,
             "status": r.status,
             "paid": r.paid,
+            "payment_method": r.payment_method,
             "created_at": r.created_at,
             "approved_at": r.approved_at,
         }
@@ -960,6 +966,11 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
         raise HTTPException(404, "Request not found")
     jump = body.get("jump", req.jump)
     req.jump = jump
+    # A bartender manually approving a pending request IS the payment confirmation (cash/card
+    # collected in person) - mark it paid unless it somehow already came through Stripe.
+    if req.payment_method != "stripe":
+        req.paid = True
+        req.payment_method = "bartender"
     # Don't mark approved here — host confirms via up_next on next sync
     bar.pending_actions.append({
         "type": "approve",
@@ -1008,11 +1019,21 @@ async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), bod
 
 @app.post("/api/bar/{jukebar_id}/deny")
 async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+    """
+    Denies a pending request, or cancels one already approved/queued (the "Cancel" button on
+    already-playing-soon free requests). Only free requests can be cancelled once approved -
+    a paid one (Stripe or bartender) already has money attached to it and must not be pulled
+    from the queue by this same one-click action. Pending (not yet approved) requests can
+    still be denied regardless of payment method - that's the pre-existing reject-before-it-
+    plays behavior, unrelated to this restriction.
+    """
     bar = _customer_bar(jukebar_id, s)
     rid = body.get("request_id", "")
     req = bar.requests.get(rid)
     if req is None:
         raise HTTPException(404, "Request not found")
+    if req.status in ("approved", "approved_jump") and req.payment_method != "free":
+        raise HTTPException(403, "Only free requests can be cancelled once approved")
     req.status = "denied"
     bar.pending_actions.append({
         "type": "deny",

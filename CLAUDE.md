@@ -121,6 +121,36 @@ the re-investigation next time: check these three call sites before treating kio
 
 **Single currency field** — one ISO currency code for both bartender cash display and Stripe processing. No separate "display currency" vs "Stripe currency".
 
+**`SongRequest.payment_method` (added 2026-07-18): `"free"` | `"bartender"` | `"stripe"`** — `paid`
+(bool) is true for both `bartender` and `stripe`, false only for `free`. A bartender tapping Approve on
+a pending request **is** the payment confirmation (cash/card collected in person) — `bartender_approve()`
+sets both `paid=True` and `payment_method="bartender"` unconditionally, since this endpoint only ever
+fires for the human-review path (Stripe-paid requests auto-inject via `new_requests` without ever
+needing an approve tap, so there's no ambiguity). Mirrored on both host apps' local approval handlers
+(iOS `AppState.swift`/`LocalServer.swift`, Android `LocalRequestManager.approveRequest()`) so their own
+local `paid` flag agrees with the relay's. `admin.html`/`bartender.html`'s Up Next list renders this as
+💳 (stripe) / 💵 (bartender) / a muted "Free" badge — the relay-side field alone drives that display,
+since it's built from `bar.requests` which `bartender_approve()` mutates directly; no host-side
+`payment_method` plumbing was needed for the admin display to work. Android's relay-mode Up Next echo
+to the customer-facing `/api/bar/{id}/display` endpoint used to always send `paid: false` regardless of
+reality — fixed same day by adding `PlaybackCoordinator.requestedSongPaid: Map<String, Boolean>`
+alongside the existing `requestedSongNames` map, threaded through all 7 `injectSongs()` call sites.
+
+**"Cancel" button on Up Next (added 2026-07-18)** — bartender/admin can pull an already-approved **free**
+request back out of the live queue; paid ones (Stripe or bartender) cannot be cancelled this way once
+approved. Reuses the existing `POST /api/bar/{id}/deny` endpoint/action rather than a new one —
+`bartender_deny()` now rejects (403) denying an `approved`/`approved_jump` request unless
+`payment_method == "free"`; a still-*pending* request can be denied regardless of payment (that's the
+pre-existing reject-before-it-plays behavior, unrelated to this restriction). The host-side "pull it out
+of the live queue" mechanism already existed on iOS (`MusicService.cancelRequest()`, built for LAN mode
+but never wired to the relay-driven `"deny"` action) — just needed connecting. Android had no equivalent
+at all; added `PlaybackCoordinator.cancelRequestedSongs()`, which only ever removes songs strictly after
+the current queue position (never touches the currently-playing song) and skips immediately via
+`advance()` if one of the cancelled songs already lost the race and became current — mirrors iOS's
+"let it flash then auto-skip" behavior for that same edge case. Both platforms wired this into their LAN
+deny handler too (Android's LAN deny previously did nothing beyond marking the status, another gap
+fixed as part of this).
+
 **STRIPE_MINIMUMS is a curated list** — not the complete Stripe currency list. Only currencies we actively support with known minimums.
 
 **`stripe_enabled` derived from key presence on register** — relay register handler originally derived `stripe_enabled = bool(pk)` (key present = enabled). Now uses `body.get("stripe_enabled", bool(pk))` so host can explicitly disable Stripe while keeping the key stored. Android client sends `stripe_enabled` explicitly; iOS sends empty key when disabled.
