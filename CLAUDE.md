@@ -168,6 +168,21 @@ mode). The raw stored status is untouched, so `new_requests`/host-confirmation l
 is relay-only — LAN mode never had this bug, since both host apps already compute the correct status
 synchronously at request-creation time with no async confirmation round-trip in between.
 
+**LAN admin.html gets the same payment_method badges + Up Next rename (added 2026-07-18)** — both host
+apps' LAN admin pages had the identical misleading-badge bug the relay pages had before today's earlier
+fix (`r.paid ? 💳 : ''` — showed a card icon for cash-paid requests too), plus their approved/queued
+section was still labeled "Approved — in queue" instead of "Up Next", and had no per-request Cancel for
+free ones (the `actions === 'cancel'` branch existed in the JS but was dead code, never invoked). Both
+host apps' local request models gained a `paymentMethod`/`payment_method` field mirroring the relay's
+(`Models.swift`'s `SongRequest`, Android's `LocalRequestManager.LocalRequest`), set at the same points as
+the relay version: `"stripe"` at Stripe-payment creation, `"bartender"` at the moment a bartender
+actually approves (both LAN's own approve endpoint and the relay-driven approve action), default
+`"free"`/nil otherwise. Both LAN `deny` endpoints also gained the same `payment_method != "free"` 403
+gate as the relay's `bartender_deny()`, for the same reason — a Stripe/bartender-paid request must never
+be cancellable through this one-click action, on any surface. LAN `bartender.html` on both platforms only
+ever shows *pending* requests (no Up Next section exists there at all), so nothing needed changing there
+— left as a known scope boundary, not silently skipped.
+
 **STRIPE_MINIMUMS is a curated list** — not the complete Stripe currency list. Only currencies we actively support with known minimums.
 
 **`stripe_enabled` derived from key presence on register** — relay register handler originally derived `stripe_enabled = bool(pk)` (key present = enabled). Now uses `body.get("stripe_enabled", bool(pk))` so host can explicitly disable Stripe while keeping the key stored. Android client sends `stripe_enabled` explicitly; iOS sends empty key when disabled.
