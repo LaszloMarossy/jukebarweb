@@ -17,10 +17,12 @@ KEY METHODS:
     the accepting_requests gate lives in the first two only, never the third
   - map_register() / _load_bar_profiles_sync() — the map/discovery + genre
     round-trip through GCS (see docs/architecture.html, flow E)
-  - bar_settings() / host_sync() — versioned settings confirmation: bar_settings()
-    only queues intent + bumps a per-field version, never patches BarSession
-    directly; host_sync()'s "settings" echo is what actually applies a field,
-    guarded by settings_confirmed_version so a stale echo can't win a race
+  - bar_settings() / host_sync() — settings propagation: bar_settings() only
+    writes into BarSession.desired_settings (latest write per field wins, no
+    queue). host_sync() unconditionally trusts the host's own echoed current
+    values (no version/ordering guard - the host re-sends them every 5s
+    regardless, so any single dropped/reordered call self-heals on the next
+    tick) and clears a desired_settings entry once the echo matches it.
 """
 import asyncio
 import json
@@ -95,9 +97,10 @@ class BarSession:
 
     RESPONSIBILITY: One bar's entire live state — catalog, settings, pending
       requests, up-next queue — held in memory only, keyed by jukebar_id in
-      the module-level _bars dict. Rebuilt wholesale on every host register(),
-      never merged; if jukebarweb restarts, a bar just looks briefly offline
-      until the host's next sync.
+      the module-level _bars dict. host_register() updates an existing entry
+      in place when it's the same ongoing session, only building fresh for a
+      genuinely new one; if jukebarweb restarts, a bar just looks briefly
+      offline until the host's next sync.
     CALLED BY: Every /api/bar/{id}/* and /api/host/* handler in this file.
     KEY METHODS: require_approval (property) — derives approval mode from
       stripe_enabled/bartender_enabled rather than storing a separate flag.
@@ -124,9 +127,9 @@ class BarSession:
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
-    settings_version: dict[str, int] = field(default_factory=dict)             # field -> monotonic counter, bumped by bar_settings()
-    settings_pending: dict[str, int] = field(default_factory=dict)             # field -> version awaiting host confirmation; absent = not pending
-    settings_confirmed_version: dict[str, int] = field(default_factory=dict)   # field -> version of the currently-trusted value; guards stale/out-of-order host echoes
+    # field -> value an admin/bartender asked for that the host hasn't echoed back yet;
+    # presence = pending. Latest write per field wins, no queue — see bar_settings()/host_sync().
+    desired_settings: dict[str, bool] = field(default_factory=dict)
 
     @property
     def require_approval(self) -> bool:
@@ -565,14 +568,20 @@ async def host_sync(body: dict[str, Any]):
       played_request_ids   — request IDs whose song just became currentSong
       approved_request_ids — request IDs approved by the Android bartender screen
                              (server sets these to "approved" so kiosk Up Next shows them)
-      settings              — optional {field: {value, version}}; the host's current
-                             settings, sent on every call so a dropped sync self-heals on
-                             the next one. Only applied if version is newer than what's
-                             already confirmed - see settings_confirmed_version.
+      settings              — {field: bool}; the host's current values for
+                             bartender_enabled/stripe_enabled/accepting_requests, sent
+                             unconditionally on every call. Trusted outright and applied
+                             immediately — the host is the only thing that actually knows
+                             its own settings, and it re-sends them every 5s regardless, so
+                             a single dropped or out-of-order call self-heals on the next tick.
 
     Server returns:
-      requests — new customer requests since last sync (status == "pending")
-      actions  — queued bartender approve/deny/settings_update actions, then clears the queue
+      requests         — new customer requests since last sync (status == "pending")
+      actions          — queued bartender approve/deny/stop_session actions, then clears the queue
+      desired_settings — {field: bool} for any field an admin/bartender has requested a
+                         change for that this host's echo hasn't matched yet. Host should
+                         apply these locally; once a later echo matches, the entry drops out
+                         of future responses on its own — no separate ack needed.
     """
     jukebar_id = body.get("jukebar_id", "")
     session    = body.get("session", "")
@@ -580,18 +589,19 @@ async def host_sync(body: dict[str, Any]):
     _validate_session(bar, session)
     _touch(bar)
 
-    # Host's settings echo - applied only if newer than what's already confirmed, so a
-    # stale/duplicate echo (arriving out of order, or repeated every heartbeat) can never
-    # regress a value or clear a pending flag for a since-superseded request.
-    for field_name, info in body.get("settings", {}).items():
-        if field_name not in ("bartender_enabled", "stripe_enabled", "accepting_requests") or not isinstance(info, dict):
+    # Host's settings echo — always trusted as current truth (see docstring above).
+    # Separately, clear a desired_settings entry once the echo matches it. Compare against
+    # whatever's CURRENTLY desired, not a stale snapshot of what was true when some earlier
+    # request went out — if a newer request changed the desired value in the meantime, this
+    # simply won't match and the entry stays pending, re-sent as-is on the next response.
+    echoed = body.get("settings", {})
+    for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
+        if field_name not in echoed:
             continue
-        version = int(info.get("version", 0))
-        if version > bar.settings_confirmed_version.get(field_name, 0):
-            setattr(bar, field_name, bool(info.get("value")))
-            bar.settings_confirmed_version[field_name] = version
-            if bar.settings_pending.get(field_name, -1) <= version:
-                bar.settings_pending.pop(field_name, None)
+        value = bool(echoed[field_name])
+        setattr(bar, field_name, value)
+        if bar.desired_settings.get(field_name) == value:
+            bar.desired_settings.pop(field_name, None)
 
     # Android bartender screen: IDs approved natively on the device
     for rid in body.get("approved_request_ids", []):
@@ -628,7 +638,7 @@ async def host_sync(body: dict[str, Any]):
     actions = list(bar.pending_actions)
     bar.pending_actions.clear()
 
-    return {"requests": new_requests, "actions": actions}
+    return {"requests": new_requests, "actions": actions, "desired_settings": dict(bar.desired_settings)}
 
 
 # ---------------------------------------------------------------------------
@@ -674,7 +684,7 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
             "accepting_requests":     bar.accepting_requests,
-            "settings_pending":       list(bar.settings_pending.keys()),
+            "settings_pending":       list(bar.desired_settings.keys()),
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -938,7 +948,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "currency": bar.currency, "require_approval": bar.require_approval,
             "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
             "accepting_requests": bar.accepting_requests,
-            "settings_pending": list(bar.settings_pending.keys())}
+            "settings_pending": list(bar.desired_settings.keys())}
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
@@ -1022,23 +1032,15 @@ async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
 @app.post("/api/bar/{jukebar_id}/settings")
 async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
-    Admin/bartender: queue a settings change for the host to pick up on its next
-    sync. Does NOT touch bar.bartender_enabled/stripe_enabled/accepting_requests directly -
-    the host is the only thing that can confirm a change actually took effect (see
-    host_sync()'s "settings" echo handling). Each field gets a bumped version number so the
-    relay can tell a genuine confirmation apart from a stale echo of a since-superseded
-    request; concurrent requests for the same field are queued in arrival order (last one
-    wins), not rejected.
+    Admin/bartender: record the desired value for one or more settings fields. Does NOT touch
+    bar.bartender_enabled/stripe_enabled/accepting_requests directly - the host picks up
+    desired_settings on its next /api/host/sync call, applies it locally, and its own echoed
+    current value is what actually updates the field (see host_sync()). A newer request for
+    the same field before the host catches up just overwrites the desired value in place -
+    only the latest matters, nothing is queued or ordered.
     """
     bar = _customer_bar(jukebar_id, s)
-    action: dict[str, Any] = {"type": "settings_update"}
     for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
         if field_name in body:
-            v = bool(body[field_name])
-            version = bar.settings_version.get(field_name, 0) + 1
-            bar.settings_version[field_name] = version
-            bar.settings_pending[field_name] = version
-            action[field_name] = v
-            action[f"{field_name}_version"] = version
-    bar.pending_actions.append(action)
+            bar.desired_settings[field_name] = bool(body[field_name])
     return {"ok": True}

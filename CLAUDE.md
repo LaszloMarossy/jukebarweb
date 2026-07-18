@@ -29,18 +29,42 @@ The Android/iOS host app owns all state. The relay is a message-passing layer:
 2. Admin/customer/bartender pages read from relay
 3. Setting changes from admin → relay queues action → host picks up on next sync → host re-registers with new state
 
-**Versioned settings confirmation (replaces the old optimistic-apply hack):** `POST /api/bar/{id}/settings` no longer patches `BarSession` directly — it only queues the intent and bumps a per-field version number, marking the field `settings_pending`. `admin.html`/`bartender.html` lock that toggle (dimmed, unclickable) the instant it's clicked, for every client polling that bar, not just the one that clicked. The host echoes its current settings + version tag back on *every* `POST /api/host/sync` call unconditionally; the relay only applies an echo whose version is newer than what it's already confirmed, then clears the pending flag. This makes a dropped sync self-heal on the next 5s heartbeat and makes a stale echo for a since-superseded request harmless — no ack handshake, no timeout needed. Concurrent changes to the same field are queued (last one applied wins), never rejected. See `docs/architecture.html` flow B.
+**Settings propagation, single-slot design (replaces both the old optimistic-apply hack and a**
+**short-lived versioned-echo design):** an admin/bartender toggle on `admin.html`/`bartender.html`
+POSTs to `/api/bar/{id}/settings`, which writes the desired value into
+`BarSession.desired_settings[field]` — a single latest-write-wins slot per field, not a queue. It does
+**not** touch `bar.stripe_enabled`/`bartender_enabled`/`accepting_requests` directly. The host picks up
+`desired_settings` in every `/api/host/sync` response, applies it locally, and its **own current
+values** — sent unconditionally on every sync call regardless of who changed them or why — are what
+actually update the live field on the relay (`bar.field = echo.value`, no version/ordering guard: the
+host just re-asserts its truth every 5s, so any single dropped or out-of-order call self-heals on the
+next tick). A `desired_settings` entry clears itself once the host's echo matches it; if a newer
+request overwrote it in the meantime, the echo won't match and it simply keeps re-sending the newer
+value. Client toggles stay locked (dimmed) exactly as long as their field name appears in
+`settings_pending` (`= list(bar.desired_settings.keys())`).
 
-Covers three fields today: `stripe_enabled`, `bartender_enabled`, `accepting_requests` (added 2026-07-18 —
-previously `accepting_requests` was host-native/LAN-toggle-only with no Internet-mode UI at all; see
-`bar_settings()`/`host_sync()` in `main.py`, `AppState.swift`'s `settingsEcho`, and `RelayClient.kt`'s
-`sync()` for the pattern). **Any new admin/bartender toggle needs to be added to all of**: `bar_settings()`
-field tuple, `host_sync()`'s echo-application allow-list, the `/api/bar/{id}/requests` response, both
-relay HTML files' Actions tab, iOS `AppState.swift` (echo + action handling) + `LocalServer.swift`
-(`/api/admin/settings`) + both LAN HTML files, and Android `RelayClient.kt`/`RelayService.kt`
-(echo + action handling) + `LocalServer.kt` (`handleAdminSettings`) + both LAN HTML files — missing any
-one of these silently breaks only that surface, which is exactly how `accepting_requests` went
-unnoticed for ten days.
+**Register is never used for a routine toggle** — only for startup, a genuinely new session (End
+Session/restart), or a catalog refresh. `host_register()` updates an existing `BarSession` in place
+when it's the same ongoing session (same `jukebar_id` + `session`), rather than replacing it, so it
+never wipes `now_playing`/`up_next_queue`/pending requests — but the real fix for that class of bug was
+removing register from the toggle path entirely: a settings change is decoupled by construction from
+playback-display state, because they now flow through completely separate fields with no shared
+replace-the-whole-object step.
+
+Covers three fields today: `stripe_enabled`, `bartender_enabled`, `accepting_requests`. **Any new
+admin/bartender toggle needs**: `bar_settings()`'s field tuple, `host_sync()`'s echo/clear logic, the
+`/api/bar/{id}/requests` response, both relay HTML files' Actions tab, iOS `AppState.swift`'s
+`settingsEcho`/`applyDesiredSettings()` + `LocalServer.swift` (`/api/admin/settings`, LAN-only, direct
+apply, unrelated to this mechanism) + both LAN HTML files, and Android `RelayClient.kt`/`RelayService.kt`
+equivalents + `LocalServer.kt` (`handleAdminSettings`) + both LAN HTML files. Missing one of these
+silently breaks only that surface, which is exactly how `accepting_requests` went unnoticed for ten
+days before this design existed.
+
+(2026-07-18: this replaced a same-day earlier version of this section describing per-field version
+numbers and a `settings_pending`/`settings_version`/`settings_confirmed_version` triple. That design
+worked but was more machinery than the problem needed — the version numbers were insurance against
+network-reordering that the heartbeat's own repetition already bounds to one cycle, and the queue-style
+`pending_actions` entry for settings updates was redundant with a plain latest-value slot.)
 
 ## UI surface matrix (13 surfaces, all must stay in sync)
 JukeBar has three codebases — iOS (`~/dev/giffy/JukeBar`), Android (`~/dev/giffy/spotonjukebar`), and this relay (jukebarweb). Every page type exists across multiple delivery surfaces and (except Bartender) both host platforms. Any task touching admin/bartender/customer UI or behavior should be checked against every relevant cell below, not just the one surface mentioned. Look and feel should be near-identical (ideally identical) across all surfaces of a given page type. The Render (internet) cell is a single shared page regardless of which platform is hosting — there is no iOS/Android branching in `static/*.html` or `main.py`.
