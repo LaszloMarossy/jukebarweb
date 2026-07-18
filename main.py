@@ -458,8 +458,16 @@ async def map_bars():
 @app.post("/api/host/register")
 async def host_register(body: dict[str, Any]):
     """
-    Called by iOS on startup when running in internet relay mode.
-    Accepts the full catalog for customer browsing — held in memory only.
+    Called by iOS/Android on startup when running in internet relay mode, and again on every
+    live settings change (payment toggles, accepting_requests) to push the new values - the
+    host has no lighter-weight "just update settings" call, so it reuses full register.
+
+    For that reason, re-registering the SAME ongoing session (jukebar_id + session both match
+    an existing entry) updates fields in place rather than replacing the BarSession outright -
+    otherwise now_playing/is_playing/up_next_queue/pending requests (none of which the register
+    payload carries) would go blank on every settings toggle until the next natural song change
+    or sync. A different (or missing) session means a genuine new session - build fresh so state
+    from the previous session doesn't leak in.
     """
     jukebar_id = body.get("jukebar_id", "")
     session = body.get("session", "")
@@ -468,24 +476,44 @@ async def host_register(body: dict[str, Any]):
 
     catalog = body.get("catalog", [])
     pk = body.get("stripe_publishable_key", "")
-    _bars[jukebar_id] = BarSession(
-        jukebar_id=jukebar_id,
-        session=session,
-        bar_name=body.get("bar_name", ""),
-        playlist_name=body.get("playlist_name", ""),
-        bartender_enabled=body.get("bartender_enabled", True),
-        accepting_requests=body.get("accepting_requests", True),
-        catalog=catalog,
-        song_index={s["id"]: s for s in catalog if "id" in s},
-        price_per_song=body.get("price_per_song", 0.0),
-        price_for_three=body.get("price_for_three", 0.0),
-        currency=body.get("currency", ""),
-        stripe_enabled=body.get("stripe_enabled", bool(pk)),
-        stripe_publishable_key=pk,
-        stripe_secret_key=body.get("stripe_secret_key", ""),
-        now_playing=body.get("now_playing"),
-        pin_hash=body.get("pin_hash", ""),
-    )
+    existing = _bars.get(jukebar_id)
+
+    if existing is not None and existing.session == session:
+        bar = existing
+        bar.bar_name = body.get("bar_name", "")
+        bar.playlist_name = body.get("playlist_name", "")
+        bar.bartender_enabled = body.get("bartender_enabled", True)
+        bar.accepting_requests = body.get("accepting_requests", True)
+        bar.catalog = catalog
+        bar.song_index = {s["id"]: s for s in catalog if "id" in s}
+        bar.price_per_song = body.get("price_per_song", 0.0)
+        bar.price_for_three = body.get("price_for_three", 0.0)
+        bar.currency = body.get("currency", "")
+        bar.stripe_enabled = body.get("stripe_enabled", bool(pk))
+        bar.stripe_publishable_key = pk
+        bar.stripe_secret_key = body.get("stripe_secret_key", "")
+        bar.pin_hash = body.get("pin_hash", "")
+        bar.last_seen = time.time()
+    else:
+        _bars[jukebar_id] = BarSession(
+            jukebar_id=jukebar_id,
+            session=session,
+            bar_name=body.get("bar_name", ""),
+            playlist_name=body.get("playlist_name", ""),
+            bartender_enabled=body.get("bartender_enabled", True),
+            accepting_requests=body.get("accepting_requests", True),
+            catalog=catalog,
+            song_index={s["id"]: s for s in catalog if "id" in s},
+            price_per_song=body.get("price_per_song", 0.0),
+            price_for_three=body.get("price_for_three", 0.0),
+            currency=body.get("currency", ""),
+            stripe_enabled=body.get("stripe_enabled", bool(pk)),
+            stripe_publishable_key=pk,
+            stripe_secret_key=body.get("stripe_secret_key", ""),
+            now_playing=body.get("now_playing"),
+            pin_hash=body.get("pin_hash", ""),
+        )
+
     # Keep map entry's last_seen fresh if the bar is registered there
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
