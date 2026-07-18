@@ -922,6 +922,19 @@ async def bar_payment_confirmed(
 
 @app.get("/api/bar/{jukebar_id}/requests")
 async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
+    """
+    Feeds admin.html/bartender.html's Requests (needs a bartender tap) and Up Next (already
+    resolved) sections. "status" here is a DISPLAY status, not always bar.requests[rid].status
+    verbatim: a still-"pending" request is shown as "approved" (Up Next, no buttons) the moment
+    it's destined to be auto-approved with no human review at all - Stripe-paid ones always
+    (payment_method == "stripe"), and any request at all when the bar's current mode needs no
+    approval (require_approval is False, i.e. both stripe_enabled and bartender_enabled are off).
+    The underlying bar.requests[rid].status is left untouched by this - it stays "pending" until
+    the host's own up_next echo confirms it (see host_sync()), since that's also what makes it
+    show up in new_requests for the host to actually pick up and inject at all. This is purely a
+    display override so the bartender never sees a fleeting, meaningless "needs approval" flash
+    for something nobody was ever going to be asked to approve.
+    """
     bar = _customer_bar(jukebar_id, s)
     pending = [
         {
@@ -940,7 +953,11 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "requester_name": r.requester_name,
             "customer_id": r.customer_id,
             "jump": r.jump,
-            "status": r.status,
+            "status": (
+                "approved"
+                if r.status == "pending" and (r.payment_method == "stripe" or not bar.require_approval)
+                else r.status
+            ),
             "paid": r.paid,
             "payment_method": r.payment_method,
             "created_at": r.created_at,
@@ -1021,19 +1038,22 @@ async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), bod
 async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
     Denies a pending request, or cancels one already approved/queued (the "Cancel" button on
-    already-playing-soon free requests). Only free requests can be cancelled once approved -
-    a paid one (Stripe or bartender) already has money attached to it and must not be pulled
-    from the queue by this same one-click action. Pending (not yet approved) requests can
-    still be denied regardless of payment method - that's the pre-existing reject-before-it-
-    plays behavior, unrelated to this restriction.
+    already-playing-soon free requests). Stripe-paid requests can never be denied/cancelled
+    through this endpoint, at any status - payment_method is set to "stripe" at creation and
+    never changes, so this one check covers both "still pending, not yet host-confirmed" and
+    "already approved" for that case. A bartender-paid request only becomes payment_method
+    "bartender" at the moment it's actually approved (see bartender_approve()), so a still-
+    pending bartender-flow request (payment_method still "free" at that point) can still be
+    denied before approval - that's the pre-existing reject-before-it-plays behavior, unrelated
+    to this restriction.
     """
     bar = _customer_bar(jukebar_id, s)
     rid = body.get("request_id", "")
     req = bar.requests.get(rid)
     if req is None:
         raise HTTPException(404, "Request not found")
-    if req.status in ("approved", "approved_jump") and req.payment_method != "free":
-        raise HTTPException(403, "Only free requests can be cancelled once approved")
+    if req.payment_method != "free":
+        raise HTTPException(403, "Paid requests cannot be denied or cancelled")
     req.status = "denied"
     bar.pending_actions.append({
         "type": "deny",

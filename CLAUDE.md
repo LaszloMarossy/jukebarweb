@@ -137,19 +137,36 @@ reality — fixed same day by adding `PlaybackCoordinator.requestedSongPaid: Map
 alongside the existing `requestedSongNames` map, threaded through all 7 `injectSongs()` call sites.
 
 **"Cancel" button on Up Next (added 2026-07-18)** — bartender/admin can pull an already-approved **free**
-request back out of the live queue; paid ones (Stripe or bartender) cannot be cancelled this way once
-approved. Reuses the existing `POST /api/bar/{id}/deny` endpoint/action rather than a new one —
-`bartender_deny()` now rejects (403) denying an `approved`/`approved_jump` request unless
-`payment_method == "free"`; a still-*pending* request can be denied regardless of payment (that's the
-pre-existing reject-before-it-plays behavior, unrelated to this restriction). The host-side "pull it out
-of the live queue" mechanism already existed on iOS (`MusicService.cancelRequest()`, built for LAN mode
-but never wired to the relay-driven `"deny"` action) — just needed connecting. Android had no equivalent
-at all; added `PlaybackCoordinator.cancelRequestedSongs()`, which only ever removes songs strictly after
-the current queue position (never touches the currently-playing song) and skips immediately via
-`advance()` if one of the cancelled songs already lost the race and became current — mirrors iOS's
-"let it flash then auto-skip" behavior for that same edge case. Both platforms wired this into their LAN
-deny handler too (Android's LAN deny previously did nothing beyond marking the status, another gap
-fixed as part of this).
+request back out of the live queue; paid ones (Stripe or bartender) cannot be cancelled this way at all.
+Reuses the existing `POST /api/bar/{id}/deny` endpoint/action rather than a new one — `bartender_deny()`
+rejects (403) whenever `payment_method != "free"`, unconditionally regardless of status. This has to be
+unconditional, not just "once approved": a Stripe request's `payment_method` is set to `"stripe"` at
+creation and never changes, so it needs blocking even during the brief window it's still raw
+`status == "pending"` (not yet host-confirmed) — a status-gated check alone would have missed that
+window. A still-pending *bartender-flow* request is unaffected (its `payment_method` only becomes
+`"bartender"` at actual approval time, so it reads `"free"` until then and stays deniable pre-approval,
+same as always). The host-side "pull it out of the live queue" mechanism already existed on iOS
+(`MusicService.cancelRequest()`, built for LAN mode but never wired to the relay-driven `"deny"` action)
+— just needed connecting. Android had no equivalent at all; added `PlaybackCoordinator.cancelRequestedSongs()`,
+which only ever removes songs strictly after the current queue position (never touches the
+currently-playing song) and skips immediately via `advance()` if one of the cancelled songs already lost
+the race and became current — mirrors iOS's "let it flash then auto-skip" behavior for that same edge
+case. Both platforms wired this into their LAN deny handler too (Android's LAN deny previously did
+nothing beyond marking the status, another gap fixed as part of this).
+
+**"Requests" vs "Up Next" display status is computed, not raw storage status (fixed 2026-07-18)** —
+`bar.requests[rid].status` legitimately stays `"pending"` on the relay until the host's own `up_next`
+echo confirms it (see `host_sync()`) — that's also what makes it appear in `new_requests` for the host
+to pick up at all, so it can't just be flipped to `"approved"` at creation without breaking delivery.
+But a Stripe-paid or pure-auto-accept-mode request was never actually going to need a bartender's
+approve/deny tap, so showing it in the pending section with action buttons for that in-between window
+was pure noise (and confusing — it would "pop down" to Up Next moments later on its own). `bartender_requests()`
+now computes a display-only status: a `"pending"` request reads as `"approved"` to the client whenever
+`payment_method == "stripe"` or the bar's `require_approval` is currently false (pure auto-accept mode)
+— covers both "always skips review" (Stripe) and "this bar isn't reviewing anything right now" (free
+mode). The raw stored status is untouched, so `new_requests`/host-confirmation logic is unaffected. This
+is relay-only — LAN mode never had this bug, since both host apps already compute the correct status
+synchronously at request-creation time with no async confirmation round-trip in between.
 
 **STRIPE_MINIMUMS is a curated list** — not the complete Stripe currency list. Only currencies we actively support with known minimums.
 
