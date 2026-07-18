@@ -1,5 +1,8 @@
 # Testing checklist — features since 2026-06-26
 
+Last reviewed 2026-07-18 against the settings-propagation redesign (§2) and the new
+accepting_requests Internet-mode toggle (§1b) — both shipped same-day as the last review.
+
 Surface key (13-surface matrix, see CLAUDE.md):
 - **A-K-i / A-K-a** = Admin kiosk-native (iOS AdminView.swift / Android AdminScreen.kt)
 -
@@ -52,28 +55,52 @@ read alone — code correctness isn't the same as verified runtime behavior.
 
 ## 1b. accepting_requests flag (pairs with shutdown, but independently testable)
 
-**Surfaces:** Customer LAN (iOS + Android), Customer Internet/relay; verify kiosk-native too
+**Surfaces:** Customer LAN (iOS + Android), Customer Internet/relay, Admin/Bartender Internet+LAN
+(the toggle control itself — added 2026-07-18, wasn't in the original 2026-07-08 accepting_requests
+build), kiosk-native
 
+- [ ] **NEW:** relay `admin.html` Actions tab has an "Accepting requests" toggle (separate card, below
+      the Payments card) — flip it and confirm it locks (dimmed) until the host confirms, same UX as
+      the Stripe/Bartender toggles
+- [ ] **NEW:** relay `bartender.html` Actions tab has the same toggle — confirm bartenders can flip it,
+      not just admin
+- [ ] **NEW:** iOS + Android LAN `admin.html`/`bartender.html` — same toggle present and working
 - [ ] Toggle off accepting new requests → Browse/Pay/Submit buttons disappear, "Not accepting requests right now" shown within ~5s poll (relay customer.html)
 - [ ] Same on iOS LAN customer.html
 - [ ] Same on Android LAN customer.html
-- [ ] QR code + now-playing stay visible throughout (not hidden along with the buttons)
+- [ ] QR code + now-playing stay visible throughout (not hidden along with the buttons) — **this
+      regressed once already (see §2's now-playing regression test) — don't skip this check**
 - [ ] `/request` and `/create-payment-intent` return 403 while off
 - [ ] `/payment-confirmed` still succeeds for a request already in flight when the flag flips off
 - [ ] Kiosk-native (iOS `KioskView.swift`'s `allowsLocalRequest`, Android `KioskView.kt`'s `showLocalRequestButton`) already gates the local Request button on this flag in source — verify live: toggle off, confirm the kiosk still shows now-playing/QR but hides/disables its own Request button too
 
-## 2. Versioned settings confirmation ("trickle-back")
+## 2. Settings confirmation ("desired_settings", redesigned 2026-07-18 — no more version numbers)
 
 **Surfaces:** Admin LAN (iOS + Android), Admin Internet, Bartender LAN (iOS + Android), Bartender Internet
 
+Two things changed same-day and both need verifying, not just the lock/unlock UX (which should look
+identical to before — the redesign was internal):
+
+- [ ] **Regression test — this is the actual bug the user found live:** with a song already playing and
+      a request already approved/queued, flip *any* of the three toggles (Stripe, Bartender, or
+      Accepting requests) from the Internet `admin.html` or `bartender.html` → confirm **Now Playing and
+      Up Next do NOT go blank** on any relay page (customer/admin/bartender) at any point during or
+      after the toggle. Repeat for each of the three fields individually — the bug wasn't specific to
+      one field, it would have hit all three before the fix.
+- [ ] Same check toggling from the **kiosk-native** admin screen and from **LAN** admin.html directly
+      (both platforms) — these paths also used to trigger a full re-register
 - [ ] Flip a payment toggle on relay `admin.html` → toggle visibly locks (dimmed, unclickable) instantly
 - [ ] A second browser tab on relay `admin.html` for the same bar also shows the toggle locked, not just the tab that clicked it
 - [ ] relay `bartender.html` for the same bar also shows the lock
 - [ ] Toggle unlocks within ~5s (one host sync cycle) once host picks it up and echoes back
 - [ ] Repeat on iOS LAN admin.html / bartender.html
 - [ ] Repeat on Android LAN admin.html / bartender.html
-- [ ] Rapid double-toggle (change, then change again before the first confirms) → confirm last-one-wins, no permanently-stuck-locked state
-- [ ] Kill host mid-sync (simulate dropped sync) → confirm toggle self-heals on next 5s heartbeat rather than staying locked forever
+- [ ] Rapid double-toggle (change, then change again before the first confirms) → confirm the **final**
+      state matches the **last** click, not the first — this is the specific race the new
+      `desired_settings` design was built to handle correctly (compare against current desired value,
+      not a stale snapshot)
+- [ ] Kill host mid-sync (simulate dropped sync/airplane mode briefly) → confirm toggle self-heals on next 5s heartbeat rather than staying locked forever
+- [ ] Optional/technical: watch server logs while rapidly toggling — should see repeated `POST /api/host/sync` calls but **no** `POST /api/host/register` calls during toggling (register should only fire at startup/End Session/catalog refresh)
 
 ## 3. Payment-mode refactor (raw stripeEnabled/bartenderEnabled flags)
 
@@ -85,7 +112,10 @@ Run these 4 combinations, each checked on: relay admin+bartender+customer, iOS L
 - [ ] Bartender only (Stripe off) — price shown, pay-to-bartender flow, no card entry
 - [ ] Both on — Stripe path takes precedence per spec; confirm behavior matches intent
 - [ ] Both off (auto-approve/free) — no price shown anywhere, requester name still required, request auto-accepted with no approval step
-- [ ] Bartender Actions tab shows exactly 2 raw toggles (Stripe/Bartender), no phantom 3rd "Auto" toggle, on all 3 bartender surfaces
+- [ ] Bartender Actions tab shows exactly 2 raw payment toggles (Stripe/Bartender) in the Payments
+      card, no phantom 3rd "Auto" toggle mixed in with them — **the separate "Accepting requests"
+      toggle in its own Requests card (added 2026-07-18, see §1b) is intentional, not a regression of
+      this rule**, don't flag it as one
 
 ## 4. requester_name standardization
 
