@@ -183,6 +183,25 @@ be cancellable through this one-click action, on any surface. LAN `bartender.htm
 ever shows *pending* requests (no Up Next section exists there at all), so nothing needed changing there
 — left as a known scope boundary, not silently skipped.
 
+**"Past Requests" overlay for played/denied history (added 2026-07-19, relay `admin.html` only)** — the
+relay's `bartender_requests()` (the live Requests/Up Next feed) has always excluded `"played"`/`"denied"`
+entries by design (`if r.status in ("pending", "approved", "approved_jump")`) — that data was never lost,
+it just had nowhere to render: the only unfiltered endpoint, `bar_history()`, was consumed solely by the
+Reports tab for a numeric count, never an inline list. Rather than broaden the live feed (and permanently
+crowd the screen with history), added a "📜 Past Requests" button that opens a bottom-sheet overlay,
+fetching `bar_history()` on demand — nothing loads until asked for. `bar_history()` was enriched to
+return the same shape as `bartender_requests()` (`song_details`, `payment_method`, etc.) so the existing
+`requestCard()` renderer could be reused as-is. That reuse surfaced a latent bug: `requestCard()`'s
+non-actionable branch **hardcoded "In queue" regardless of actual status** — harmless before, since it
+was only ever called with genuinely-approved rows, but wrong the moment played/denied rows started
+flowing through the same renderer. Fixed to branch on `r.status` properly (`.req-badge.played`/`.denied`
+added). **LAN admin.html on both platforms got the equivalent restructuring**, but simpler: their
+`/api/requests` was never filtered by status to begin with (`renderRequests()` already received
+everything and did its own client-side grouping into Pending/Up Next/Played/Denied, always rendering all
+four inline) — so no backend change was needed, just moving the already-correct Played/Denied rendering
+out of the main scroll and into the same on-demand overlay pattern, reusing already-fetched data with no
+extra network call.
+
 **STRIPE_MINIMUMS is a curated list** — not the complete Stripe currency list. Only currencies we actively support with known minimums.
 
 **`stripe_enabled` derived from key presence on register** — relay register handler originally derived `stripe_enabled = bool(pk)` (key present = enabled). Now uses `body.get("stripe_enabled", bool(pk))` so host can explicitly disable Stripe while keeping the key stored. Android client sends `stripe_enabled` explicitly; iOS sends empty key when disabled.

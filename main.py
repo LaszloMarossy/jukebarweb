@@ -1000,18 +1000,37 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
 
 @app.get("/api/bar/{jukebar_id}/history")
 async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
-    """All requests for the current session — used by admin page reports tab."""
+    """
+    All requests for the current session, any status - used by admin page's Reports tab (status
+    counts) and the Past Requests overlay (played/denied list). Shaped the same as
+    bartender_requests()'s entries (song_details, payment_method, etc.) so the client can reuse
+    the same requestCard() renderer for both.
+    """
     bar = _customer_bar(jukebar_id, s)
     return {
         "bar_name": bar.bar_name,
         "requests": [
             {
                 "id": r.id,
+                "song_ids": r.song_ids,
                 "song_titles": r.song_titles,
+                "song_details": [
+                    {
+                        "artist":           bar.song_index.get(sid, {}).get("artist", ""),
+                        "album":            bar.song_index.get(sid, {}).get("album", ""),
+                        "title":            bar.song_index.get(sid, {}).get("title", ""),
+                        "duration_seconds": bar.song_index.get(sid, {}).get("duration_seconds", 0),
+                    }
+                    for sid in r.song_ids
+                ],
                 "requester_name": r.requester_name,
+                "customer_id": r.customer_id,
                 "status": r.status,
                 "jump": r.jump,
+                "paid": r.paid,
+                "payment_method": r.payment_method,
                 "created_at": r.created_at,
+                "approved_at": r.approved_at,
             }
             for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
         ],
