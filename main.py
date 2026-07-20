@@ -577,16 +577,14 @@ async def host_sync(body: dict[str, Any]):
                              price, created_at, approved_at). Sent unconditionally every call,
                              same self-healing pattern as settings below — upserted into
                              bar.requests (see merge loop). This is what makes a request born
-                             on ANY host-local surface (kiosk, LAN web) visible relay-side
-                             without a client-specific POST: the host is sole authority for its
-                             own state, and this broadcasts it out every tick. iOS sends this
-                             fully today; Android sends it for kiosk/LAN-originated requests
-                             (its LocalRequestManager) but not yet for internet-adopted ones, so
-                             played_request_ids/approved_request_ids/up_next below remain live
-                             for that gap — see CLAUDE.md's host-broadcasts-state note.
-      played_request_ids   — request IDs whose song just became currentSong
-      approved_request_ids — request IDs approved by the Android bartender screen
-                             (server sets these to "approved" so kiosk Up Next shows them)
+                             on ANY host-local surface (kiosk, LAN web, internet-adopted) visible
+                             relay-side without a client-specific POST: the host is sole
+                             authority for its own state, and this broadcasts it out every tick.
+                             Both iOS (LocalStorage) and Android (LocalRequestManager) send this
+                             as their single, fully unified request store as of 2026-07-20 — see
+                             CLAUDE.md's host-broadcasts-state note.
+      up_next                — host's live queue, for bar_display() only (not request status —
+                             see requests above).
       settings              — {field: bool}; the host's current values for
                              bartender_enabled/stripe_enabled/accepting_requests, sent
                              unconditionally on every call. Trusted outright and applied
@@ -623,24 +621,8 @@ async def host_sync(body: dict[str, Any]):
         if bar.desired_settings.get(field_name) == value:
             bar.desired_settings.pop(field_name, None)
 
-    # Android bartender screen: IDs approved natively on the device
-    for rid in body.get("approved_request_ids", []):
-        if rid in bar.requests and bar.requests[rid].status == "pending":
-            bar.requests[rid].status = "approved"
-            bar.requests[rid].approved_at = time.time()
-
-    for rid in body.get("played_request_ids", []):
-        if rid in bar.requests:
-            bar.requests[rid].status = "played"
-
     if "up_next" in body:
         bar.up_next_queue = body["up_next"]
-        # Host's up_next is the authority: mark any request the host has queued as approved
-        up_next_ids = {item.get("request_id") for item in body["up_next"] if item.get("request_id")}
-        for rid in up_next_ids:
-            if rid in bar.requests and bar.requests[rid].status == "pending":
-                bar.requests[rid].status = "approved"
-                bar.requests[rid].approved_at = time.time()
 
     # Host's full request-list broadcast (see docstring): upsert only, never delete — a
     # customer-web/Stripe request the relay just created may not be in this echo yet (host

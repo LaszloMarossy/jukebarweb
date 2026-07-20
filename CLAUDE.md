@@ -64,12 +64,22 @@ Android `MainActivity.handleLocalRequest()`) now **always** just saves to host-l
 relay-awareness at request-creation time at all, matching how LAN mode always worked. **iOS is fully
 unified**: `LocalStorage` was already the single request store for every origin, so the old
 `played_request_ids` mechanism (and its `pendingPlayedIds` bookkeeping) was deleted outright, fully
-superseded by the `requests` echo. **Android is not yet fully unified** — `LocalRequestManager` covers
-kiosk- and LAN-web-originated requests, but internet-adopted (customer-web/Stripe) ones still live only
-in `RelayService`'s ad hoc `pendingRequests`/`injectedRequestIds` bookkeeping, not in
-`LocalRequestManager` — so `played_request_ids`/`approved_request_ids`/`up_next`'s approval-trigger loop
-in `host_sync()` stay live specifically to cover that gap. Fully unifying Android onto one request store
-(matching iOS) is a known follow-up, not done as part of this change.
+superseded by the `requests` echo. **Android is now fully unified too, as of the same day's follow-up**:
+`LocalRequestManager` — previously only for kiosk/LAN-web-originated requests — is now also where
+`RelayService.handleSyncResponse()` adopts internet-web/Stripe requests (`addRequest(requestId = req.id,
+...)`, keeping the relay's own id so later approve/deny actions can find it), and where bartender
+approve/deny actions and played-detection (`nowPlayingJob`'s song-changed check) write, replacing the old
+`pendingRequests`/`PendingRequest`/`approvePending()`/`denyPending()` bookkeeping (all deleted — confirmed
+unused by any UI before removal). `played_request_ids`/`approved_request_ids` are gone from both the
+Android client and `host_sync()`'s handling — the `requests` echo alone now covers status for every
+origin on both platforms. `RelayService` still keeps one small piece of its own bookkeeping,
+`injectedRequestIds: Map<songId, requestId>` — that's a live-queue-position question (which currently
+playing song belongs to which request, for `up_next`'s display and for pulling a cancelled song back out
+of the ExoPlayer queue) that a flat request list doesn't answer, not request *state*, so it stays
+separate from `LocalRequestManager` by design, matching how iOS's `PlaybackCoordinator`/`AppState` queue
+tracking is also kept separate from `LocalStorage`. `LocalRequestManager.markPlayed()` also gained the
+same "only the request's last song" guard iOS's `markRequestPlayed()` already had — previously it flagged
+a whole multi-song request as played the moment its first song started.
 
 **Settings propagation, single-slot design (replaces both the old optimistic-apply hack and a**
 **short-lived versioned-echo design):** an admin/bartender toggle on `admin.html`/`bartender.html`
