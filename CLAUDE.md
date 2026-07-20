@@ -33,23 +33,43 @@ author of truth:
 **Governing principle (2026-07-20): every surface writes to host app state; host app state broadcasts**
 **itself out to every client.** This applies uniformly to settings, `now_playing`, `up_next`, and song
 requests — regardless of which client (kiosk, LAN web, internet web, bartender, admin) originated the
-change. A client action is never allowed to update relay state directly and have that stand as truth;
-it must change the host's own state (directly if it's already host-local, or via a relay-queued action
-the host applies on its next sync), and the host's next sync unconditionally re-asserts its full current
-state to the relay — the same self-healing, no-version-numbers-needed pattern already used for settings
-(see below) and `now_playing`/`up_next` (`host_sync()`/`host_nowplaying()` overwrite unconditionally
-every call, `main.py:544`/`624`). **`bar.requests` does not yet fully comply** — it's independently
-authored by relay-side POST handlers (`bar_request()`, `bar_payment_confirmed()`) for customer-web/kiosk/
-Stripe-created requests, and the host's sync only *mutates* existing entries by id (status flips via
-`up_next`/`approved_request_ids`/`played_request_ids`), never creates them from host-local data. This is
-what let a kiosk-created free-mode request go fully invisible on the relay-served admin page: the kiosk
-saved it to `LocalStorage` only, and nothing in the sync payload could reconstruct a full `SongRequest`
-relay-side from that. Fixed as a narrower patch on 2026-07-20 (kiosk POSTs to `/request` directly,
-mirroring what customer.html already does) — the principled fix is a follow-up: extend the host sync
-payload to carry the host's full local request list (not just `up_next`'s minimal display data) so the
-relay can mirror it into `bar.requests` unconditionally, the same way it already mirrors settings and
-`now_playing`. Once that lands, the kiosk's direct-POST patch becomes unnecessary and should be removed
-— any future host-side write path gets this for free, with no client-specific relay plumbing required.
+change. A client action never updates relay state directly and has that stand as truth; it must change
+the host's own state (directly if it's already host-local, or via a relay-queued action the host applies
+on its next sync), and the host's next sync unconditionally re-asserts its full current state to the
+relay — the same self-healing, no-version-numbers-needed pattern already used for settings (see below).
+Two channels ride the same 5s heartbeat: **upstream** ("requested stuff" the host needs to know about
+and make official — `new_requests`, `actions`, `desired_settings`, all delivered in the sync *response*
+since the relay can't push to a polling host any other way) and **downstream** ("confirmed stuff" the
+host broadcasts out unconditionally every tick — `settings` echo, `now_playing`, `up_next`, and now
+`requests` too). A request is *born* wherever a customer/bartender/kiosk acts, but only becomes official
+once it's host state; from there it propagates out to every reader (LAN pages read host state directly,
+no relay hop; relay-served pages read the mirrored copy `host_sync()` maintains). Stripe fits this
+without special-casing: the relay is simply the only thing Stripe can talk to, so a confirmed payment
+just joins `new_requests` upstream like any other newly-known request.
+
+**`bar.requests` full compliance, landed 2026-07-20:** `host_sync()`'s `requests` field carries the
+host's complete local request list (any status) every call; the relay **upserts** each into
+`bar.requests` — never deletes, since a customer-web/Stripe request the relay just created may not be in
+the host's echo yet (not yet adopted), and history the host has stopped keeping locally shouldn't vanish
+just because it aged out of the echo. For an id the relay already knows (born relay-side via
+`bar_request()`/`bar_payment_confirmed()`), only `status`/`jump`/`approved_at`/`paid` are trusted from
+the host — `price`/`payment_method`/`requester_name`/`song_ids` stay whatever the relay originally
+recorded, since that's authoritative for anything born there, not something the host reconstructed.
+`new_requests` (upstream) also now carries `price`/`payment_method` so a host adopting a relay-born
+request doesn't have to guess them (iOS previously recomputed price from *current* bar settings here,
+missing 3-song-bundle pricing — now trusts the relay's frozen value directly). This retired the
+free-mode-only kiosk-POSTs-directly patch from earlier the same day: kiosk (iOS `CatalogBrowseView.submit()`,
+Android `MainActivity.handleLocalRequest()`) now **always** just saves to host-local state
+(`LocalStorage`/`LocalRequestManager`) regardless of network mode or approval mode — one path, no
+relay-awareness at request-creation time at all, matching how LAN mode always worked. **iOS is fully
+unified**: `LocalStorage` was already the single request store for every origin, so the old
+`played_request_ids` mechanism (and its `pendingPlayedIds` bookkeeping) was deleted outright, fully
+superseded by the `requests` echo. **Android is not yet fully unified** — `LocalRequestManager` covers
+kiosk- and LAN-web-originated requests, but internet-adopted (customer-web/Stripe) ones still live only
+in `RelayService`'s ad hoc `pendingRequests`/`injectedRequestIds` bookkeeping, not in
+`LocalRequestManager` — so `played_request_ids`/`approved_request_ids`/`up_next`'s approval-trigger loop
+in `host_sync()` stay live specifically to cover that gap. Fully unifying Android onto one request store
+(matching iOS) is a known follow-up, not done as part of this change.
 
 **Settings propagation, single-slot design (replaces both the old optimistic-apply hack and a**
 **short-lived versioned-echo design):** an admin/bartender toggle on `admin.html`/`bartender.html`
