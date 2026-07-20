@@ -92,6 +92,9 @@ class SongRequest:
     # approval IS the payment confirmation) | "stripe" (paid online). paid is true for both
     # bartender and stripe - only "free" means no payment happened at all.
     payment_method: str = "free"
+    # Frozen at request creation (mirrors iOS/Android's immutable SongRequest.price) so historical
+    # rows still show what was actually charged/quoted even if the bar's pricing changes later.
+    price: float = 0.0
 
 
 @dataclass
@@ -776,6 +779,14 @@ async def bar_display(jukebar_id: str, s: str = Query(None)):
     }
 
 
+def _compute_price(bar: "BarSession", song_ids: list[str]) -> float:
+    pps = bar.price_per_song
+    p3  = bar.price_for_three
+    if pps <= 0:
+        return 0.0
+    return p3 if (len(song_ids) == 3 and p3 > 0) else pps * len(song_ids)
+
+
 @app.post("/api/bar/{jukebar_id}/request")
 async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
@@ -795,6 +806,7 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
         customer_id=body.get("customer_id", ""),
         jump=body.get("jump", False),
         status="pending",  # always pending; host confirms via up_next — relay is not the authority
+        price=_compute_price(bar, song_ids),
     )
     bar.requests[rid] = req
     return {"request_id": rid, "status": req.status}
@@ -836,11 +848,9 @@ async def bar_create_payment_intent(
     song_ids: list[str] = body.get("song_ids", [])
     if not song_ids:
         raise HTTPException(400, "song_ids required")
-    pps = bar.price_per_song
-    p3  = bar.price_for_three
-    if pps <= 0:
+    price = _compute_price(bar, song_ids)
+    if price <= 0:
         raise HTTPException(400, "No price configured")
-    price    = p3 if (len(song_ids) == 3 and p3 > 0) else pps * len(song_ids)
     currency = bar.currency.lower()
     if not currency:
         raise HTTPException(400, "Stripe currency not set")
@@ -911,6 +921,7 @@ async def bar_payment_confirmed(
         status="pending",   # host picks this up via new_requests (paid=True → auto-inject)
         paid=True,
         payment_method="stripe",
+        price=_compute_price(bar, song_ids),
     )
     bar.requests[rid] = req
     return {"request_id": rid, "status": "approved"}
@@ -960,6 +971,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             ),
             "paid": r.paid,
             "payment_method": r.payment_method,
+            "price": r.price,
             "created_at": r.created_at,
             "approved_at": r.approved_at,
         }
@@ -1001,10 +1013,9 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
 @app.get("/api/bar/{jukebar_id}/history")
 async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
     """
-    All requests for the current session, any status - used by admin page's Reports tab (status
-    counts) and the Past Requests overlay (played/denied list). Shaped the same as
-    bartender_requests()'s entries (song_details, payment_method, etc.) so the client can reuse
-    the same requestCard() renderer for both.
+    All requests for the current session, any status - powers admin page's Reports tab (status
+    counts + full request list). Shaped the same as bartender_requests()'s entries (song_details,
+    payment_method, price, etc.) so the client can reuse the same requestCard() renderer for both.
     """
     bar = _customer_bar(jukebar_id, s)
     return {
@@ -1029,6 +1040,7 @@ async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
                 "jump": r.jump,
                 "paid": r.paid,
                 "payment_method": r.payment_method,
+                "price": r.price,
                 "created_at": r.created_at,
                 "approved_at": r.approved_at,
             }

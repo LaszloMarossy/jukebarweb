@@ -191,30 +191,6 @@
 
     .section-gap { margin-top: 28px; }
 
-    /* ── Past Requests overlay ── */
-    .btn-history {
-      display: block; width: 100%; margin-top: 28px; padding: 10px;
-      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-      color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer;
-    }
-    .btn-history:active { opacity: .7; }
-    #history-overlay {
-      position: fixed; inset: 0; z-index: 95;
-      background: rgba(0,0,0,.75); display: none; align-items: flex-end; justify-content: center;
-    }
-    #history-overlay.open { display: flex; }
-    .history-panel {
-      width: 100%; max-width: 480px; height: 75dvh; background: var(--bg);
-      border-radius: 20px 20px 0 0; display: flex; flex-direction: column; overflow: hidden;
-    }
-    .history-header {
-      display: flex; align-items: center; gap: 10px; padding: 16px 18px 8px; flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .history-title { flex: 1; font-size: 15px; font-weight: 800; color: var(--text); }
-    .history-close { background: none; border: none; color: var(--accent); font-size: 22px; cursor: pointer; padding: 0; }
-    .history-list { flex: 1; overflow-y: auto; padding: 10px 14px 16px; }
-
     /* ── payment toggles ── */
     .payment-card {
       background: var(--card); border-radius: 14px; border: 1px solid var(--border);
@@ -282,22 +258,7 @@
     .summary-card.denied   .summary-num { color: var(--red); }
     .summary-card.played   .summary-num { color: var(--accent); }
     .summary-card.pending  .summary-num { color: var(--muted); }
-    .history-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
-    }
-    .history-row:last-child { border-bottom: none; }
-    .history-status {
-      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-      padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
-    }
-    .hs-approved { background: rgba(74,222,128,.12); color: var(--green); }
-    .hs-denied   { background: rgba(248,113,113,.12); color: var(--red); }
-    .hs-played   { background: rgba(253,161,133,.12); color: var(--accent); }
-    .hs-pending  { background: rgba(136,136,136,.12); color: var(--muted); }
-    .history-songs { flex: 1; min-width: 0; color: var(--text); font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .history-who { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    #history-list { display: flex; flex-direction: column; gap: 10px; }
 
     /* ── loading overlay ── */
     #s-loading {
@@ -412,17 +373,6 @@
     <div id="upnext-section" class="section-gap" style="display:none">
       <div class="section-title">Up Next</div>
       <div id="upnext-list"></div>
-    </div>
-    <button class="btn-history" onclick="openHistory()">📜 Past Requests</button>
-  </div>
-
-  <div id="history-overlay" onclick="closeHistory()">
-    <div class="history-panel" onclick="event.stopPropagation()">
-      <div class="history-header">
-        <div class="history-title">Past Requests</div>
-        <button class="history-close" onclick="closeHistory()">✕</button>
-      </div>
-      <div class="history-list" id="history-list"></div>
     </div>
   </div>
 
@@ -783,29 +733,6 @@ function renderRequests(requests) {
   }
 }
 
-// ── Past Requests overlay (played/denied — fetched on demand, not kept inline) ────────────
-async function openHistory() {
-  $('history-overlay').classList.add('open');
-  $('history-list').innerHTML = '<div class="empty-state">Loading…</div>';
-  try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/history?s=${enc(S.session)}`);
-    if (!res.ok) { $('history-list').innerHTML = '<div class="empty-state">Could not load.</div>'; return; }
-    const d = await res.json();
-    const past = (d.requests || [])
-      .filter(r => r.status === 'played' || r.status === 'denied')
-      .sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-    $('history-list').innerHTML = past.length
-      ? past.map(r => requestCard(r, false)).join('')
-      : '<div class="empty-state">No past requests yet</div>';
-  } catch {
-    $('history-list').innerHTML = '<div class="empty-state">Could not load.</div>';
-  }
-}
-
-function closeHistory() {
-  $('history-overlay').classList.remove('open');
-}
-
 function deviceLabel(id) {
   if (!id) return '';
   if (id === 'HOST') return 'HOST';
@@ -815,12 +742,8 @@ function deviceLabel(id) {
 function requestCard(r, showActions) {
   const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
   const devId = deviceLabel(r.customer_id);
-  const count = (r.song_ids || r.song_details || []).length || 1;
-  const price = S.pricePerSong > 0
-    ? (count === 3 && S.priceForThree > 0 ? S.priceForThree : S.pricePerSong * count)
-    : 0;
-  // Gate on this specific request's payment_method, not the bar's current mode — a free
-  // request's price is 0 regardless of what the bar happens to be configured for right now.
+  // Frozen server-side at request creation — accurate even if the bar's pricing has since changed.
+  const price = r.price || 0;
   const priceHtml = (r.payment_method !== 'free' && price > 0) ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
   const actedLabel = actedRequests.get(r.id);
   const acts = actedLabel
@@ -840,7 +763,7 @@ function requestCard(r, showActions) {
             ? `<span class="req-badge played">Played</span>`
             : r.status === 'denied'
               ? `<span class="req-badge denied">Denied</span>`
-              : `<span class="req-badge approved">In queue</span>`;
+              : `<span class="req-badge">Pending</span>`;
   const songRows = (r.song_details || []).map(s =>
     `<div class="song-row">
       <span class="song-col song-artist">${esc(s.artist)}</span>
@@ -921,7 +844,8 @@ async function loadReports() {
 function renderReports(requests) {
   const counts = { approved: 0, denied: 0, played: 0, pending: 0 };
   requests.forEach(r => {
-    const k = r.status === 'approved' ? 'approved' : r.status === 'denied' ? 'denied' : r.status === 'played' ? 'played' : 'pending';
+    const k = (r.status === 'approved' || r.status === 'approved_jump') ? 'approved'
+      : r.status === 'denied' ? 'denied' : r.status === 'played' ? 'played' : 'pending';
     counts[k] = (counts[k] || 0) + 1;
   });
   $('sum-approved').textContent = counts.approved;
@@ -933,18 +857,7 @@ function renderReports(requests) {
     $('history-list').innerHTML = '<div class="empty-state">No requests yet.</div>';
     return;
   }
-  const rows = [...requests].reverse().map(r => {
-    const songs = (r.song_titles || []).join(', ');
-    const who   = esc(r.requester_name || 'Guest');
-    const time  = r.created_at ? new Date(r.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const st    = r.status || 'pending';
-    return `<div class="history-row">
-      <span class="history-status hs-${esc(st)}">${esc(st)}</span>
-      <span class="history-songs">${esc(songs)}</span>
-      <span class="history-who">${who}${time ? ' · ' + time : ''}</span>
-    </div>`;
-  }).join('');
-  $('history-list').innerHTML = rows;
+  $('history-list').innerHTML = [...requests].reverse().map(r => requestCard(r, false)).join('');
 }
 
 function downloadCSV() {
