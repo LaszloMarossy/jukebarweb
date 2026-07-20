@@ -853,11 +853,12 @@ function renderReports(requests) {
   $('sum-played').textContent   = counts.played;
   $('sum-pending').textContent  = counts.pending;
 
-  if (!requests.length) {
-    $('history-list').innerHTML = '<div class="empty-state">No requests yet.</div>';
-    return;
-  }
-  $('history-list').innerHTML = [...requests].reverse().map(r => requestCard(r, false)).join('');
+  // Reports lists resolved history only (played/denied) - anything still pending or "in queue"
+  // already shows on the Requests tab, no need to duplicate it here.
+  const past = requests.filter(r => r.status === 'played' || r.status === 'denied');
+  $('history-list').innerHTML = past.length
+    ? [...past].reverse().map(r => requestCard(r, false)).join('')
+    : '<div class="empty-state">No past requests yet.</div>';
 }
 
 function downloadCSV() {
