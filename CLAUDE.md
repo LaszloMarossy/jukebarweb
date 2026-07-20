@@ -24,10 +24,32 @@ Render-hosted relay so bars can operate over the internet (not just LAN).
 - Admin browser posts setting changes here; they queue as actions for the host
 
 ## Architecture: host is source of truth
-The Android/iOS host app owns all state. The relay is a message-passing layer:
+The Android/iOS host app owns all state. The relay is a message-passing layer, never an independent
+author of truth:
 1. Host registers with full catalog + bar details
 2. Admin/customer/bartender pages read from relay
 3. Setting changes from admin → relay queues action → host picks up on next sync → host re-registers with new state
+
+**Governing principle (2026-07-20): every surface writes to host app state; host app state broadcasts**
+**itself out to every client.** This applies uniformly to settings, `now_playing`, `up_next`, and song
+requests — regardless of which client (kiosk, LAN web, internet web, bartender, admin) originated the
+change. A client action is never allowed to update relay state directly and have that stand as truth;
+it must change the host's own state (directly if it's already host-local, or via a relay-queued action
+the host applies on its next sync), and the host's next sync unconditionally re-asserts its full current
+state to the relay — the same self-healing, no-version-numbers-needed pattern already used for settings
+(see below) and `now_playing`/`up_next` (`host_sync()`/`host_nowplaying()` overwrite unconditionally
+every call, `main.py:544`/`624`). **`bar.requests` does not yet fully comply** — it's independently
+authored by relay-side POST handlers (`bar_request()`, `bar_payment_confirmed()`) for customer-web/kiosk/
+Stripe-created requests, and the host's sync only *mutates* existing entries by id (status flips via
+`up_next`/`approved_request_ids`/`played_request_ids`), never creates them from host-local data. This is
+what let a kiosk-created free-mode request go fully invisible on the relay-served admin page: the kiosk
+saved it to `LocalStorage` only, and nothing in the sync payload could reconstruct a full `SongRequest`
+relay-side from that. Fixed as a narrower patch on 2026-07-20 (kiosk POSTs to `/request` directly,
+mirroring what customer.html already does) — the principled fix is a follow-up: extend the host sync
+payload to carry the host's full local request list (not just `up_next`'s minimal display data) so the
+relay can mirror it into `bar.requests` unconditionally, the same way it already mirrors settings and
+`now_playing`. Once that lands, the kiosk's direct-POST patch becomes unnecessary and should be removed
+— any future host-side write path gets this for free, with no client-specific relay plumbing required.
 
 **Settings propagation, single-slot design (replaces both the old optimistic-apply hack and a**
 **short-lived versioned-echo design):** an admin/bartender toggle on `admin.html`/`bartender.html`
