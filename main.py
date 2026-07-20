@@ -572,6 +572,18 @@ async def host_sync(body: dict[str, Any]):
     Called by host every 5 s.
 
     Host sends:
+      requests              — host's full local request list, any status (id, song_ids,
+                             requester_name, customer_id, status, jump, paid, payment_method,
+                             price, created_at, approved_at). Sent unconditionally every call,
+                             same self-healing pattern as settings below — upserted into
+                             bar.requests (see merge loop). This is what makes a request born
+                             on ANY host-local surface (kiosk, LAN web) visible relay-side
+                             without a client-specific POST: the host is sole authority for its
+                             own state, and this broadcasts it out every tick. iOS sends this
+                             fully today; Android sends it for kiosk/LAN-originated requests
+                             (its LocalRequestManager) but not yet for internet-adopted ones, so
+                             played_request_ids/approved_request_ids/up_next below remain live
+                             for that gap — see CLAUDE.md's host-broadcasts-state note.
       played_request_ids   — request IDs whose song just became currentSong
       approved_request_ids — request IDs approved by the Android bartender screen
                              (server sets these to "approved" so kiosk Up Next shows them)
@@ -583,7 +595,8 @@ async def host_sync(body: dict[str, Any]):
                              a single dropped or out-of-order call self-heals on the next tick.
 
     Server returns:
-      requests         — new customer requests since last sync (status == "pending")
+      requests         — new customer requests since last sync (status == "pending"), including
+                         price/payment_method so the host doesn't have to recompute/guess them
       actions          — queued bartender approve/deny/stop_session actions, then clears the queue
       desired_settings — {field: bool} for any field an admin/bartender has requested a
                          change for that this host's echo hasn't matched yet. Host should
@@ -629,6 +642,44 @@ async def host_sync(body: dict[str, Any]):
                 bar.requests[rid].status = "approved"
                 bar.requests[rid].approved_at = time.time()
 
+    # Host's full request-list broadcast (see docstring): upsert only, never delete — a
+    # customer-web/Stripe request the relay just created may not be in this echo yet (host
+    # hasn't adopted it via new_requests below on this tick), and old history the host has
+    # stopped keeping locally shouldn't vanish from the relay's view just because it aged out
+    # of the echo. For an id the relay already knows about (born here via bar_request()/
+    # bar_payment_confirmed()), only status/jump/approved_at/paid are trusted from the host —
+    # price/payment_method/requester_name/song_ids stay whatever the relay originally recorded,
+    # since that's the authoritative source for anything born on the relay, not a value the host
+    # independently reconstructed. For an id the relay has never seen (born host-side — kiosk or
+    # LAN web), the host's echo is the only source of truth for every field.
+    for r in body.get("requests", []):
+        rid = r.get("id")
+        if not rid:
+            continue
+        existing = bar.requests.get(rid)
+        if existing is not None:
+            existing.status = r.get("status", existing.status)
+            existing.jump = bool(r.get("jump", existing.jump))
+            if r.get("approved_at"):
+                existing.approved_at = r["approved_at"]
+            if r.get("paid"):
+                existing.paid = True
+        else:
+            bar.requests[rid] = SongRequest(
+                id=rid,
+                song_ids=r.get("song_ids", []),
+                song_titles=r.get("song_titles", []),
+                requester_name=r.get("requester_name", ""),
+                customer_id=r.get("customer_id", "HOST"),
+                jump=bool(r.get("jump", False)),
+                status=r.get("status", "pending"),
+                paid=bool(r.get("paid", False)),
+                payment_method=r.get("payment_method", "free"),
+                price=float(r.get("price", 0.0)),
+                created_at=r.get("created_at") or time.time(),
+                approved_at=r.get("approved_at") or 0.0,
+            )
+
     new_requests = [
         {
             "id": r.id,
@@ -637,6 +688,8 @@ async def host_sync(body: dict[str, Any]):
             "requester_name": r.requester_name,
             "jump": r.jump,
             "paid": r.paid,
+            "payment_method": r.payment_method,
+            "price": r.price,
         }
         for r in bar.requests.values()
         if r.status == "pending"
