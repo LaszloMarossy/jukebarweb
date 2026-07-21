@@ -851,7 +851,12 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
         customer_id=body.get("customer_id", ""),
         jump=body.get("jump", False),
         status="pending",  # always pending; host confirms via up_next — relay is not the authority
-        price=_compute_price(bar, song_ids),
+        # This endpoint ("Submit to Bartender") is only ever reached for the free/pay-to-bartender
+        # path, never Stripe (that's create-payment-intent/payment-confirmed) - so bartender_enabled
+        # is the only signal that determines whether this request is actually charged. A free/
+        # auto-accept request is never charged, regardless of whatever price_per_song/
+        # price_for_three happen to still be configured.
+        price=_compute_price(bar, song_ids) if bar.bartender_enabled else 0.0,
     )
     bar.requests[rid] = req
     return {"request_id": rid, "status": req.status}
