@@ -744,7 +744,12 @@ function requestCard(r, showActions) {
   const devId = deviceLabel(r.customer_id);
   // Frozen server-side at request creation — accurate even if the bar's pricing has since changed.
   const price = r.price || 0;
-  const priceHtml = (r.payment_method !== 'free' && price > 0) ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
+  // Gate on price alone, not payment_method — a still-pending bartender-flow request has
+  // payment_method "free" until the bartender actually taps Approve (that tap IS the payment
+  // confirmation), so gating on payment_method hid the price on exactly the rows that most need
+  // to show it. price > 0 already means "this needs paying" regardless of whether that payment
+  // has happened yet.
+  const priceHtml = price > 0 ? `<span class="req-price">${S.currency}${price.toFixed(2)}</span>` : '';
   const actedLabel = actedRequests.get(r.id);
   const acts = actedLabel
     ? `<span class="req-badge acted">${actedLabel}</span>`
@@ -773,8 +778,9 @@ function requestCard(r, showActions) {
   ).join('') || (r.song_titles || []).map(t =>
     `<div class="song-row"><span class="song-col song-artist" style="grid-column:1/-1">${esc(t)}</span></div>`
   ).join('');
-  const payBadge = r.payment_method === 'stripe'    ? ' <span title="Paid online (card)">💳</span>'
-                  : r.payment_method === 'bartender' ? ' <span title="Paid at the bar">💵</span>'
+  // Same price>0 gate as priceHtml above - "Free" only means genuinely free, not "not yet paid".
+  const payBadge = r.payment_method === 'stripe'  ? ' <span title="Paid online (card)">💳</span>'
+                  : price > 0                     ? ' <span title="Pay to bartender">💵</span>'
                   : ' <span class="req-free-badge" title="Free — not paid">Free</span>';
   return `<div class="req-card ${r.status}" id="req-${esc(r.id)}">
   <div class="req-row1">
