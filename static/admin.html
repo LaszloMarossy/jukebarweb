@@ -854,10 +854,14 @@ function renderReports(requests) {
   $('sum-pending').textContent  = counts.pending;
 
   // Reports lists resolved history only (played/denied) - anything still pending or "in queue"
-  // already shows on the Requests tab, no need to duplicate it here.
-  const past = requests.filter(r => r.status === 'played' || r.status === 'denied');
+  // already shows on the Requests tab, no need to duplicate it here. Sorted by when each one
+  // actually resolved, not when it was created - a request that sat in queue a while before
+  // playing shouldn't jump the line ahead of one created earlier but played more recently.
+  const past = requests
+    .filter(r => r.status === 'played' || r.status === 'denied')
+    .sort((a, b) => (b.resolved_at || b.created_at || 0) - (a.resolved_at || a.created_at || 0));
   $('history-list').innerHTML = past.length
-    ? [...past].reverse().map(r => requestCard(r, false)).join('')
+    ? past.map(r => requestCard(r, false)).join('')
     : '<div class="empty-state">No past requests yet.</div>';
 }
 

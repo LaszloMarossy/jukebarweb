@@ -87,6 +87,11 @@ class SongRequest:
     status: str  # "pending" | "approved" | "denied" | "played"
     created_at: float = field(default_factory=time.time)
     approved_at: float = 0.0
+    # When this request actually resolved (played or denied) - not creation or approval time.
+    # Set directly by bartender_deny() for relay-driven denials, and via the host's requests
+    # echo for played ones (which only the host can detect). Powers "most recently resolved
+    # first" ordering on admin.html's Reports tab.
+    resolved_at: float = 0.0
     paid: bool = False
     # "free" (auto-accepted, no payment) | "bartender" (cash/card collected in person, bartender
     # approval IS the payment confirmation) | "stripe" (paid online). paid is true for both
@@ -644,6 +649,10 @@ async def host_sync(body: dict[str, Any]):
             existing.jump = bool(r.get("jump", existing.jump))
             if r.get("approved_at"):
                 existing.approved_at = r["approved_at"]
+            # Only the host can detect "played" (relay already stamps its own denials directly
+            # in bartender_deny()) - trust its resolved_at whenever it sends one.
+            if r.get("resolved_at"):
+                existing.resolved_at = r["resolved_at"]
             if r.get("paid"):
                 existing.paid = True
         else:
@@ -660,6 +669,7 @@ async def host_sync(body: dict[str, Any]):
                 price=float(r.get("price", 0.0)),
                 created_at=r.get("created_at") or time.time(),
                 approved_at=r.get("approved_at") or 0.0,
+                resolved_at=r.get("resolved_at") or 0.0,
             )
 
     new_requests = [
@@ -1009,6 +1019,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "price": r.price,
             "created_at": r.created_at,
             "approved_at": r.approved_at,
+            "resolved_at": r.resolved_at,
         }
         for r in sorted(bar.requests.values(), key=lambda r: r.created_at)
         if r.status in ("pending", "approved", "approved_jump")
@@ -1121,6 +1132,7 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: 
     if req.payment_method != "free":
         raise HTTPException(403, "Paid requests cannot be denied or cancelled")
     req.status = "denied"
+    req.resolved_at = time.time()
     bar.pending_actions.append({
         "type": "deny",
         "request_id": rid,
