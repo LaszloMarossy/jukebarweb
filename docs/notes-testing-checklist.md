@@ -242,3 +242,22 @@ admin.html Reports tab and Requests tab
 - [ ] A genuinely free/auto-accept request: confirm it shows **no price** and the "Free" badge —
       confirms the companion fix (zeroing price at creation in free mode) didn't overcorrect and
       start showing phantom prices on real free requests
+
+## 9. Android kiosk/LAN request duplicate-ghost-entry fix (2026-07-22)
+
+**Surfaces:** Android host (kiosk-only or WiFi-served requests), relay `admin.html` Requests/Up Next
+
+- [ ] **Regression test — the exact bug the user found live:** Android host, kiosk-only (Local
+      Only) mode, Internet transport. Make a request from the kiosk. On relay `admin.html`,
+      confirm it appears in **Requests** (not a single undivided list). Tap Approve → confirm it
+      **moves to Up Next** within one poll cycle (not stuck showing "Sent" forever in the same
+      spot). Let the song play → confirm it **disappears from Up Next** and shows up under
+      Reports/Past Requests as played. This exact sequence was fully broken before the fix: the
+      relay's `new_requests` echo caused the host to create a second, permanently-`PENDING`
+      duplicate of its own request, whose stale status kept overwriting the real approved/played
+      status back to pending on the relay every sync tick
+- [ ] Same check with a request made over WiFi-served LAN `admin.html`/`customer.html` (not just
+      kiosk) — the bug applied to any host-originated request, not kiosk-only specifically
+- [ ] Confirm a genuinely foreign request (customer-web or Stripe, made from a browser hitting the
+      relay directly, not the kiosk) still gets adopted and injected correctly — the fix must not
+      cause the host to *ignore* real new requests, only avoid re-adopting ones it already knows

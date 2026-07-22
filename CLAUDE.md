@@ -349,6 +349,30 @@ extra network call.
 
 **Payment labels (all admin pages):** "Stripe 💳", "Pay to bartender", "Auto (free requests)"
 
+**`host_sync()`'s `new_requests` cannot tell a host's own echoed-back request from a genuinely**
+**foreign one (fixed on Android 2026-07-22)** — `new_requests` is built purely from `bar.requests`
+filtered to `status == "pending"` (see `host_sync()` docstring), with no origin tag distinguishing
+"born on the relay via customer-web/Stripe" from "born on this very host (kiosk/LAN) and already
+echoed up via the `requests` field on an earlier tick." A host that naively adopts every entry in
+`new_requests` as if it might be new will, the first time its own kiosk/LAN request comes back down
+still pending, try to adopt an id it already has locally. Android's `RelayService.handleSyncResponse()`
+did exactly this, gated only by a volatile in-memory `seenRequestIds` set — `LocalRequestManager.addRequest()`
+has no id-uniqueness check, so this created a second `LocalRequest` object sharing the same `requestId`,
+permanently stuck at `PENDING` (approve/getRequest only ever resolve the *first* match). Since both
+copies get serialized into every later sync's `requests` array, and `host_sync()`'s upsert loop applies
+them in array order, the stale duplicate (sorted after the original) kept overwriting the just-approved
+status back to `"pending"` on every tick — symptom: admin's Requests/Up Next split never happened, the
+request just sat at the bottom of one list forever showing "Sent" after being tapped, while playback
+(a separate, already-correct path) proceeded normally and Reports stayed empty since the request never
+reached "played" server-side either. Fixed by gating adoption on `localRequestManager.getRequest(id) !=
+null` (a durable, accurate "do we already know this" check) instead of the separate volatile set, which
+was removed outright. **iOS doesn't have this bug** — `LocalStorage.saveRequest()` writes to a file
+keyed by request id, a true upsert, so iOS reprocessing its own echoed-back request just overwrites with
+equivalent data, never creating a duplicate object. Any future client-side consumer of `new_requests`
+must adopt by checking local existence first, not a separately-tracked "have I seen this" set — the
+relay has no way to help by tagging origin, since by design it doesn't track which host any given
+request came from.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
