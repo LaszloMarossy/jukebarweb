@@ -218,6 +218,7 @@
     }
     .toggle-track.on .toggle-thumb { transform: translateX(18px); background: #fbbe84; }
     .toggle-track.pending { cursor: default; pointer-events: none; opacity: .5; }
+    .toggle-track.disabled { cursor: default; pointer-events: none; opacity: .3; }
     .pay-row.pending .pay-label::after { content: ' \00b7\00b7\00b7 updating'; font-size: 11px; color: var(--muted); font-style: italic; }
     .pay-warning { font-size: 11px; color: #fbbf24; margin-top: 8px; display: none; }
     .pay-warning.show { display: block; }
@@ -396,6 +397,7 @@
         <span class="pay-label">Stripe 💳</span>
         <div class="toggle-track" id="tog-stripe" onclick="togglePayment('stripe')"><div class="toggle-thumb"></div></div>
       </div>
+      <div class="pay-warning" id="stripe-localonly-warning" style="display:none">Not usable in Local Only mode — no customer page exists to pay from.</div>
       <div class="pay-row" id="row-bartender">
         <span class="pay-label">Pay to bartender</span>
         <div class="toggle-track" id="tog-bartender" onclick="togglePayment('bartender')"><div class="toggle-thumb"></div></div>
@@ -414,7 +416,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [] };
+const S = { jukebarId: '', session: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote' };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
@@ -570,9 +572,13 @@ function switchTab(name) {
 // stays locked (see updatePaymentUI) until it drops out of that list.
 function updatePaymentUI() {
   const pending = S.settingsPending || [];
+  const stripeLocked = S.kioskMode === 'localOnly';
   $('tog-stripe')?.classList.toggle('on', S.stripeEnabled);
   $('tog-stripe')?.classList.toggle('pending', pending.includes('stripe_enabled'));
+  $('tog-stripe')?.classList.toggle('disabled', stripeLocked);
   $('row-stripe')?.classList.toggle('pending', pending.includes('stripe_enabled'));
+  const stripeWarn = $('stripe-localonly-warning');
+  if (stripeWarn) stripeWarn.style.display = stripeLocked ? 'block' : 'none';
   $('tog-bartender')?.classList.toggle('on', S.bartenderEnabled);
   $('tog-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
   $('row-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
@@ -594,6 +600,7 @@ async function postSetting(body) {
 }
 
 async function togglePayment(which) {
+  if (which === 'stripe' && S.kioskMode === 'localOnly') return;  // disabled, not just visually
   const field   = which === 'stripe' ? 'stripe_enabled' : which === 'bartender' ? 'bartender_enabled' : 'accepting_requests';
   const current = which === 'stripe' ? S.stripeEnabled  : which === 'bartender' ? S.bartenderEnabled  : S.acceptingRequests;
   if ((S.settingsPending || []).includes(field)) return;   // already locked, ignore extra clicks
@@ -630,6 +637,7 @@ async function poll() {
     S.stripeEnabled      = !!d.stripe_enabled;
     S.bartenderEnabled   = d.bartender_enabled !== false;
     S.acceptingRequests  = d.accepting_requests !== false;
+    S.kioskMode          = d.kiosk_mode || 'localAndRemote';
     S.settingsPending    = d.settings_pending || [];
     updatePaymentUI();
     renderRequests(d.requests || []);

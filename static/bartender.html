@@ -190,6 +190,7 @@
     .lan-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #555; transition: transform .2s, background .2s; }
     .lan-toggle.on .lan-thumb { transform: translateX(18px); background: #fbbe84; }
     .lan-toggle.pending { cursor: default; pointer-events: none; opacity: .5; }
+    .lan-toggle.disabled { cursor: default; pointer-events: none; opacity: .3; }
     .cfg-row.pending .cfg-label::after { content: ' \00b7\00b7\00b7 updating'; font-size: 11px; color: #888; font-style: italic; }
     .lan-pay-warn { font-size: 12px; color: #f87171; margin-top: 10px; }
 
@@ -289,6 +290,7 @@
       <span class="cfg-label">Stripe 💳</span>
       <div class="lan-toggle" id="lan-tog-stripe" onclick="toggleBtPayment('stripe')"><div class="lan-thumb"></div></div>
     </div>
+    <div class="lan-pay-warn" id="stripe-localonly-warning" style="display:none">Not usable in Local Only mode — no customer page exists to pay from.</div>
     <div class="cfg-row" id="lan-row-bartender">
       <span class="cfg-label">Pay to bartender</span>
       <div class="lan-toggle" id="lan-tog-bartender" onclick="toggleBtPayment('bartender')"><div class="lan-thumb"></div></div>
@@ -329,6 +331,7 @@ let btStripeEnabled     = false;
 let btBartenderEnabled  = true;
 let btAcceptingRequests = true;
 let btSettingsPending   = []; // field names still awaiting the host's confirmation - see updatePaymentToggleUI
+let btKioskMode         = 'localAndRemote';
 
 function colorize(el, text) {
   const cols = ['#fda185','#fbbe84','#ffc24a','#dc7955','#e8406a','#ffffff'];
@@ -444,6 +447,7 @@ async function poll() {
     btBartenderEnabled  = d.bartender_enabled !== false;
     btAcceptingRequests = d.accepting_requests !== false;
     btSettingsPending   = d.settings_pending || [];
+    btKioskMode         = d.kiosk_mode || 'localAndRemote';
     updatePaymentToggleUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -589,9 +593,13 @@ function markActed(btn, label) {
 // settings_pending list; a field name in it means the relay queued a change for it but
 // hasn't yet heard the host's confirmation back - the row stays locked until it clears.
 function updatePaymentToggleUI() {
+  const stripeLocked = btKioskMode === 'localOnly';
   $('lan-tog-stripe')?.classList.toggle('on', btStripeEnabled);
   $('lan-tog-stripe')?.classList.toggle('pending', btSettingsPending.includes('stripe_enabled'));
+  $('lan-tog-stripe')?.classList.toggle('disabled', stripeLocked);
   $('lan-row-stripe')?.classList.toggle('pending', btSettingsPending.includes('stripe_enabled'));
+  const stripeWarn = $('stripe-localonly-warning');
+  if (stripeWarn) stripeWarn.style.display = stripeLocked ? '' : 'none';
   $('lan-tog-bartender')?.classList.toggle('on', btBartenderEnabled);
   $('lan-tog-bartender')?.classList.toggle('pending', btSettingsPending.includes('bartender_enabled'));
   $('lan-row-bartender')?.classList.toggle('pending', btSettingsPending.includes('bartender_enabled'));
@@ -605,6 +613,7 @@ function updatePaymentToggleUI() {
 }
 
 async function toggleBtPayment(which) {
+  if (which === 'stripe' && btKioskMode === 'localOnly') return;  // disabled, not just visually
   const field = which === 'stripe' ? 'stripe_enabled' : which === 'bartender' ? 'bartender_enabled' : 'accepting_requests';
   if (btSettingsPending.includes(field)) return;   // already locked, ignore extra clicks
   const togEl = $('lan-tog-' + which);

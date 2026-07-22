@@ -749,6 +749,7 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
             "accepting_requests":     bar.accepting_requests,
+            "kiosk_mode":             bar.kiosk_mode,
             "settings_pending":       list(bar.desired_settings.keys()),
         },
         headers={"Cache-Control": "no-store"},
@@ -1054,7 +1055,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
             "price_per_song": bar.price_per_song, "price_for_three": bar.price_for_three,
             "currency": bar.currency, "require_approval": bar.require_approval,
             "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
-            "accepting_requests": bar.accepting_requests,
+            "accepting_requests": bar.accepting_requests, "kiosk_mode": bar.kiosk_mode,
             "settings_pending": list(bar.desired_settings.keys())}
 
 
