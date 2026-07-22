@@ -192,6 +192,15 @@ entry. This section covers both together since they were tested/found in the sam
       unreachable via the hidden QR
 - [ ] Confirm the kiosk's own on-device Request button still works normally in Local Only (that's
       the one surface that's supposed to keep working)
+- [ ] **Regression test — a real bug that shipped, on iOS only:** with Local Only active on WiFi
+      transport, submit a request needing bartender approval from the kiosk → confirm it **does
+      show up** in the pending Requests list on the WiFi-served `admin.html` (and
+      `bartender.html`). Also confirm bartender pairing (`/api/bartender/pair`) still works, and
+      that approve/deny buttons on both LAN pages still function — the Local-Only lockout was
+      first implemented by folding it into a check shared with these exact routes, silently
+      breaking all of them (not just the customer-facing ones it was meant to block). This
+      regression is specifically iOS-only (Android/relay were scoped correctly from the start),
+      so prioritize the iOS side of this check
 - [ ] Stripe toggle in Local Only mode: setup wizard AND live Admin screen both show it visibly
       **disabled** (greyed switch) with the "Not usable in Local Only mode" caption — on all of:
       iOS setup + iOS Admin, Android setup + Android Admin, relay `admin.html`, relay

@@ -233,6 +233,29 @@ should have deferred to. Register/sync payloads and admin toggle UI display stil
 read the **raw** stored value everywhere (never the effective one) — that's what keeps the
 toggle showing the operator's true preference, greyed out, rather than silently flipping it off.
 
+**The `kioskDisplayMode == .localOnly` hard lockout must never be folded into a check shared with
+admin/bartender routes (follow-up fix, same day)** — iOS's `LocalServer.swift` has one
+`checkLocalMode()` function used by all 15 LAN routes: the 4 genuinely customer-exclusive ones
+(`/api/request`, `/api/create-payment-intent`, `/api/payment-confirmed`, `/api/request/:id`), but
+also every admin-facing route (`/api/request/approve`, `/api/request/deny`), every
+bartender-facing one (`/api/bartender/pair`/`status`/`list`/`approve`/`deny`), and shared ones
+(`/api/catalog`, `/api/requests`, `/api/genres`, `/api/init`) — it was originally built solely for
+wifi/hotspot IP-range isolation, nothing customer-specific about its name. The first version of
+the Local-Only lockout added `guard kioskDisplayMode != .localOnly else { return false }` directly
+inside `checkLocalMode()` itself, which meant **every one of those 15 routes** started rejecting
+in Local Only mode — admin.html could no longer even list pending requests (`/api/requests`),
+bartenders couldn't pair or approve/deny anything, none of it just the 4 routes that were actually
+supposed to be locked out. Symptom the user hit: "requests made to bartender do not show up on
+the WiFi admin page" — not a request-visibility bug at all, but the entire admin/bartender LAN
+surface silently broken. Fixed by splitting the lockout into its own `checkCustomerAllowed()`,
+applied only at the 4 customer-exclusive routes; `checkLocalMode()` reverted to its original sole
+job. Android and the relay never had this bug — both already kept an equivalent narrow check
+(`LocalServer.kt`'s `checkCustomerAllowed()`, main.py's per-endpoint `kiosk_mode` checks inside
+`bar_request()`/`bar_payment_confirmed()`/etc., never folded into the shared `_customer_bar()`
+used by 13+ endpoints) separate from day one. Lesson: before adding a hard lockout to an existing
+shared helper, grep every call site first — a name like `checkLocalMode` doesn't tell you its
+actual blast radius.
+
 **`SongRequest.price` is frozen at creation time, not recomputed live** — mirrors iOS's `SongRequest.price: Double` (`let`) and Android's `LocalRequest.price: Double` (`val`), both already immutable. `bar_request()`/`bar_payment_confirmed()` compute it once via `_compute_price()` at the moment the request is created; `admin.html`'s `requestCard()` reads `r.price` rather than recomputing from the bar's *current* `price_per_song`/`price_for_three` — otherwise historical (played/denied) rows would show today's pricing instead of what was actually charged/quoted.
 
 **Single currency field** — one ISO currency code for both bartender cash display and Stripe processing. No separate "display currency" vs "Stripe currency".
