@@ -194,8 +194,14 @@ customer page/write endpoints (`/api/request`, `/api/create-payment-intent`,
 `bar_payment_confirmed()`) for the internet-transport case, via a new `BarSession.kiosk_mode`
 field sent once at `host_register()` time (kiosk mode is fixed for a session's lifetime, only
 changeable via End Session + re-setup — no live toggle, so no `host_sync()` echo needed). Stripe
-stays visible/toggleable in every kiosk mode, including `localOnly` — deliberately not hidden,
-so an operator discovers it exists even if not using it today. `KioskDisplayMode.localRemote` was
+stays **visible but disabled** (not hidden) whenever `kioskDisplayMode == .localOnly`, in both the
+setup wizard and the live Admin screen (iOS `SetupView.swift`/`AdminView.swift`, Android
+`ApprovalModeStep.kt`/`AdminScreen.kt`) — a caption explains why ("no customer page exists to pay
+from"). First cut just left it fully enabled with no visual difference, which the user flagged
+after testing as actively confusing: a setting that's shown as freely toggleable but silently has
+no effect looks broken, not discoverable. Disabled-but-visible is the middle ground — the operator
+learns Stripe exists without being misled that flipping it does anything right now.
+`KioskDisplayMode.localRemote` was
 also renamed to `.localAndRemote` (Android: `"localRemote"` → `"localAndRemote"`) for clarity —
 zero relay involvement in that rename, kiosk display mode was never part of any wire payload
 before this fix.
