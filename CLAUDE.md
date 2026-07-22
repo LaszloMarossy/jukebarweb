@@ -171,6 +171,35 @@ the re-investigation next time: check these three call sites before treating kio
 
 ## Key decisions
 
+**Kiosk display mode is orthogonal to transport (fixed 2026-07-22)** — three independent axes
+govern a session: transport (`wifi`/`hotspot`/`internet`, always one of these — see below),
+customer-facing kiosk mode (`localOnly`/`localAndRemote`/`remoteOnly`), and payment mode
+(free/bartender-pay/Stripe). Before this date, picking "Local Only" in the setup wizard
+incorrectly set a fourth, since-removed `PreferredNetworkMode.local`/`networkMode="local"` value
+that skipped choosing a transport entirely — meaning `LocalServer` never started and no relay
+registration happened, so **admin and bartender had no way to be reached at all**, even though
+approvals can be needed any time payment mode changes to bartender-pay. Root cause: "no remote
+customer access" and "no network for anyone at all" were conflated into one flag. Fixed by
+retiring the standalone local-only transport value — a transport is now **always** chosen via the
+network-picker wizard step, for all three kiosk display modes, since admin/bartender need one
+reachable at all times regardless of whether customers get one. `kioskDisplayMode == .localOnly`
+now means exactly one thing: no customer-facing QR, and the local Request button is the only way
+customers can submit — a deliberate **hard lockout**, not just an unadvertised URL, since the
+reason an operator picks it is often "someone's been abusing the QR from next door." Enforced at
+every layer that could otherwise still accept a customer submission: both hosts' `LocalServer`
+customer page/write endpoints (`/api/request`, `/api/create-payment-intent`,
+`/api/payment-confirmed`, `/api/request/:id`, and the customer page route itself) return a real
+404/503 — not a friendly error page — and so does the relay's own customer surface
+(`bar_page()`, `bar_request()`, `bar_request_status()`, `bar_create_payment_intent()`,
+`bar_payment_confirmed()`) for the internet-transport case, via a new `BarSession.kiosk_mode`
+field sent once at `host_register()` time (kiosk mode is fixed for a session's lifetime, only
+changeable via End Session + re-setup — no live toggle, so no `host_sync()` echo needed). Stripe
+stays visible/toggleable in every kiosk mode, including `localOnly` — deliberately not hidden,
+so an operator discovers it exists even if not using it today. `KioskDisplayMode.localRemote` was
+also renamed to `.localAndRemote` (Android: `"localRemote"` → `"localAndRemote"`) for clarity —
+zero relay involvement in that rename, kiosk display mode was never part of any wire payload
+before this fix.
+
 **`SongRequest.price` is frozen at creation time, not recomputed live** — mirrors iOS's `SongRequest.price: Double` (`let`) and Android's `LocalRequest.price: Double` (`val`), both already immutable. `bar_request()`/`bar_payment_confirmed()` compute it once via `_compute_price()` at the moment the request is created; `admin.html`'s `requestCard()` reads `r.price` rather than recomputing from the bar's *current* `price_per_song`/`price_for_three` — otherwise historical (played/denied) rows would show today's pricing instead of what was actually charged/quoted.
 
 **Single currency field** — one ISO currency code for both bartender cash display and Stripe processing. No separate "display currency" vs "Stripe currency".
