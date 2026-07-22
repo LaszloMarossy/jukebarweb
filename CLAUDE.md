@@ -206,6 +206,33 @@ also renamed to `.localAndRemote` (Android: `"localRemote"` → `"localAndRemote
 zero relay involvement in that rename, kiosk display mode was never part of any wire payload
 before this fix.
 
+**Stripe's stored value must never be read raw for behavior once `kioskDisplayMode == .localOnly`
+exists (follow-up fix, same day)** — disabling Stripe's toggle in Local Only mode (previous
+decision) only stops the *user* from flipping it; the underlying `stripeEnabled`/`stripe_enabled`
+value stays whatever it was before the mode switch, by design, so the operator's preference
+survives switching back later. But that means anything computing "does this bar need approval /
+is Stripe an active payment method" from the raw value gets it wrong the moment Bartender Pay is
+also turned off: `stripeEnabled=true, bartenderEnabled=false` reads as "still needs approval" even
+though Stripe can't actually be used — hiding the kiosk's own Request button entirely, the same
+symptom as `accepting_requests` being off, when the bar is actually free/auto-accept. Fixed by
+introducing one **effective** value per platform that both discounts Stripe whenever `kiosk_mode
+== "localOnly"`: relay `BarSession.require_approval` (the single property everything already
+funneled through) now computes `effective_stripe = stripe_enabled and kiosk_mode != "localOnly"`
+before ORing with `bartender_enabled`. Android: `BarDetails.effectiveStripeEnabled`/`requireApproval`
+fixed the same way, in one place, since `kioskMode` already lived in the same struct as
+`stripeEnabled` — every consumer (`MainActivity.handleLocalRequest()`, `RelayService`'s
+auto-approve) already read through `requireApproval`, so fixing the property fixed all of them for
+free. iOS needed a new `AppState.effectiveStripeEnabled` computed property (since `kioskDisplayMode`
+lives on `AppState`, separate from `HostConfig`) threaded manually into every behavioral call
+site — and the *first pass at that (still same day) missed the actual kiosk button-visibility
+gate*, `KioskView.swift`'s `allowsLocalRequest`, which reads `cfg?.stripeEnabled` directly rather
+than going through `AppState` at all — exactly the bug the user then hit and reported. Lesson: when
+sweeping raw-value consumers on a platform with no single natural choke point, grep isn't enough —
+the actual UI-visibility gate has to be checked directly, not inferred from the properties it
+should have deferred to. Register/sync payloads and admin toggle UI display still intentionally
+read the **raw** stored value everywhere (never the effective one) — that's what keeps the
+toggle showing the operator's true preference, greyed out, rather than silently flipping it off.
+
 **`SongRequest.price` is frozen at creation time, not recomputed live** — mirrors iOS's `SongRequest.price: Double` (`let`) and Android's `LocalRequest.price: Double` (`val`), both already immutable. `bar_request()`/`bar_payment_confirmed()` compute it once via `_compute_price()` at the moment the request is created; `admin.html`'s `requestCard()` reads `r.price` rather than recomputing from the bar's *current* `price_per_song`/`price_for_three` — otherwise historical (played/denied) rows would show today's pricing instead of what was actually charged/quoted.
 
 **Single currency field** — one ISO currency code for both bartender cash display and Stripe processing. No separate "display currency" vs "Stripe currency".

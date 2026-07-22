@@ -1,7 +1,8 @@
 # Testing checklist — features since 2026-06-26
 
-Last reviewed 2026-07-18 against the settings-propagation redesign (§2) and the new
-accepting_requests Internet-mode toggle (§1b) — both shipped same-day as the last review.
+Last reviewed 2026-07-22 — added §7 (kiosk display mode / Local Only) and §8 (Up Next queue-order +
+Past Requests fixes), both shipped same-day as this review. Previous review was 2026-07-18 against
+the settings-propagation redesign (§2) and the new accepting_requests Internet-mode toggle (§1b).
 
 Surface key (13-surface matrix, see CLAUDE.md):
 - **A-K-i / A-K-a** = Admin kiosk-native (iOS AdminView.swift / Android AdminScreen.kt)
@@ -162,3 +163,73 @@ on long-press via `combinedClickable(onLongClick)`). User confirmed working live
 - [ ] Android: bubble colors match playlist genre profile (source-verified, not yet live-tested)
 - [ ] Android: long-press a bubble → raw tags shown correctly
 - [ ] Both: bar that hasn't opted into the map (no GCS profile) shows plain/ungenred bubbles, not an error
+
+---
+
+## 7. Kiosk display mode: Local Only / Local + Remote / Remote Only (2026-07-22)
+
+**Surfaces:** Setup wizard (iOS + Android), Admin kiosk-native + Internet (relay), kiosk Request
+button visibility, LAN + relay customer-facing routes
+
+Background: transport (WiFi/Hotspot/Internet) used to be skippable entirely by picking "Local
+Only," which silently left admin/bartender unreachable — see CLAUDE.md's "Kiosk display mode is
+orthogonal to transport" entry for the full root cause. Also landed same day: Stripe's toggle
+shown-but-disabled (not hidden) in Local Only, and a "stale Stripe value" bug class that hit the
+kiosk's own Request button — see CLAUDE.md's "Stripe's stored value must never be read raw"
+entry. This section covers both together since they were tested/found in the same pass.
+
+- [ ] Pick "Local Only" in the setup wizard on iOS → confirm the network-transport picker
+      (WiFi/Hotspot/Internet) still appears, doesn't skip straight to setup
+- [ ] Same on Android
+- [ ] With Local Only + Internet transport chosen: confirm Admin and Bartender QR codes actually
+      render in the kiosk-native Admin screen (`adminURL`/`bartenderURL` resolve, not blank) —
+      this was the original reported symptom of the bug
+- [ ] With Local Only active on any transport: hit the customer page directly (`/request` on LAN,
+      `jukebars.com/bar/{id}` on relay) → confirm a real 404, not a loaded page that then fails to
+      submit
+- [ ] Same for `POST /api/request` / `/api/create-payment-intent` / `/api/payment-confirmed` /
+      `GET /api/request/{id}` (LAN) and their relay equivalents — all should 404/503, not just be
+      unreachable via the hidden QR
+- [ ] Confirm the kiosk's own on-device Request button still works normally in Local Only (that's
+      the one surface that's supposed to keep working)
+- [ ] Stripe toggle in Local Only mode: setup wizard AND live Admin screen both show it visibly
+      **disabled** (greyed switch) with the "Not usable in Local Only mode" caption — on all of:
+      iOS setup + iOS Admin, Android setup + Android Admin, relay `admin.html`, relay
+      `bartender.html`
+- [ ] **Regression test — the exact bug the user found live:** with Local Only active and Stripe's
+      stored value still `true` from before switching modes, turn OFF "Pay to bartender" from the
+      Internet-mode admin page (relay `admin.html`) → confirm the kiosk's Request button **stays
+      visible** and requests go through **free/auto-accepted**, not hidden as if
+      `accepting_requests` were off. Repeat after restarting the host app (confirms the fix
+      isn't just a cached-state artifact) — this specific repro is what caught the bug the first
+      time
+- [ ] Same check on Android
+- [ ] With Local Only + Stripe stale-true + Bartender Pay off: confirm the "Both off — free and
+      auto-accepted" warning banner **does** show, in the setup wizard AND live Admin, on all
+      three platforms — Stripe must count as off for this warning once it's inert, even though its
+      stored value is still true
+- [ ] Switch a bar OUT of Local Only back to Local + Remote (or Remote Only) → confirm Stripe's
+      toggle re-enables and shows whatever value it had before (not silently reset to off) —
+      confirms the "raw value preserved, only effective behavior discounted" design actually holds
+
+## 8. Up Next queue-order + Past Requests sort/badge fixes (2026-07-21/22)
+
+**Surfaces:** iOS host (kiosk-native Up Next display + Internet-mode sync payload), relay/LAN
+admin.html Reports tab and Requests tab
+
+- [ ] Approve a 2-or-3-song request (bartender-pay or Stripe) → once the first song starts
+      playing, confirm it **disappears** from Up Next on the relay customer page within one sync
+      tick — it used to keep showing as "up next" until the whole request's last song started
+- [ ] Same check on the kiosk's own on-screen Up Next display
+- [ ] Past Requests / Reports tab (relay `admin.html`, iOS + Android LAN `admin.html`): confirm
+      rows are ordered by when they were actually played/denied (most recent first), not by
+      creation time — make a request, let it sit queued a while, then approve/play a *newer*
+      request first, and confirm the newer one appears above the older one once both have played
+- [ ] Reports tab lists only played/denied rows, not everything still pending/in-queue (already
+      covered 2026-07-20, re-check it hasn't regressed)
+- [ ] A still-pending bartender-pay request (not yet approved): confirm it shows its price and a
+      💵 badge, not "Free" with no price — this was gated on `payment_method`, which stays `"free"`
+      until actual approval, so it used to look identical to a genuinely free auto-accepted request
+- [ ] A genuinely free/auto-accept request: confirm it shows **no price** and the "Free" badge —
+      confirms the companion fix (zeroing price at creation in free mode) didn't overcorrect and
+      start showing phantom prices on real free requests
