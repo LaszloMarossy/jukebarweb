@@ -607,7 +607,9 @@ function updatePaymentToggleUI() {
   $('lan-tog-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
   $('lan-row-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
   const warn = $('lan-pay-warn');
-  if (warn) warn.style.display = (!btStripeEnabled && !btBartenderEnabled) ? '' : 'none';
+  // Stripe is inert (not just its toggle disabled) in Local Only mode regardless of its stored
+  // value, so it counts as "off" here too.
+  if (warn) warn.style.display = ((!btStripeEnabled || stripeLocked) && !btBartenderEnabled) ? '' : 'none';
   const acceptWarn = $('lan-accepting-warn');
   if (acceptWarn) acceptWarn.style.display = btAcceptingRequests ? 'none' : '';
 }

@@ -586,7 +586,10 @@ function updatePaymentUI() {
   $('tog-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
   $('row-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
   const warn = $('pay-warning');
-  if (warn) warn.classList.toggle('show', !S.stripeEnabled && !S.bartenderEnabled);
+  // Stripe is inert (not just its toggle disabled) in Local Only mode regardless of its stored
+  // value, so it counts as "off" here too - otherwise turning off bartender-pay alone wouldn't
+  // show the free/auto-accept warning even though Stripe can't actually cover it in this mode.
+  if (warn) warn.classList.toggle('show', (!S.stripeEnabled || stripeLocked) && !S.bartenderEnabled);
   const acceptWarn = $('accepting-warning');
   if (acceptWarn) acceptWarn.style.display = S.acceptingRequests ? 'none' : 'block';
 }
