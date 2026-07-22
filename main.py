@@ -151,7 +151,15 @@ class BarSession:
 
     @property
     def require_approval(self) -> bool:
-        return self.stripe_enabled or self.bartender_enabled
+        # stripe_enabled can still read True while kiosk_mode is "localOnly" - the host reports
+        # its raw stored preference (so admin.html/bartender.html can show the toggle checked but
+        # greyed out, preserving what the operator will get back once they switch modes), but
+        # Stripe is functionally inert in that mode (no customer page exists to ever use it from).
+        # Treating it as still "requiring approval" here would make a bar with Stripe on but
+        # Bartender Pay just turned off look like it still needs approval, when it's actually
+        # free/auto-accept now - hiding the kiosk's own Request button for no real reason.
+        effective_stripe = self.stripe_enabled and self.kiosk_mode != "localOnly"
+        return effective_stripe or self.bartender_enabled
 
 
 _map_entries: dict[str, MapEntry] = {}   # persisted to disk
