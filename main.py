@@ -142,6 +142,12 @@ class BarSession:
     # field -> value an admin/bartender asked for that the host hasn't echoed back yet;
     # presence = pending. Latest write per field wins, no queue — see bar_settings()/host_sync().
     desired_settings: dict[str, bool] = field(default_factory=dict)
+    # "localOnly" | "localAndRemote" | "remoteOnly" (2026-07-22+) — governs CUSTOMERS only, set at
+    # register time from the host's own wizard choice. "localOnly" is a hard lockout enforced here
+    # too (bar_request()/bar_create_payment_intent()/bar_payment_confirmed()/bar_page()), not just
+    # on the host's LAN server — a bar using Internet transport with kioskMode=localOnly must not
+    # have its relay-served customer page/endpoints reachable either.
+    kiosk_mode: str = "localAndRemote"
 
     @property
     def require_approval(self) -> bool:
@@ -508,6 +514,7 @@ async def host_register(body: dict[str, Any]):
         bar.stripe_publishable_key = pk
         bar.stripe_secret_key = body.get("stripe_secret_key", "")
         bar.pin_hash = body.get("pin_hash", "")
+        bar.kiosk_mode = body.get("kiosk_mode", "localAndRemote")
         bar.last_seen = time.time()
     else:
         _bars[jukebar_id] = BarSession(
@@ -527,6 +534,7 @@ async def host_register(body: dict[str, Any]):
             stripe_secret_key=body.get("stripe_secret_key", ""),
             now_playing=body.get("now_playing"),
             pin_hash=body.get("pin_hash", ""),
+            kiosk_mode=body.get("kiosk_mode", "localAndRemote"),
         )
 
     # Keep map entry's last_seen fresh if the bar is registered there
@@ -709,6 +717,11 @@ _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 @app.get("/bar/{jukebar_id}", response_class=HTMLResponse)
 async def bar_page(jukebar_id: str):
+    # Hard lockout (real 404, not just unadvertised) when the bar has locked itself to
+    # kiosk_mode "localOnly" — the page shouldn't even load, not just fail to submit once loaded.
+    bar = _bars.get(jukebar_id)
+    if bar is not None and bar.kiosk_mode == "localOnly":
+        raise HTTPException(404, "Not found")
     return HTMLResponse((Path("static") / "customer.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
@@ -835,6 +848,8 @@ def _compute_price(bar: "BarSession", song_ids: list[str]) -> float:
 @app.post("/api/bar/{jukebar_id}/request")
 async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
+    if bar.kiosk_mode == "localOnly":
+        raise HTTPException(404, "Not found")
     if not bar.accepting_requests:
         raise HTTPException(403, "Not accepting requests right now")
 
@@ -865,6 +880,8 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
 @app.get("/api/bar/{jukebar_id}/request/{request_id}")
 async def bar_request_status(jukebar_id: str, request_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
+    if bar.kiosk_mode == "localOnly":
+        raise HTTPException(404, "Not found")
     req = bar.requests.get(request_id)
     if req is None:
         raise HTTPException(404, "Request not found")
@@ -891,6 +908,8 @@ async def bar_create_payment_intent(
 ):
     import httpx
     bar = _customer_bar(jukebar_id, s)
+    if bar.kiosk_mode == "localOnly":
+        raise HTTPException(404, "Not found")
     if not bar.accepting_requests:
         raise HTTPException(403, "Not accepting requests right now")
     if not bar.stripe_secret_key:
@@ -936,6 +955,8 @@ async def bar_payment_confirmed(
 ):
     import httpx
     bar = _customer_bar(jukebar_id, s)
+    if bar.kiosk_mode == "localOnly":
+        raise HTTPException(404, "Not found")
     if not bar.stripe_secret_key:
         raise HTTPException(400, "Stripe not configured")
     pi_id = body.get("payment_intent_id", "")
