@@ -32,6 +32,172 @@ against the rest of the matrix, not because they're missing elsewhere.
 
 ---
 
+## A. End-to-End Cross-Surface Scenarios
+
+**Read this section differently from the rest of the document.** Sections 1–14 are an inventory —
+does each surface, in isolation, do what it's supposed to. That can all pass while the *system* is
+still broken, because almost every real feature here works by one surface changing host state and
+that state broadcasting out to every other surface (`CLAUDE.md`'s "governing principle"). A scenario
+below is a single story with multiple actors and a time dimension — trace it start to finish; if any
+step doesn't match, that's the bug, and the step number tells you which link in the chain broke, not
+just "something's wrong." Steps within a scenario are ordered and each depends on the previous one.
+
+**Transport reminder for every scenario below**: a bar session is on wifi, hotspot, *or* internet —
+never more than one at a time — and render (relay) surfaces only exist at all for an internet-transport
+session (`hostRegisterOnRelay()` is internet-only). **kiosk-native admin/customer is the one surface
+that's reachable regardless of transport** (same on-device process as the host, no network involved),
+so it's the only surface that can validly appear alongside *either* branch. Where a scenario is worth
+running on both transports, it says so explicitly with two branches — don't mix wifi/hotspot and render
+surfaces into one "simultaneous" checklist for a single session.
+
+### A1. Settings toggle propagates to every surface, with correct lock/unlock timing
+
+Proves: `desired_settings` single-slot propagation (`CLAUDE.md` — settings section).
+
+**Branch 1 — internet transport:**
+- [ ] Start with Stripe **ON**. On **render admin**, toggle Stripe OFF.
+- [ ] Immediately after clicking: the Stripe control on **render admin itself** shows dimmed/locked
+      (`settings_pending`) — it does not just silently flip.
+- [ ] Within one host sync cycle (~5s): host applies the change locally.
+- [ ] **kiosk admin** (native) now shows Stripe OFF, unlocked.
+- [ ] **render admin**'s own control unlocks and confirms OFF once the host's echo comes back.
+- [ ] **render bartender**: payment-method display for *new* incoming requests reflects the change (no
+      more Stripe option surfaced to customers).
+- [ ] **render customer** and **kiosk customer**: Stripe payment option is gone from the request flow
+      on both, not just one.
+- [ ] Toggle it back ON from a *different* surface this time — **kiosk admin** — and confirm the same
+      full propagation happens in reverse, proving it's not a one-directional fluke.
+
+**Branch 2 — wifi/hotspot transport (repeat independently, separate session):**
+- [ ] Same sequence, substituting **wifi/hotspot admin/bartender/customer** for the render surfaces.
+      This path applies directly to host state with no relay round-trip at all — confirm the unlock is
+      correspondingly near-instant, not lagging by a sync-cycle's worth of latency the way the
+      internet-transport branch legitimately does.
+
+### A2. A request born on the kiosk is cancelled from Render admin — actually stops playing everywhere
+
+Proves: host-is-source-of-truth request lifecycle + the kiosk-origin Cancel bug fixed 2026-07
+(`RelayService.kt`'s `injectedRequestIds` fallback) — **regression test, keep permanently.** This
+scenario is internet-transport-specific by nature — the bug it guards against only existed in the
+relay-mediated action path (`RelayService`'s action queue); wifi/hotspot Cancel applies directly to
+host state via `LocalServer`, a different code path entirely that never had this bug.
+
+- [ ] Bar in free/auto-accept mode, Local+Remote or Local Only kiosk mode, **internet transport**.
+- [ ] Submit a request via the **kiosk's own local Request button** (not a web surface).
+- [ ] Confirm it auto-approves and appears in Up Next on: **kiosk itself**, **render customer**,
+      **render admin**.
+- [ ] From **render admin** (over the internet, physically nowhere near the kiosk), click Cancel on
+      that request.
+- [ ] Confirm the song is actually pulled out of the *live playback queue* — it does not play when its
+      turn comes, not just marked denied in a list somewhere.
+- [ ] Confirm it disappears from Up Next on **every** surface simultaneously within one sync cycle:
+      kiosk and render customer — not just render admin's own view.
+
+### A3. Stripe payment on Render customer reaches the kiosk queue and plays, then shows correctly everywhere as played
+
+Proves: the full Stripe → `new_requests` upstream → host adoption → live queue → played-detection →
+`bar.requests` downstream loop, across the whole surface set.
+
+- [ ] Submit and pay for a request via **render customer** page (Stripe test key + card, or Apple
+      Pay/Google Pay per §4).
+- [ ] Request appears with a 💳 badge in Up Next on **render admin** and **render bartender** — no
+      approve/deny buttons shown for it (Stripe skips review).
+- [ ] It also appears (unlabeled/generic) in the **kiosk's own** Up Next preview.
+- [ ] Let it actually play through.
+- [ ] Confirm it's pruned from Up Next **immediately** on kiosk, render customer, and admin — not lagging
+      on any one surface (2026-07 regression: kiosk/render-customer used to lag behind admin here).
+- [ ] Confirm it now appears in **Reports/Past Requests** on render admin with the 💳 badge and the
+      price actually charged (not today's live price if pricing changed since).
+
+### A4. Local Only lockout is customer-exclusive — admin/bartender stay fully reachable
+
+Proves: the `checkCustomerAllowed()` vs `checkLocalMode()` split (a real historical bug: the first
+version of this lockout broke *all* LAN admin/bartender routes, not just the 4 customer ones). This is
+genuinely two separate implementations (LAN's own check in each host app, and the relay's per-endpoint
+`kiosk_mode` checks in `main.py`) — worth running both branches for real, not treating one as a stand-in
+for the other.
+
+**Branch 1 — wifi/hotspot transport:**
+- [ ] Set kiosk display mode to **Local Only**.
+- [ ] **wifi/hotspot customer** page: write endpoints (request, payment-intent, payment-confirmed,
+      request status) return real 404/503 — not a friendly error page.
+- [ ] **wifi/hotspot admin** can still list pending requests, approve, deny — full functionality.
+- [ ] **wifi/hotspot bartender** can still pair, list, approve, deny — full functionality.
+- [ ] Only the kiosk's own local Request button can create new requests; everything else about
+      admin/bartender operation is completely unaffected by the customer lockout.
+
+**Branch 2 — internet transport (separate session):**
+- [ ] Same Local Only setup, this time on internet transport.
+- [ ] **render customer** page: same 404/503 behavior on the 4 customer-exclusive endpoints.
+- [ ] **render admin** and **render bartender**: fully functional, unaffected.
+- [ ] Kiosk's local Request button still the only customer entry point.
+
+### A5. `accepting_requests` OFF hides the ask everywhere, without touching in-flight requests
+
+**Branch 1 — internet transport:**
+- [ ] With 1+ requests already pending/approved, toggle **accepting_requests OFF** from render admin.
+- [ ] kiosk's local Request button hides/disables — kiosk still shows now-playing and QR (not blank).
+- [ ] render customer: Request submission UI disabled/hidden.
+- [ ] Already-pending/approved requests from before the toggle are **unaffected** — bartender can still
+      approve/deny them, Up Next still plays them out normally.
+- [ ] Toggle back ON — Request capability returns on kiosk and render customer simultaneously, no
+      restart needed.
+
+**Branch 2 — wifi/hotspot transport (repeat independently, separate session):** same sequence,
+substituting wifi/hotspot admin/customer for the render surfaces.
+
+### A6. `effective_stripe` — Local Only + Stripe ON + Bartender OFF behaves as free, without losing the raw preference
+
+Proves the 2026-07-22 bug: this combination used to hide the kiosk's own Request button entirely
+(read as "still needs approval" when it should read as free/auto-accept). The `effective_stripe`
+computation itself doesn't depend on transport, so this only needs one run — pick either transport,
+using kiosk admin plus whichever remote admin surface matches (render or wifi/hotspot).
+
+- [ ] Bar in Local Only kiosk mode, Stripe toggle **ON** (raw), Bartender Pay **OFF**.
+- [ ] kiosk local Request button is **visible and usable** (not hidden) — this is the actual regression.
+- [ ] A request submitted this way auto-approves with no payment step and no approval wait — behaves as
+      pure free/auto-accept.
+- [ ] Stripe toggle on **kiosk admin** and on the matching remote admin surface (render *or*
+      wifi/hotspot, whichever the session is on) both still show it as **ON** (raw value) —
+      dimmed/disabled with the "no customer page exists to pay from" caption, not silently flipped off.
+- [ ] Switch kiosk mode to Local+Remote — Stripe becomes live again automatically, still ON, no
+      re-toggling needed; confirms the raw value was preserved, not lost, while it was inert.
+
+### A7. Spotify outage mid-session (Android) — kiosk locks out customers, but admin/bartender keep working, and paid state survives
+
+Proves the 2026-07-30/31 outage-recovery feature end-to-end, including the surface split. Inherently an
+internet-transport scenario — the interesting part is render admin staying in control while the kiosk
+itself is locked, which only makes sense to test where render is actually the relevant remote surface.
+
+- [ ] Bar on internet transport. While Spotify is connected and stable, queue 2+ paid or
+      free-approved requests into Up Next.
+- [ ] Force/observe a Spotify outage (3 consecutive no-device failures) — kiosk drops to the blocked
+      "ask staff" screen; confirm **all** customer interaction is blocked, only the Staff button is live.
+- [ ] While the kiosk is blocked: from **render admin/bartender**, confirm approve/deny/Cancel actions on
+      *other* requests still work — the host's relay sync loop is not paused by the outage, only local
+      playback is. (If this fails, that's a real gap: admin should not lose control just because
+      Spotify did.)
+- [ ] Enter the correct PIN on the kiosk's blocked screen (or use "Re-attach to Spotify" on AdminScreen
+      as the alternate manual path).
+- [ ] Confirm the specific song that failed resumes — not a different, wherever-the-queue-drifted song.
+- [ ] Confirm both paid requests still show correctly in Up Next across kiosk, render customer, and
+      render admin after recovery — nothing was silently lost during the outage.
+- [ ] Confirm settings (every toggle) are byte-for-byte unchanged from before the outage — this path
+      never touches the setup wizard.
+
+### A8. Genre/map opt-in — LAN-only bar appears on the map without genre data, gains it only once on internet transport
+
+Proves the `hostRegisterOnRelay`/`registerOnMap` split confirmed this session (§13's note).
+
+- [ ] Host on wifi/hotspot transport (device has a real internet uplink), `listOnMap` **ON**.
+- [ ] Confirm the bar appears on `/discover` — name, location, playlist visible.
+- [ ] Confirm it shows **no genre coloring** in its pie chart (expected — no relay `BarSession` exists
+      for a LAN-only bar, so genre polling can't run).
+- [ ] Switch the same bar to internet transport (new session/setup) with `listOnMap` still ON.
+- [ ] Confirm genre coloring now populates on `/discover` within one profile-cache refresh cycle.
+
+---
+
 ## 1. Setup & Onboarding `[Both]`
 
 - [ ] Fresh setup wizard, start to finish, all steps in order
