@@ -153,3 +153,39 @@ Android was calling `unregisterMap` in both `restartSession()` and `resetSetup()
 **Not applied to the payment/settings toggles** (Stripe/Bartender/Auto) in either file — those still flip instantly client-side and just re-fetch true state after a fixed 12s delay (`loadPaymentState`, commit `1977145`), no locked/greyed visual in between. `customer.html` has no equivalent list to lock; its own submit/pay button just does a simpler one-shot "Sending…/Processing…" disable.
 
 **Confirmed absent on the LAN-served variants** (`JukeBar/WebApps/{admin,bartender}.html`, spotonjukebar `assets/{admin,bartender}.html`) — no `actedRequests`/acted-badge code there, consistent with there being no relay round-trip to wait out on those pages.
+
+---
+
+### 2026-07-31 — Full system test plan generated; reconfirmed map registration is transport-agnostic by design
+
+**Context:** User asked for a comprehensive, hierarchical (not tabular — needs to paste cleanly into an
+external doc) test case list covering both host platforms, all transports, all modes/features. Saved to
+`testing.md` in this repo. Also flagged that Stripe test-key Apple Pay on iOS completes as a success
+without an actual charge — noted as a safe repeatable manual test path (test key only).
+
+**Self-correction during this pass, worth recording precisely:** while writing the Community/Discover
+Map section, an initial grep of the Android codebase for `listOnMap` was truncated by a `head -10` before
+reaching Android's matches (iOS's many hits filled the buffer first, since `~/dev/giffy/JukeBar` was
+listed before `~/dev/giffy/spotonjukebar` in the combined grep) — wrongly concluded Android had no
+equivalent feature. User corrected this immediately (their own playlist was visibly listed on
+jukebars.com from an Android host at the time). Re-investigated properly: Android has it
+(`BarDetails.listOnMap`, `ui/setup/NameEntryStep.kt`, `RelayClient.registerMap()`).
+
+**Then a second, more substantive mix-up while investigating the *iOS* side**, also caught and corrected
+by the user: initially reported iOS's `registerOnMap()` as gated behind `config.internetMode`. On a
+closer re-read, that gate actually belongs to a *different* function, `AppState.swift`'s
+`startGenrePoll()` (populates the discover-map genre pie-chart data) — `registerOnMap()` itself
+(`AppState.swift:440`) has no transport gate at all, matching Android exactly. This matches the
+already-existing decision above ("Map / discover layer is always-on, relay sessions are opt-in" —
+`/api/map/register` called regardless of connection mode) — re-confirmed still true in both clients'
+current code, not something that needed fixing. `startGenrePoll()`'s gate is legitimate, not a bug: it
+depends on a relay `BarSession` existing at all, and `hostRegisterOnRelay()` is correctly
+`internetMode`-only (LAN-only bars' admin/bartender are reached via the LAN pages directly, no relay
+session exists for them) — so a wifi/hotspot-only bar can appear on `/discover` (name/location/playlist)
+but without genre coloring, which is expected, not a gap.
+
+**User's stated principle, worth keeping for future map/connectivity work:** "being on the net should be
+a feature for all modes... that can be a runtime determination, not something we code around." Any
+future feature that depends on outbound connectivity should default to attempting the call and letting
+it fail naturally rather than gating on the configured transport mode, unless (like `hostRegisterOnRelay`)
+there's a real structural dependency, not just a plausible-sounding restriction.
