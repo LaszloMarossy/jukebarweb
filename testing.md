@@ -109,28 +109,56 @@ Proves: the full Stripe → `new_requests` upstream → host adoption → live q
 - [ ] Confirm it now appears in **Reports/Past Requests** on render admin with the 💳 badge and the
       price actually charged (not today's live price if pricing changed since).
 
-### A4. Local Only lockout is customer-exclusive — admin/bartender stay fully reachable
+### A4. Local Only — full walkthrough: setup through request display, map visibility, and lockout scope
 
-Proves: the `checkCustomerAllowed()` vs `checkLocalMode()` split (a real historical bug: the first
-version of this lockout broke *all* LAN admin/bartender routes, not just the 4 customer ones). This is
-genuinely two separate implementations (LAN's own check in each host app, and the relay's per-endpoint
-`kiosk_mode` checks in `main.py`) — worth running both branches for real, not treating one as a stand-in
-for the other.
+Proves every Local-Only-specific behavior as one coherent operator story rather than scattered checks:
+wizard-time Stripe disable, QR suppression, kiosk request name requirement, Up Next strip vs popup
+content, the `checkCustomerAllowed()` vs `checkLocalMode()` lockout-scope split (a real historical bug:
+the first version of this lockout broke *all* LAN admin/bartender routes, not just the 4 customer
+ones), and map registration continuing to work despite the customer lockout. The setup/kiosk/map parts
+below are transport-independent (on-device or connectivity-only, not gated by which transport is
+chosen) — only the lockout-scope part genuinely needs both branches run for real, since LAN and relay
+enforce it via two separate implementations.
 
-**Branch 1 — wifi/hotspot transport:**
-- [ ] Set kiosk display mode to **Local Only**.
+**Setup:**
+- [ ] During the setup wizard, select Local Only kiosk display mode with Stripe toggled ON.
+- [ ] Wizard's Stripe step shows it visible but **disabled**, with the "no customer page exists to pay
+      from" caption — not hidden, not silently editable.
+- [ ] Complete setup with `listOnMap` ON.
+
+**Post-setup, live, on the kiosk itself:**
+- [ ] Kiosk shows **no QR code** anywhere on screen.
+- [ ] Kiosk's local Request button is the only way to submit — confirm it's actually present and usable
+      (Local Only ≠ fully locked, per the earlier `effective_stripe` distinction in A6).
+
+**Kiosk request flow:**
+- [ ] Attempt to submit a local request with a **blank requester name** — confirm submission is
+      actually blocked/rejected, not just silently accepted as anonymous.
+- [ ] Submit a valid free request with a name filled in.
+- [ ] Once approved, the song appears in the kiosk's **always-visible Up Next preview strip**.
+- [ ] Tap to expand the **full-queue popup overlay** — the same request appears here too, and **only
+      here** shows the requester's name (the strip itself does not display names).
+- [ ] Popup overlay self-dismisses after 15s of no interaction (existing kiosk-native invariant).
+
+**Map visibility despite the customer lockout:**
+- [ ] Confirm the bar **does** appear on `/discover` with its current playlist shown — the customer
+      lockout is request/browse-specific; it does not suppress map registration, a separate, unrelated
+      codepath (confirmed this session, §13).
+
+**Lockout scope — run both branches for real, separate sessions:**
+
+*Branch 1 — wifi/hotspot transport:*
 - [ ] **wifi/hotspot customer** page: write endpoints (request, payment-intent, payment-confirmed,
       request status) return real 404/503 — not a friendly error page.
 - [ ] **wifi/hotspot admin** can still list pending requests, approve, deny — full functionality.
 - [ ] **wifi/hotspot bartender** can still pair, list, approve, deny — full functionality.
-- [ ] Only the kiosk's own local Request button can create new requests; everything else about
-      admin/bartender operation is completely unaffected by the customer lockout.
 
-**Branch 2 — internet transport (separate session):**
-- [ ] Same Local Only setup, this time on internet transport.
+*Branch 2 — internet transport:*
 - [ ] **render customer** page: same 404/503 behavior on the 4 customer-exclusive endpoints.
 - [ ] **render admin** and **render bartender**: fully functional, unaffected.
-- [ ] Kiosk's local Request button still the only customer entry point.
+
+- [ ] In both branches: only the kiosk's own local Request button can create new requests; everything
+      else about admin/bartender operation is completely unaffected by the customer lockout.
 
 ### A5. `accepting_requests` OFF hides the ask everywhere, without touching in-flight requests
 
@@ -195,6 +223,23 @@ Proves the `hostRegisterOnRelay`/`registerOnMap` split confirmed this session (�
       for a LAN-only bar, so genre polling can't run).
 - [ ] Switch the same bar to internet transport (new session/setup) with `listOnMap` still ON.
 - [ ] Confirm genre coloring now populates on `/discover` within one profile-cache refresh cycle.
+
+### A9. Turning off both Stripe and Bartender Pay transitions a live bar to free/auto-accept
+
+Proves the `require_approval`/`effective_stripe` computation genuinely re-evaluates and takes effect
+live, mid-session, not just at setup time — and that it's the combination of *both* being off (not
+either alone) that flips the mode.
+
+- [ ] Start with Stripe **ON** and Bartender Pay **ON** (approval required either way).
+- [ ] From any admin surface, turn Stripe **OFF** alone.
+- [ ] Confirm approval is **still required** — Bartender Pay alone still gates it; a new request still
+      needs a bartender tap, doesn't auto-approve.
+- [ ] Now also turn Bartender Pay **OFF** (both off).
+- [ ] Submit a **new** request after this point — confirm it auto-approves with no approval step and no
+      payment step, behaving as pure free/auto-accept.
+- [ ] Confirm this took effect **live**, mid-session, without End Session or any restart.
+- [ ] Turn either one back ON — confirm the *next* new request goes back to requiring approval/payment;
+      requests already auto-approved during the free window are unaffected retroactively.
 
 ---
 
