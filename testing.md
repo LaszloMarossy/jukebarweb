@@ -260,6 +260,11 @@ either alone) that flips the mode.
 - [ ] Stop Session (web admin "Stop Session" action) → Spotify/Apple Music auth token also cleared,
       re-login required next setup
 - [ ] Re-pairing host device to IDE for deployment doesn't require a fresh setup (sanity, not a product test)
+- [ ] **(Android, gap found by code audit 2026-08-01)** Skip **both** the Spotify device step and the
+      local folder step in the same setup run — confirm the resulting empty queue doesn't crash
+      playback (`PlaybackCoordinator.play()` guards against a null `currentSong`), and note there's
+      currently **no operator-facing indication** that the queue is empty at all — decide if that's
+      acceptable or needs a visible warning
 
 ## 2. Transport Modes (WiFi and Hotspot = one test case each)
 
@@ -311,10 +316,18 @@ either alone) that flips the mode.
         the system without an actual charge. Good repeatable manual test path — re-verify after any
         Stripe-related change. *Do not use a live key for this test.*
   - [ ] Google Pay (Android) — equivalent check
-  - [ ] Currency-specific minimum enforced per `STRIPE_MINIMUMS` curated list (test at least 2 currencies)
   - [ ] Apple Pay domain file served correctly (`/.well-known/apple-developer-merchantid-domain-association`
         or equivalent) — full end-to-end Apple Pay activation is still blocked on Stripe dashboard domain
         registration per project notes; confirm current status before assuming this is fully live
+  - [ ] **Correction (code audit 2026-08-01): `STRIPE_MINIMUMS` is NOT actually enforced anywhere.**
+        Android's pricing step shows it only as an informational caption — `pricesValid` never checks
+        against it, so the wizard lets an operator save a price below Stripe's floor. The relay's
+        `create-payment-intent` has no server-side floor check either. Set a price below the minimum
+        for the chosen currency and confirm what a customer actually sees when they try to pay: today
+        that's Stripe's raw unformatted error text surfacing on `customer.html`, not a friendly message
+        — and it's only discoverable at payment time, not caught at setup. Decide if this needs a real
+        validation fix (wizard-side floor check, or a friendlier customer-facing error) rather than
+        treating "enforced" as already true.
 - [ ] `effective_stripe`: Stripe ON + Bartender OFF + Local Only kiosk mode → system behaves as free/auto-accept
       (kiosk Request button visible, no approval required) — this was a real bug, keep as regression check
 
@@ -356,6 +369,14 @@ Origins to test: **kiosk-native**, **LAN web** (wifi/hotspot customer), **render
 - [ ] `SongRequest.price` frozen at creation — change the bar's live pricing *after* a request exists,
       confirm the request's Reports-tab price is unchanged (reflects what was actually charged)
 - [ ] Payment method badges render correctly on admin/bartender: 💳 Stripe, 💵 bartender, muted "Free" badge
+- [ ] **(gap found by code audit 2026-08-01)** Multi-song request (2–3 songs): deny or Cancel it
+      **after** song 1 has already played but before the remaining song(s) have. `markPlayed()` only
+      flips the request's overall status once the *last* song plays (both platforms), so at this point
+      it's still `APPROVED` — confirm current behavior: the whole request flips to `DENIED`, and the
+      Reports CSV/Past-Requests row shows it as a flat denied entry for the whole request, even though
+      the customer already received 1+ songs. Decide whether this mislabeling (no "partially fulfilled"
+      status exists) is acceptable as-is or needs a fix — currently it's just how the code behaves, not
+      something anyone decided was correct.
 
 ## 7. Up Next / Playback Queue Correctness (Android — regression tests from 2026-07)
 
@@ -390,8 +411,13 @@ Origins to test: **kiosk-native**, **LAN web** (wifi/hotspot customer), **render
   - [ ] Resumes whatever's currently selected if no specific song was pending retry
 - [ ] Long pause (multiple hours) then resume — confirm Spotify device lookup can fail on resume
       (same class of issue as backgrounding); "Re-attach to Spotify" resolves it
-- [ ] iOS: confirm whether an equivalent outage state can occur at all (no equivalent breaker built this
-      session — determine if iOS's Spotify/Apple Music integration needs the same treatment)
+- [ ] **iOS: confirmed gap, not just unverified (code audit 2026-08-01).** Full read of `MusicService.swift`
+      found no retry, reconnect, or outage-detection logic of any kind — `handleNowPlayingChanged()` only
+      reacts to normal track-advance and cancellation, nothing for a playback failure or Apple Music auth
+      revocation mid-session. This is a real platform gap, not parity-pending-verification. Test: force
+      an Apple Music playback failure (e.g. revoke access mid-session) and confirm what actually happens
+      today — likely just silent failure with no recovery path — then decide whether iOS needs equivalent
+      treatment or whether Apple Music's playback has proven reliable enough in practice not to need it.
 
 ## 9. Cross-Platform Kiosk-Native Parity (iOS vs Android)
 
@@ -413,6 +439,18 @@ Origins to test: **kiosk-native**, **LAN web** (wifi/hotspot customer), **render
 - [ ] Past Requests overlay (admin, on-demand fetch) shows played/denied history with correct badges,
       correct status text (not hardcoded "In queue" for historical rows)
 - [ ] LAN admin's Played/Denied sections (always-fetched, client-grouped) match relay's on-demand overlay
+- [ ] **(gaps found by code audit 2026-08-01, Android `LocalServer.generateReport()`)**
+  - [ ] Tap "Generate Report Now" with **zero requests** in the session — confirm current behavior:
+        silently no-ops (`if (requests.isEmpty()) return`), no file written, **no visible feedback** to
+        the operator that nothing happened. Decide if that's acceptable or needs a shown message.
+  - [ ] Tap "Generate Report Now" **mid-session**, while pending/approved (not yet played/denied)
+        requests exist — confirm the report includes those rows with their current non-final status,
+        not just finalized history.
+  - [ ] Tap "Generate Report Now" **twice** in the same session — confirm two independent timestamped
+        files are produced with overlapping data, no de-dup or cutoff marker between the two runs.
+  - [ ] For a multi-song request's CSV row: confirm price is populated **only on the first song's row**,
+        blank on subsequent songs (`idx == 0` check) — correct design intent, but a real gotcha if you
+        validate report totals by naively summing the price column per row.
 
 ## 12. Bar Configuration Details
 
@@ -480,3 +518,32 @@ relay session exists for it, the endpoint would just 404). Don't "fix" this gate
 - [ ] Multiple customer devices submitting concurrently — no request lost, no duplicate processing
 - [ ] Wireless debugging pairing expires mid-session — does **not** affect the running app/session,
       purely a dev-tooling concern
+
+## 15. Admin/Bartender Authentication Robustness (gaps found by code audit 2026-08-01)
+
+None of these are confirmed-working features to check off — they're **known gaps found by reading the
+actual auth code on both platforms**. Each item below is "confirm this weakness still exists as
+described, then decide whether it needs fixing" — not "confirm this is secure."
+
+- [ ] **Kiosk-native admin PIN has no lockout at all, on both platforms.** Android `KioskView.kt`'s
+      `AdminPinEntry` and iOS `AdminView.verify()` both do a bare string comparison with no attempt
+      counter — unlimited on-device guesses.
+- [ ] **Contrast/confirm the asymmetry**: LAN admin auth on *both* platforms genuinely does lock out
+      after 5 wrong attempts for 300s (Android `LocalRequestManager.checkAdminPin`, iOS
+      `LocalServer.swift`'s equivalent) — confirm this actually triggers and actually clears after the
+      cooldown, i.e. the LAN side is the one surface where "wrong PIN" behavior is worth positively
+      verifying, not just noting the gap.
+- [ ] **LAN bartender pairing (`POST /api/bartender/pair`, both platforms) has NO brute-force protection
+      at all** — no attempt counter, no lockout, no rate limit, and it's network-reachable rather than
+      on-device — arguably higher priority than the admin PIN gaps above.
+- [ ] **Android-specific**: force `barDetails.pin` to resolve to an empty string at runtime and confirm
+      whether kiosk admin PIN entry then accepts **any** input as valid (`adminPin.isEmpty() || entered
+      == adminPin` in `KioskView.kt`) — if this state is ever reachable in normal operation (not just a
+      theoretical default), that's a real bypass, not just a defensive guard clause with no live path.
+- [ ] **Bartender pairing never expires.** Once paired, a bartender device stays authorized for the rest
+      of the session (potentially many hours) with no re-auth prompt — unlike the customer-facing
+      session token, which does rotate mid-session. Confirm this is an accepted intentional tradeoff
+      (convenience over rotation for a device that's presumably trusted staff hardware), not an oversight.
+- [ ] Admin PIN **cannot** be changed mid-session on either platform — only via End Session → full
+      wizard. Confirm this is accepted (no "PIN changed while other devices have open sessions"
+      scenario is possible today, so nothing to test there).
