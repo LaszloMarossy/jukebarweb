@@ -139,6 +139,12 @@ class BarSession:
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
+    # token -> {"name": str, "paired_at": float, "ip": str}. Minted by bar_authenticate() on a
+    # correct PIN; required by every bartender/admin action endpoint below (approve/deny/control/
+    # settings/requests/history) via _require_bartender_token() — the PIN check alone used to be
+    # purely a client-side UI gate with zero server enforcement, since those endpoints previously
+    # only validated the same session token the public customer QR code also carries. Fixed 2026-08.
+    bartender_tokens: dict[str, dict] = field(default_factory=dict)
     # field -> value an admin/bartender asked for that the host hasn't echoed back yet;
     # presence = pending. Latest write per field wins, no queue — see bar_settings()/host_sync().
     desired_settings: dict[str, bool] = field(default_factory=dict)
@@ -728,6 +734,15 @@ def _customer_bar(jukebar_id: str, session: str) -> BarSession:
     return bar
 
 
+def _require_bartender_token(bar: BarSession, token: str) -> None:
+    """Raise 401 unless token is a currently-valid bartender/admin token minted by
+    bar_authenticate(). Call this in every bartender/admin action endpoint — approve, deny,
+    control, settings, requests, history — none of these should be reachable with just the
+    session token customers also have (see BarSession.bartender_tokens docstring)."""
+    if not token or token not in bar.bartender_tokens:
+        raise HTTPException(401, "Bartender/admin authentication required")
+
+
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 
@@ -775,8 +790,10 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
 @app.post("/api/bar/{jukebar_id}/authenticate")
 async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
-    Bartender PIN gate. Client hashes the PIN with SHA-256 (same algorithm as iOS CryptoKit)
-    and posts the hex digest. Returns 200 OK or 403 Forbidden.
+    Bartender/admin PIN gate. Client hashes the PIN with SHA-256 (same algorithm as iOS CryptoKit)
+    and posts the hex digest. On success, mints and returns a bartender token that must be sent
+    on every subsequent bartender/admin action (approve/deny/control/settings/requests/history) —
+    see _require_bartender_token(). Returns 403 Forbidden on a wrong PIN.
     If the bar has no pin_hash (legacy / not yet set), access is denied — PIN is mandatory.
 
     Locked out per (bar, source IP) after BARTENDER_LOCKOUT_MAX_ATTEMPTS wrong guesses, for
@@ -800,7 +817,13 @@ async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(...
         raise HTTPException(403, "Incorrect PIN")
 
     _bartender_lockouts.pop(key, None)
-    return {"ok": True}
+    token = uuid.uuid4().hex
+    bar.bartender_tokens[token] = {
+        "name":      (body.get("name") or "Bartender").strip()[:60] or "Bartender",
+        "paired_at": now,
+        "ip":        client_ip,
+    }
+    return {"ok": True, "token": token}
 
 
 @app.get("/api/bar/{jukebar_id}/genres")
@@ -1036,7 +1059,7 @@ async def bar_payment_confirmed(
 # ---------------------------------------------------------------------------
 
 @app.get("/api/bar/{jukebar_id}/requests")
-async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
+async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
     """
     Feeds admin.html/bartender.html's Requests (needs a bartender tap) and Up Next (already
     resolved) sections. "status" here is a DISPLAY status, not always bar.requests[rid].status
@@ -1051,6 +1074,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
     for something nobody was ever going to be asked to approve.
     """
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     pending = [
         {
             "id": r.id,
@@ -1092,8 +1116,9 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s")):
 
 
 @app.post("/api/bar/{jukebar_id}/approve")
-async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     rid = body.get("request_id", "")
     req = bar.requests.get(rid)
     if req is None:
@@ -1116,13 +1141,14 @@ async def bartender_approve(jukebar_id: str, s: str = Query(..., alias="s"), bod
 
 
 @app.get("/api/bar/{jukebar_id}/history")
-async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
+async def bar_history(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
     """
     All requests for the current session, any status - powers admin page's Reports tab (status
     counts + full request list). Shaped the same as bartender_requests()'s entries (song_details,
     payment_method, price, etc.) so the client can reuse the same requestCard() renderer for both.
     """
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     return {
         "bar_name": bar.bar_name,
         "requests": [
@@ -1155,8 +1181,9 @@ async def bar_history(jukebar_id: str, s: str = Query(..., alias="s")):
 
 
 @app.post("/api/bar/{jukebar_id}/control")
-async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     action = body.get("action", "")
     if action not in ("play", "pause", "next", "prev"):
         raise HTTPException(400, "action must be play, pause, next, or prev")
@@ -1171,7 +1198,7 @@ async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), bod
 
 
 @app.post("/api/bar/{jukebar_id}/deny")
-async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
     """
     Denies a pending request, or cancels one already approved/queued (the "Cancel" button on
     already-playing-soon free requests). Stripe-paid requests can never be denied/cancelled
@@ -1184,6 +1211,7 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: 
     to this restriction.
     """
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     rid = body.get("request_id", "")
     req = bar.requests.get(rid)
     if req is None:
@@ -1200,7 +1228,7 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: 
 
 
 @app.post("/api/bar/{jukebar_id}/settings")
-async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
     """
     Admin/bartender: record the desired value for one or more settings fields. Does NOT touch
     bar.bartender_enabled/stripe_enabled/accepting_requests directly - the host picks up
@@ -1210,6 +1238,7 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), body: di
     only the latest matters, nothing is queued or ordered.
     """
     bar = _customer_bar(jukebar_id, s)
+    _require_bartender_token(bar, token)
     for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
         if field_name in body:
             bar.desired_settings[field_name] = bool(body[field_name])

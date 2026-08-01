@@ -324,7 +324,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
+const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, pricePerSong: 0, priceForThree: 0, currency: '' };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 let currentTab = 'requests';
 let btStripeEnabled     = false;
@@ -361,10 +361,12 @@ async function boot() {
   if (!S.jukebarId || !S.session)
     return showError('Invalid link', 'Please get the bartender QR code from the JukeBar admin panel.');
 
-  // Check for cached auth in sessionStorage (valid until tab is closed or session rotates)
+  // Check for cached auth token in sessionStorage (valid until tab is closed or session rotates)
   const authKey = `jb_auth_${S.jukebarId}_${S.session}`;
   $('s-loading').style.display = 'none';
-  if (sessionStorage.getItem(authKey) === 'ok') {
+  const cachedToken = sessionStorage.getItem(authKey);
+  if (cachedToken) {
+    S.token = cachedToken;
     await startMain();
   } else {
     showScreen('s-pin');
@@ -415,8 +417,10 @@ async function verifyPin() {
     if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) throw new Error(res.status);
 
+    const authData = await res.json();
+    S.token = authData.token;
     // Cache so they don't have to re-enter on refresh (cleared when tab closes)
-    sessionStorage.setItem(`jb_auth_${S.jukebarId}_${S.session}`, 'ok');
+    sessionStorage.setItem(`jb_auth_${S.jukebarId}_${S.session}`, S.token);
     await startMain();
   } catch {
     $('pin-err').textContent = 'Connection error — check your internet.';
@@ -434,7 +438,7 @@ async function startMain() {
 // ── Poll (requests + approval queue) ────────────────────────────────────────
 async function poll() {
   try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}`);
+    const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}&token=${enc(S.token)}`);
     if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
     if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) return;
@@ -558,7 +562,7 @@ async function approve(requestId, jump, btn) {
   actedRequests.set(requestId, label);
   markActed(btn, label);
   try {
-    await fetch(`/api/bar/${S.jukebarId}/approve?s=${enc(S.session)}`, {
+    await fetch(`/api/bar/${S.jukebarId}/approve?s=${enc(S.session)}&token=${enc(S.token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ request_id: requestId, jump }),
@@ -572,7 +576,7 @@ async function deny(requestId, btn) {
   actedRequests.set(requestId, label);
   markActed(btn, label);
   try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}`, {
+    const res = await fetch(`/api/bar/${S.jukebarId}/deny?s=${enc(S.session)}&token=${enc(S.token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ request_id: requestId }),
@@ -632,7 +636,7 @@ async function toggleBtPayment(which) {
   btSettingsPending = [...btSettingsPending, field];
   updatePaymentToggleUI();
   try {
-    const res = await fetch(`/api/bar/${S.jukebarId}/settings?s=${enc(S.session)}`, {
+    const res = await fetch(`/api/bar/${S.jukebarId}/settings?s=${enc(S.session)}&token=${enc(S.token)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
