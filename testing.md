@@ -547,17 +547,15 @@ None of these are confirmed-working features to check off — they're **known ga
 actual auth code on both platforms**. Each item below is "confirm this weakness still exists as
 described, then decide whether it needs fixing" — not "confirm this is secure."
 
-- [ ] **Kiosk-native admin PIN has no lockout at all, on both platforms.** Android `KioskView.kt`'s
-      `AdminPinEntry` and iOS `AdminView.verify()` both do a bare string comparison with no attempt
-      counter — unlimited on-device guesses.
-- [ ] **Contrast/confirm the asymmetry**: LAN admin auth on *both* platforms genuinely does lock out
-      after 5 wrong attempts for 300s (Android `LocalRequestManager.checkAdminPin`, iOS
-      `LocalServer.swift`'s equivalent) — confirm this actually triggers and actually clears after the
-      cooldown, i.e. the LAN side is the one surface where "wrong PIN" behavior is worth positively
-      verifying, not just noting the gap.
-- [ ] **LAN bartender pairing (`POST /api/bartender/pair`, both platforms) has NO brute-force protection
-      at all** — no attempt counter, no lockout, no rate limit, and it's network-reachable rather than
-      on-device — arguably higher priority than the admin PIN gaps above.
+- [x] ~~Kiosk-native admin PIN has no lockout at all~~ — **fixed 2026-08-01**: progressive backoff on
+      both platforms (first 3 wrong tries free, then 20s/40s/80s/160s... escalating delay before the
+      field re-enables). See §A-adjacent scenario below for the "Forgot PIN?" flow this pairs with.
+- [ ] **Contrast/confirm**: LAN admin auth on *both* platforms genuinely does lock out after 5 wrong
+      attempts for 300s (Android `LocalRequestManager.checkAdminPin`, iOS `LocalServer.swift`'s
+      equivalent) — confirm this actually triggers and actually clears after the cooldown.
+- [ ] **LAN bartender pairing (`POST /api/bartender/pair`, both platforms) still has NO brute-force
+      protection at all** — no attempt counter, no lockout, no rate limit, network-reachable. **Not yet
+      fixed** — the agreed design (IP-based, 3 tries/15 min) is written up but not yet implemented.
 - [ ] **Android-specific**: force `barDetails.pin` to resolve to an empty string at runtime and confirm
       whether kiosk admin PIN entry then accepts **any** input as valid (`adminPin.isEmpty() || entered
       == adminPin` in `KioskView.kt`) — if this state is ever reachable in normal operation (not just a
@@ -566,6 +564,21 @@ described, then decide whether it needs fixing" — not "confirm this is secure.
       of the session (potentially many hours) with no re-auth prompt — unlike the customer-facing
       session token, which does rotate mid-session. Confirm this is an accepted intentional tradeoff
       (convenience over rotation for a device that's presumably trusted staff hardware), not an oversight.
-- [ ] Admin PIN **cannot** be changed mid-session on either platform — only via End Session → full
-      wizard. Confirm this is accepted (no "PIN changed while other devices have open sessions"
-      scenario is possible today, so nothing to test there).
+
+### Kiosk "Forgot PIN?" reset flow (new 2026-08-01)
+
+Gated purely by physical presence at the kiosk — no secondary secret. On both platforms' kiosk PIN
+entry screen, a "Forgot PIN?" link leads to a reset form (new PIN + confirm), during which playback
+pauses and a repeating audible tone plays (Android: `ToneGenerator`; iOS: generated tone, no bundled
+asset) so anyone nearby knows a sensitive action is underway. Confirming logs straight into the admin
+panel with the new PIN active — no need to re-type it immediately.
+
+- [ ] Tap "Forgot PIN?" — music pauses, a repeating tone starts audibly within ~1s
+- [ ] New PIN + confirm PIN fields — "Set PIN" stays disabled until both are 4-6 digits and match
+- [ ] Confirm — PIN is persisted (`barDetails.pin` / `LocalStorage`'s `pinHash`), tone stops, music
+      resumes if it was playing before, admin panel opens directly (no re-entry required)
+- [ ] The *new* PIN is what's required on the next normal kiosk PIN entry — old PIN no longer works
+- [ ] Cancel from the reset form — tone stops, music resumes, back to normal PIN entry, PIN unchanged
+- [ ] This flow is kiosk-only — confirm no equivalent exists or is reachable on LAN/render admin
+- [ ] Settings/Up Next/session are completely untouched by a PIN reset — this never goes through
+      End Session or the setup wizard at all
