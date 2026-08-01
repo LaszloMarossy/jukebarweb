@@ -616,7 +616,7 @@ async def host_sync(body: dict[str, Any]):
     Server returns:
       requests         — new customer requests since last sync (status == "pending"), including
                          price/payment_method so the host doesn't have to recompute/guess them
-      actions          — queued bartender approve/deny/stop_session actions, then clears the queue
+      actions          — queued bartender approve/deny/control actions, then clears the queue
       desired_settings — {field: bool} for any field an admin/bartender has requested a
                          change for that this host's echo hasn't matched yet. Host should
                          apply these locally; once a later echo matches, the entry drops out
@@ -1172,14 +1172,6 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), body: 
         "type": "deny",
         "request_id": rid,
     })
-    return {"ok": True}
-
-
-@app.post("/api/bar/{jukebar_id}/stop")
-async def bar_stop(jukebar_id: str, s: str = Query(..., alias="s")):
-    """Queue a stop_session action — iOS picks it up on the next sync and rotates the session."""
-    bar = _customer_bar(jukebar_id, s)
-    bar.pending_actions.append({"type": "stop_session"})
     return {"ok": True}
 
 

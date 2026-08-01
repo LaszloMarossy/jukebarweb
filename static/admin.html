@@ -142,7 +142,6 @@
     .btn-prev, .btn-next { background: #ffc24a; }
     .btn-pp             { background: #fbbe84; font-size: 38px; }
     .btn-pp.playing     { background: #fda185; font-size: 20px; letter-spacing: -5px; }
-    .btn-stop           { background: #dc7955; }
 
     /* ── section title ── */
     .section-title {
@@ -356,7 +355,6 @@
       <button class="btn-control btn-prev" onclick="skipTrack('prev')" title="Previous">⏮&#xFE0E;</button>
       <button class="btn-control btn-pp" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">►</button>
       <button class="btn-control btn-next" onclick="skipTrack('next')" title="Next">⏭&#xFE0E;</button>
-      <button class="btn-control btn-stop" onclick="stopSession()" title="End Session">■</button>
     </div>
   </div>
 
@@ -703,14 +701,6 @@ function skipTrack(action) {
   $('btn-play-pause').textContent = '▮▮';
   $('btn-play-pause').classList.add('playing');
   S.playStateReady = true;
-}
-
-async function stopSession() {
-  if (!confirm('End Session?\n\nMusic will pause and the host will return to the setup wizard.')) return;
-  try {
-    await fetch(`/api/bar/${S.jukebarId}/stop?s=${enc(S.session)}`, { method: 'POST' });
-    renderNowPlaying(null);
-  } catch {}
 }
 
 // ── Render requests ────────────────────────────────────────────────────────

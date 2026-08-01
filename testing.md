@@ -256,14 +256,24 @@ either alone) that flips the mode.
   - [ ] Approval mode step (Free / Bartender Pay / Stripe)
   - [ ] Pricing step (per-song, 3-song bundle, currency)
   - [ ] Summary/confirm step, session actually starts
-- [ ] End Session → wizard reopens with **all previous values pre-filled**, not blank
-- [ ] Stop Session (web admin "Stop Session" action) → Spotify/Apple Music auth token also cleared,
-      re-login required next setup
-- [ ] **End Session = full wizard wipe on both platforms, confirmed and intentional (2026-08-01)**:
-      Up Next does **not** need to survive this — that's fine, it's a genuine restart (playlist,
-      settings, everything can change). Confirmed consistent across every trigger on iOS — kiosk
-      admin, LAN admin, and render admin (relay-queued `stop_session` action) all call the same
-      full-wipe path (`resetSetup()`), no kiosk-vs-remote inconsistency exists.
+- [ ] **End Session — kiosk-only, redesigned 2026-08-01.** Full wizard wipe, previous values
+      pre-filled, Up Next intentionally does NOT survive it (a genuine restart — playlist/settings/
+      everything can legitimately change). **Reachable only from the kiosk's own on-device admin
+      screen on both platforms** — the equivalent "Stop/End Session" button and its backing endpoint
+      (`/api/admin/stop` on LAN, the relay's `stop_session` action on render) were **removed entirely**
+      from LAN admin.html (both platforms) and the shared render `static/admin.html`. Rationale: the
+      wizard can only ever be completed at the kiosk regardless of where it's triggered from, so a
+      remote trigger only exposes the admin wizard on the public-facing kiosk screen to bystanders
+      without anyone physically present to supervise it — and a remote page would orphan its own
+      session the moment the kiosk's QR/session rotates anyway, since it can't retrieve the new one.
+  - [ ] Confirm the button/control is genuinely gone from wifi/hotspot admin AND render admin on both
+        platforms — not just hidden, actually unreachable (no working endpoint left to call directly)
+  - [ ] Confirm kiosk admin's End Session still works normally, full wizard wipe, on both platforms
+  - [ ] Android: End Session keeps the Spotify login (no re-auth needed next setup) — this was already
+        true before the redesign, `restartSession()`'s existing behavior, unchanged
+  - [ ] iOS: Apple Music access is an OS-level authorization, not an app-managed token — there is
+        nothing to "keep or clear" here at all; confirm no re-auth prompt appears after End Session
+        (should already hold true, structurally, with no code change needed for this specifically)
 - [ ] **(regression, iOS, fixed 2026-08-01) Pausing must never rotate the session/QR or wipe Up Next**
       — neither the manual admin play/pause toggle (already correct, calls `MusicService.pause()`
       directly) nor the automatic 30-minute idle timer (was calling `stopSession()`, which minted a
