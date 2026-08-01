@@ -762,6 +762,17 @@ def _require_bartender_token(bar: BarSession, token: str) -> None:
         raise HTTPException(401, "Bartender/admin authentication required")
 
 
+def _require_admin_token(bar: BarSession, token: str) -> None:
+    """Stricter than _require_bartender_token: also requires the token's role to be "admin" —
+    for the Bartender Sessions view/kill/clear-lockout actions and bartender-PIN changes, none of
+    which a bartender should be able to do to itself or another bartender. Tokens minted before
+    the 2026-08 role split (none should exist in a live process, but defensively) have no "role"
+    key at all and are treated as non-admin."""
+    _require_bartender_token(bar, token)
+    if bar.bartender_tokens[token].get("role") != "admin":
+        raise HTTPException(403, "Admin authentication required")
+
+
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 
@@ -850,15 +861,26 @@ async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(...
     if body.get("pin_hash") != expected_hash:
         attempts = (entry["attempts"] if entry else 0) + 1
         locked_until = now + BARTENDER_LOCKOUT_SECONDS if attempts >= BARTENDER_LOCKOUT_MAX_ATTEMPTS else 0
-        _bartender_lockouts[key] = {"attempts": attempts, "locked_until": locked_until}
+        # last_name: whatever name (if any) was typed alongside this failed attempt — purely
+        # informational, shown on the Bartender Sessions admin tab so an admin clearing a lockout
+        # has a hint who's asking, not used for anything security-relevant.
+        _bartender_lockouts[key] = {
+            "attempts": attempts, "locked_until": locked_until,
+            "last_name": (body.get("name") or "").strip()[:60],
+        }
         raise HTTPException(403, "Incorrect PIN")
 
     _bartender_lockouts.pop(key, None)
     token = uuid.uuid4().hex
     bar.bartender_tokens[token] = {
-        "name":      (body.get("name") or "Bartender").strip()[:60] or "Bartender",
-        "paired_at": now,
-        "ip":        client_ip,
+        "name":       (body.get("name") or "Bartender").strip()[:60] or "Bartender",
+        "paired_at":  now,
+        "ip":         client_ip,
+        "role":       role,
+        # Separate opaque id for the Bartender Sessions admin UI (2026-08) — admin.html lists/kills
+        # sessions by this, never by the actual bearer token, so the working credential is never
+        # round-tripped back through a view a bartender could conceivably also load.
+        "session_id": uuid.uuid4().hex,
     }
     return {"ok": True, "token": token}
 
@@ -1275,9 +1297,9 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: s
     request for the same field before the host catches up just overwrites the desired value in
     place - only the latest matters, nothing is queued or ordered.
 
-    bartender_pin_hash is admin-only by UI convention (only admin.html exposes a control for it —
-    bartender.html has no "change PIN" UI), but this endpoint itself doesn't distinguish admin
-    vs bartender tokens for any field, same as the three existing toggles.
+    bartender_pin_hash requires an admin token specifically (2026-08, Bartender Sessions work) —
+    unlike the three toggle fields below, which any valid bartender token can still set, same as
+    always.
     """
     bar = _customer_bar(jukebar_id, s)
     _require_bartender_token(bar, token)
@@ -1285,5 +1307,84 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: s
         if field_name in body:
             bar.desired_settings[field_name] = bool(body[field_name])
     if "bartender_pin_hash" in body:
+        _require_admin_token(bar, token)
         bar.desired_settings["bartender_pin_hash"] = str(body["bartender_pin_hash"] or "")
+    return {"ok": True}
+
+
+@app.get("/api/bar/{jukebar_id}/bartender_sessions")
+async def bartender_sessions(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
+    """
+    Admin-only (2026-08, Bartender Sessions tab). Lists currently-paired bartender tokens and
+    currently-tracked PIN-lockout entries for THIS bar — both already existed as bookkeeping for
+    other purposes (bartender_tokens for _require_bartender_token(), _bartender_lockouts for
+    bar_authenticate()'s rate limiting) and are just being surfaced here, not new state.
+
+    Deliberately returns "session_id" (opaque, minted alongside the real token at pairing time),
+    never the bartender's actual bearer token — admin.html can list/kill sessions without the
+    admin's browser ever holding a working bartender credential.
+    """
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    now = time.time()
+    sessions = sorted(
+        (
+            {
+                "session_id": rec["session_id"],
+                "name":       rec["name"],
+                "paired_at":  rec["paired_at"],
+                "ip":         rec["ip"],
+            }
+            for rec in bar.bartender_tokens.values()
+            if rec.get("role") == "bartender"
+        ),
+        key=lambda r: r["paired_at"], reverse=True,
+    )
+    lockouts = sorted(
+        (
+            {
+                "ip":            ip,
+                "attempts":      entry["attempts"],
+                "locked_until":  entry["locked_until"],
+                "locked":        now < entry["locked_until"],
+                "last_name":     entry.get("last_name", ""),
+            }
+            for (bid, ip, role), entry in _bartender_lockouts.items()
+            if bid == jukebar_id and role == "bartender" and entry.get("attempts", 0) > 0
+        ),
+        key=lambda r: r["locked_until"], reverse=True,
+    )
+    return {"sessions": sessions, "lockouts": lockouts}
+
+
+@app.post("/api/bar/{jukebar_id}/bartender_sessions/kill")
+async def bartender_sessions_kill(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
+    """Admin-only. Revokes one bartender's token immediately — their next call to any
+    bartender/admin action endpoint gets 401 (see _require_bartender_token()). Does not touch
+    the bartender PIN itself; pair with bar_settings()'s bartender_pin_hash if the admin also
+    wants to stop this device from simply re-pairing with the old PIN (that's a second, separate
+    call from the client - see admin.html's kill-session confirm flow)."""
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    session_id = body.get("session_id", "")
+    match = next(
+        (tok for tok, rec in bar.bartender_tokens.items()
+         if rec.get("session_id") == session_id and rec.get("role") == "bartender"),
+        None,
+    )
+    if match is None:
+        raise HTTPException(404, "Session not found")
+    del bar.bartender_tokens[match]
+    return {"ok": True}
+
+
+@app.post("/api/bar/{jukebar_id}/bartender_sessions/clear_lockout")
+async def bartender_sessions_clear_lockout(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
+    """Admin-only. Resets one IP's failed-attempt counter for bartender pairing (not admin PIN
+    lockouts, which are a separate lockout entirely and not exposed here) — lets a legitimately
+    locked-out bartender retry immediately once told the (unchanged) current PIN verbally."""
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    ip = body.get("ip", "")
+    _bartender_lockouts.pop((jukebar_id, ip, "bartender"), None)
     return {"ok": True}

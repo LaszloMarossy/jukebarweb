@@ -410,6 +410,50 @@ available, so they send the raw entered PIN over `/api/admin/settings` and the *
 server-side** before storing — both iOS and Android converged on this same approach independently.
 Either way, only a hash is ever what's compared against or forwarded to the relay.
 
+**Bartender Sessions admin tab (2026-08-02), on remote admin only — LAN admin.html both**
+**platforms + render `static/admin.html`, deliberately NOT kiosk-native.** Surfaces data that
+already existed as bookkeeping for other purposes (paired-bartender records, PIN-lockout attempt
+counters) behind a new "Sessions" tab: an **Active Bartender Sessions** list (name, paired-at,
+source IP, per-row **Kill**) and a **Locked-Out IPs** list (IP, last name attempted, attempt
+count, remaining lockout time, per-row **Clear**). All three new endpoints/routes on every
+surface require a true **admin** token specifically — deliberately excludes LAN's
+isAdmin-promoted-first-bartender path (`isValidSettingsToken`/Android's equivalent), since
+managing *other* bartenders' sessions and PIN lockouts shouldn't be something even the "admin
+bartender" can do to peers. Relay: `_require_admin_token()` (stricter than the pre-existing
+`_require_bartender_token()`), checking a new `role` field now stored per `bartender_tokens`
+entry (minted with `role` at `bar_authenticate()` time, same call that already carries it from
+the PIN-split work). `bar_settings()`'s `bartender_pin_hash` field was tightened to also require
+admin token specifically, closing what was previously only a UI convention.
+
+**Kill** revokes one bartender's credential immediately — their next call to any protected
+endpoint 401s. Relay mints a separate opaque `session_id` per token (alongside the real bearer
+token) specifically so admin.html never has to hold or display a working bartender credential to
+list/kill sessions. **LAN has no equivalent separation** — a bartender's `bartenderId` (Android)
+/ `BartenderRecord.id` (iOS) **is** its bearer token by existing design, so the LAN sessions list
+necessarily exposes each bartender's actual working credential to the admin viewing it. Accepted
+as a known, deliberate scope boundary rather than a bug to fix here — restructuring LAN's
+identity/credential split is a real refactor, and LAN already requires physical network presence
+(a different threat model than the relay's full internet exposure, the same reasoning already
+applied elsewhere to other LAN/render asymmetries in this doc).
+
+**Kill's confirm flow bundles a convenience**: "also change the bartender PIN so they can't just
+re-pair" — reuses the existing bartender-PIN-set mechanism (the Actions-tab control from the PIN
+split above) rather than being a separate feature; killing and rotating are still two independent
+calls under the hood, just offered together in one UI flow since a hacker who already knew the
+old PIN needs both to actually be locked out.
+
+**Killed bartenders now get a clean client-side logout, not a silently-stuck UI**: none of the
+three `bartender.html`/`WebApps/bartender.html`/`assets/bartender.html` poll loops previously
+handled a 401 response at all — a revoked session would just poll into 401s forever with the UI
+frozen on stale data. All three gained a `sessionKicked()`/equivalent: clears the cached
+token/bartenderId and drops back to the PIN/pair screen with an explanatory message.
+
+**Incidental bug found and fixed on Android during this work**: `LocalServer.kt`'s `jsonError()`
+had no `401` case in its status-code `when` block, so all 4 pre-existing `jsonError(401, ...)`
+call sites (approve/deny/list/settings auth failures) were actually returning HTTP 500, not 401 —
+silently wrong for as long as the token-auth layer has existed. Fixed as part of wiring the new
+endpoints' own 401s (which needed it to work at all), incidentally fixing the pre-existing ones too.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

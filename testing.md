@@ -701,3 +701,43 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
       the relay's `main.py`), not one shared code path
 - [ ] Relay restart clears all render-side lockouts (in-memory only, same accepted tradeoff as
       `bar.requests`) — not a bug, matches existing relay-restart behavior elsewhere
+
+### Bartender Sessions admin tab (new 2026-08-02) — LAN admin.html (both platforms) + render admin.html only, NOT kiosk-native
+
+Surfaces existing paired-bartender and PIN-lockout bookkeeping behind a new "Sessions" tab, with
+Kill (per bartender) and Clear (per locked-out IP) actions, admin-token-only.
+
+- [ ] Pair 2+ bartenders (different names/devices if possible), open the Sessions tab on each of
+      the 3 admin surfaces — each shows every currently-paired bartender for **that surface's own**
+      transport (LAN sessions and render sessions are separate pools — a bartender paired via LAN
+      never appears in render's list or vice versa, confirmed by design, not a bug)
+- [ ] Fail a bartender PIN 1-2 times (not enough to lock out) from one IP — that IP appears in
+      Locked-Out IPs with the correct attempt count and "not locked" status, plus the name that was
+      typed on the last failed attempt
+- [ ] Fail 3 times to trigger the lockout — same row now shows "locked" with a counting-down
+      remaining time
+- [ ] **Kill a session**: confirm dialog fires, declining the "also change PIN" follow-up prompt
+      still kills the session — that bartender's next poll gets logged out (session/pair screen
+      reappears with an explanatory message, not a frozen stale UI) within one poll interval
+- [ ] **Kill + bundled PIN change**: accept the "also change PIN" prompt, enter a new PIN — confirm
+      BOTH happen: the killed bartender is logged out AND the old PIN no longer works for a fresh
+      pairing attempt (new PIN required)
+- [ ] **Clear a lockout**: confirm the target IP can immediately retry the PIN (not waiting out the
+      remaining lockout time), and that this does NOT change the PIN itself — the same PIN that was
+      failing before still works once entered correctly
+- [ ] **Admin-only enforcement, all three surfaces**: pair as the *first* bartender (LAN only — gets
+      auto-promoted to `isAdmin`/settings-capable) and confirm that bartender's own token/id gets
+      401 on `GET .../bartender_sessions` (or render's equivalent) — the isAdmin-promoted-bartender
+      shortcut that already exists for the 3 payment toggles must NOT extend to viewing/killing
+      sessions or clearing lockouts. This is the single most important regression to verify — it's
+      an easy shortcut to accidentally take (reusing `isValidSettingsToken` instead of
+      `isValidAdminToken`) since the two checks look similar everywhere else in this codebase.
+- [ ] Kiosk-native admin (iOS `AdminView.swift`, Android `AdminScreen.kt`) has **no** Sessions tab —
+      confirm this is still true (deliberately out of scope, not an oversight)
+- [ ] **Known, accepted gap — LAN only, not a bug to fix here**: the sessions list on LAN
+      necessarily shows each bartender's actual working credential (`bartenderId` IS the bearer
+      token on LAN, unlike render's opaque `session_id`) — confirm this is understood as an accepted
+      LAN/render asymmetry (LAN requires physical network presence already), not something to
+      silently patch over with a fake extra id layer that wouldn't add real protection anyway
+- [ ] Relay restart / LAN session reset (End Session) clears all sessions and lockout state for
+      that surface — same in-memory-only tradeoff as everywhere else in this system

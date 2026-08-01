@@ -238,6 +238,16 @@
     .btn-bt-clear { width: 100%; margin-top: 8px; color: var(--red); }
     .bt-pin-err { font-size: 12px; color: var(--red); min-height: 16px; margin-top: 6px; }
 
+    /* ── bartender sessions tab ── */
+    .bt-sess-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-top: 1px solid var(--border); gap: 10px;
+    }
+    .bt-sess-row:first-child { border-top: none; }
+    .bt-sess-main { font-size: 14px; color: var(--text); }
+    .bt-sess-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .bt-sess-sub.locked { color: #fbbf24; }
+
     /* ── tabs ── */
     .tab-bar {
       display: flex; gap: 0; margin-top: 20px; margin-bottom: 0;
@@ -378,6 +388,7 @@
     <button class="tab-btn active" id="tab-btn-requests" onclick="switchTab('requests')">Requests</button>
     <button class="tab-btn"        id="tab-btn-reports"  onclick="switchTab('reports')">Reports</button>
     <button class="tab-btn"        id="tab-btn-actions"  onclick="switchTab('actions')">Actions</button>
+    <button class="tab-btn"        id="tab-btn-sessions" onclick="switchTab('sessions')">Sessions</button>
   </div>
 
   <div id="pane-requests" class="tab-pane active">
@@ -436,6 +447,20 @@
       </div>
       <div class="bt-pin-err" id="bt-pin-err"></div>
       <button class="btn-report btn-bt-clear" id="bt-pin-clear" style="display:none" onclick="clearBartenderPin()">Turn Off Bartender Access</button>
+    </div>
+  </div>
+
+  <div id="pane-sessions" class="tab-pane">
+    <div class="report-actions">
+      <button class="btn-report" onclick="loadBartenderSessions()">↻ Refresh</button>
+    </div>
+    <div class="payment-card" style="margin-top:4px">
+      <div class="payment-title">Active Bartender Sessions</div>
+      <div id="bt-sessions-list"><div class="empty-state">Loading…</div></div>
+    </div>
+    <div class="payment-card" style="margin-top:14px">
+      <div class="payment-title">Locked-Out IPs</div>
+      <div id="bt-lockouts-list"><div class="empty-state">Loading…</div></div>
     </div>
   </div>
 </div>
@@ -594,11 +619,12 @@ let _audioKeepAlive = null;
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name) {
   S.activeTab = name;
-  ['requests', 'reports', 'actions'].forEach(t => {
+  ['requests', 'reports', 'actions', 'sessions'].forEach(t => {
     $('tab-btn-' + t)?.classList.toggle('active', t === name);
     $('pane-' + t)?.classList.toggle('active', t === name);
   });
   if (name === 'reports') loadReports();
+  if (name === 'sessions') loadBartenderSessions();
 }
 
 // ── Payment / Actions toggles ─────────────────────────────────────────────────
@@ -716,6 +742,107 @@ async function togglePayment(which) {
     S.settingsPending = S.settingsPending.filter(f => f !== field);
     updatePaymentUI();
   }
+}
+
+// ── Bartender Sessions tab (2026-08) ───────────────────────────────────────────
+// Admin-only view/actions over data that already existed as bookkeeping elsewhere (paired
+// tokens, PIN lockout attempts) — just surfaced here. Fetched on tab-open + manual refresh,
+// not continuously polled — this is an occasionally-used admin view, not the live request feed.
+function fmtElapsed(ts) {
+  const secs = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+async function loadBartenderSessions() {
+  const sessEl = $('bt-sessions-list');
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/bartender_sessions?s=${enc(S.session)}&token=${enc(S.token)}`);
+    if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
+    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
+    if (!res.ok) { if (sessEl) sessEl.innerHTML = '<div class="empty-state">Could not load — try Refresh.</div>'; return; }
+    const d = await res.json();
+    renderBartenderSessions(d.sessions || [], d.lockouts || []);
+  } catch {
+    if (sessEl) sessEl.innerHTML = '<div class="empty-state">Connection error — try Refresh.</div>';
+  }
+}
+
+function renderBartenderSessions(sessions, lockouts) {
+  const sessEl = $('bt-sessions-list');
+  const lockEl = $('bt-lockouts-list');
+
+  sessEl.innerHTML = sessions.length ? '' : '<div class="empty-state">No bartenders currently paired.</div>';
+  sessions.forEach(sess => {
+    const row = document.createElement('div');
+    row.className = 'bt-sess-row';
+    row.innerHTML = `
+      <div>
+        <div class="bt-sess-main">${esc(sess.name)}</div>
+        <div class="bt-sess-sub">${esc(sess.ip)} · paired ${fmtElapsed(sess.paired_at)}</div>
+      </div>
+      <button class="btn-act btn-cancel">Kill</button>`;
+    row.querySelector('button').onclick = () => killBartenderSession(sess.session_id, sess.name);
+    sessEl.appendChild(row);
+  });
+
+  lockEl.innerHTML = lockouts.length ? '' : '<div class="empty-state">No lockouts.</div>';
+  lockouts.forEach(lo => {
+    const row = document.createElement('div');
+    row.className = 'bt-sess-row';
+    const status = lo.locked
+      ? `locked — ${Math.max(0, Math.ceil(lo.locked_until - Date.now() / 1000))}s left`
+      : `${lo.attempts} failed attempt${lo.attempts === 1 ? '' : 's'}, not locked`;
+    row.innerHTML = `
+      <div>
+        <div class="bt-sess-main">${esc(lo.ip)}${lo.last_name ? ' · ' + esc(lo.last_name) : ''}</div>
+        <div class="bt-sess-sub${lo.locked ? ' locked' : ''}">${status}</div>
+      </div>
+      <button class="btn-act btn-cancel">Clear</button>`;
+    row.querySelector('button').onclick = () => clearBartenderLockout(lo.ip);
+    lockEl.appendChild(row);
+  });
+}
+
+// Kill a paired bartender's token immediately. Offers a bundled convenience: also set a new
+// bartender PIN in the same flow so this device can't just re-pair with the old one (a hacker
+// who already knew the PIN needs both the session killed AND the PIN changed to actually be
+// locked out — killing alone only stops the current token, not a fresh re-pair attempt).
+async function killBartenderSession(sessionId, name) {
+  if (!confirm(`Kill ${name}'s bartender session? They'll be logged out immediately.`)) return;
+  let newPinHash = null;
+  if (confirm("Also change the bartender PIN so they can't just re-pair with the old one?")) {
+    const newPin = (prompt('New bartender PIN (4-6 digits):') || '').replace(/\D/g, '');
+    if (newPin.length >= 4) newPinHash = await sha256hex(newPin);
+  }
+  try {
+    if (newPinHash) await postSetting({ bartender_pin_hash: newPinHash });
+    const res = await fetch(`/api/bar/${S.jukebarId}/bartender_sessions/kill?s=${enc(S.session)}&token=${enc(S.token)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    if (!res.ok) throw new Error('kill failed');
+  } catch {
+    alert('Could not kill session — try again.');
+  }
+  loadBartenderSessions();
+  if (newPinHash) { S.settingsPending = [...(S.settingsPending || []), 'bartender_pin_hash']; updateBartenderPinUI(); }
+}
+
+async function clearBartenderLockout(ip) {
+  if (!confirm(`Clear the lockout for ${ip}? They'll be able to try the PIN again immediately.`)) return;
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/bartender_sessions/clear_lockout?s=${enc(S.session)}&token=${enc(S.token)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip }),
+    });
+    if (!res.ok) throw new Error('clear failed');
+  } catch {
+    alert('Could not clear lockout — try again.');
+  }
+  loadBartenderSessions();
 }
 
 // ── Poll (requests) ──────────────────────────────────────────────────────────

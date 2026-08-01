@@ -439,6 +439,7 @@ async function startMain() {
 async function poll() {
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/requests?s=${enc(S.session)}&token=${enc(S.token)}`);
+    if (res.status === 401) return sessionKicked();
     if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
     if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) return;
@@ -656,6 +657,19 @@ function setTab(tab) {
   $('tab-actions-btn').classList.toggle('active', tab === 'actions');
   $('requests-pane').style.display = tab === 'actions' ? 'none' : 'block';
   $('actions-pane').style.display  = tab === 'actions' ? 'block' : 'none';
+}
+
+// Admin killed this bartender's session from the Bartender Sessions tab (2026-08) — clear the
+// cached token and drop back to the PIN screen with an explanatory message, rather than the poll
+// loop silently going nowhere forever on repeated 401s.
+function sessionKicked() {
+  if (S.pollTimer) clearInterval(S.pollTimer);
+  sessionStorage.removeItem(`jb_auth_${S.jukebarId}_${S.session}`);
+  S.token = '';
+  showScreen('s-pin');
+  $('pin-input').value = '';
+  $('pin-err').textContent = 'Your access was ended by the admin — enter the PIN again to continue.';
+  $('pin-btn').disabled = true;
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
