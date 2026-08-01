@@ -259,6 +259,18 @@ either alone) that flips the mode.
 - [ ] End Session → wizard reopens with **all previous values pre-filled**, not blank
 - [ ] Stop Session (web admin "Stop Session" action) → Spotify/Apple Music auth token also cleared,
       re-login required next setup
+- [ ] **End Session = full wizard wipe on both platforms, confirmed and intentional (2026-08-01)**:
+      Up Next does **not** need to survive this — that's fine, it's a genuine restart (playlist,
+      settings, everything can change). Confirmed consistent across every trigger on iOS — kiosk
+      admin, LAN admin, and render admin (relay-queued `stop_session` action) all call the same
+      full-wipe path (`resetSetup()`), no kiosk-vs-remote inconsistency exists.
+- [ ] **(regression, iOS, fixed 2026-08-01) Pausing must never rotate the session/QR or wipe Up Next**
+      — neither the manual admin play/pause toggle (already correct, calls `MusicService.pause()`
+      directly) nor the automatic 30-minute idle timer (was calling `stopSession()`, which minted a
+      new session id **and** wiped the live queue as a side effect of merely going idle — fixed by
+      renaming to `stopPlaying()` and stripping those side effects). Test: let a session sit idle
+      past 30 minutes with 1+ approved requests in Up Next — confirm the QR code is unchanged and
+      Up Next is intact when it auto-pauses.
 - [ ] Re-pairing host device to IDE for deployment doesn't require a fresh setup (sanity, not a product test)
 - [ ] **(Android, gap found by code audit 2026-08-01)** Skip **both** the Spotify device step and the
       local folder step in the same setup run — confirm the resulting empty queue doesn't crash
