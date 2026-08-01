@@ -248,7 +248,7 @@
     </svg>
   </div>
   <div class="pin-title">Bartender Access</div>
-  <div class="pin-sub">Enter the admin PIN to continue</div>
+  <div class="pin-sub">Enter the bartender PIN to continue</div>
   <input class="pin-field" id="pin-input" type="tel" inputmode="numeric"
          maxlength="6" placeholder="••••" autocomplete="off"
          oninput="onPinInput()" onkeydown="if(event.key==='Enter') verifyPin()">
@@ -398,7 +398,7 @@ async function verifyPin() {
     const res  = await fetch(`/api/bar/${S.jukebarId}/authenticate?s=${enc(S.session)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin_hash: hash }),
+      body: JSON.stringify({ pin_hash: hash, role: 'bartender' }),
     });
     if (res.status === 403) {
       $('pin-err').textContent = 'Incorrect PIN — try again.';
@@ -414,7 +414,7 @@ async function verifyPin() {
       $('pin-btn').disabled = true;
       return;
     }
-    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
+    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, bartender access was turned off, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) throw new Error(res.status);
 
     const authData = await res.json();

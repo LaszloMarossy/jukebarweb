@@ -222,6 +222,22 @@
     .pay-warning { font-size: 11px; color: #fbbf24; margin-top: 8px; display: none; }
     .pay-warning.show { display: block; }
 
+    /* ── bartender PIN control ── */
+    .bt-pin-status { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .bt-pin-status.on { color: #4ade80; }
+    .bt-pin-row { display: flex; gap: 8px; }
+    .bt-pin-field {
+      flex: 1; min-width: 0; box-sizing: border-box;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 15px; font-weight: 600; letter-spacing: 2px;
+      text-align: center; padding: 10px 12px;
+    }
+    .bt-pin-field:focus { outline: none; border-color: var(--accent); }
+    .bt-pin-field:disabled { opacity: .4; }
+    .btn-bt-pin { flex-shrink: 0; padding: 10px 16px; }
+    .btn-bt-clear { width: 100%; margin-top: 8px; color: var(--red); }
+    .bt-pin-err { font-size: 12px; color: var(--red); min-height: 16px; margin-top: 6px; }
+
     /* ── tabs ── */
     .tab-bar {
       display: flex; gap: 0; margin-top: 20px; margin-bottom: 0;
@@ -410,11 +426,22 @@
       </div>
       <div class="pay-warning show" id="accepting-warning" style="display:none">Off — customers can't submit new requests; the device keeps shuffling its current playlist</div>
     </div>
+    <div class="payment-card" style="margin-top:14px">
+      <div class="payment-title">Bartender Access</div>
+      <div class="bt-pin-status" id="bt-pin-status">Off — no bartender QR code or bartender page exists; approve/deny/settings all happen here in Admin.</div>
+      <div class="bt-pin-row">
+        <input class="bt-pin-field" id="bt-pin-input" type="tel" inputmode="numeric" maxlength="6"
+               placeholder="New bartender PIN" oninput="onBtPinInput()">
+        <button class="btn-report btn-bt-pin" id="bt-pin-save" onclick="saveBartenderPin()" disabled>Save</button>
+      </div>
+      <div class="bt-pin-err" id="bt-pin-err"></div>
+      <button class="btn-report btn-bt-clear" id="bt-pin-clear" style="display:none" onclick="clearBartenderPin()">Turn Off Bartender Access</button>
+    </div>
   </div>
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote' };
+const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote', bartenderAccessEnabled: false };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
@@ -488,7 +515,7 @@ async function verifyPin() {
     const res  = await fetch(`/api/bar/${S.jukebarId}/authenticate?s=${enc(S.session)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin_hash: hash }),
+      body: JSON.stringify({ pin_hash: hash, role: 'admin' }),
     });
     if (res.status === 403) {
       $('pin-err').textContent = 'Incorrect PIN — try again.';
@@ -602,6 +629,67 @@ function updatePaymentUI() {
   if (warn) warn.classList.toggle('show', (!S.stripeEnabled || stripeLocked) && !S.bartenderEnabled);
   const acceptWarn = $('accepting-warning');
   if (acceptWarn) acceptWarn.style.display = S.acceptingRequests ? 'none' : 'block';
+  updateBartenderPinUI();
+}
+
+// ── Bartender PIN (2026-08 admin/bartender PIN split) ─────────────────────────
+// Admin-only control: sets a separate secret bartender.html authenticates against. Empty/unset
+// (the default) means the bartender role is off entirely for this bar — no bartender QR, no
+// bartender.html reachable — admin does approve/deny/control/settings from here instead.
+function onBtPinInput() {
+  const val = $('bt-pin-input').value.replace(/\D/g, '');
+  $('bt-pin-input').value = val;
+  $('bt-pin-save').disabled = val.length < 4;
+  $('bt-pin-err').textContent = '';
+}
+
+function updateBartenderPinUI() {
+  const pending = (S.settingsPending || []).includes('bartender_pin_hash');
+  $('bt-pin-input').disabled = pending;
+  $('bt-pin-save').disabled = pending || $('bt-pin-input').value.replace(/\D/g, '').length < 4;
+  const status = $('bt-pin-status');
+  if (status) {
+    status.classList.toggle('on', S.bartenderAccessEnabled);
+    status.textContent = pending
+      ? 'Updating…'
+      : S.bartenderAccessEnabled
+        ? 'On — bartender QR code and bartender page are active.'
+        : 'Off — no bartender QR code or bartender page exists; approve/deny/settings all happen here in Admin.';
+  }
+  const clearBtn = $('bt-pin-clear');
+  if (clearBtn) clearBtn.style.display = (S.bartenderAccessEnabled && !pending) ? 'block' : 'none';
+}
+
+async function saveBartenderPin() {
+  const pin = $('bt-pin-input').value.trim();
+  if (pin.length < 4) return;
+  if ((S.settingsPending || []).includes('bartender_pin_hash')) return;
+  $('bt-pin-err').textContent = '';
+  const hash = await sha256hex(pin);
+  S.settingsPending = [...(S.settingsPending || []), 'bartender_pin_hash'];
+  updateBartenderPinUI();
+  try {
+    if (!await postSetting({ bartender_pin_hash: hash })) throw new Error('post failed');
+    $('bt-pin-input').value = '';
+  } catch {
+    S.settingsPending = S.settingsPending.filter(f => f !== 'bartender_pin_hash');
+    $('bt-pin-err').textContent = 'Connection error — try again.';
+    updateBartenderPinUI();
+  }
+}
+
+async function clearBartenderPin() {
+  if ((S.settingsPending || []).includes('bartender_pin_hash')) return;
+  if (!confirm('Turn off bartender access? The bartender QR code and bartender page will stop working immediately.')) return;
+  S.settingsPending = [...(S.settingsPending || []), 'bartender_pin_hash'];
+  updateBartenderPinUI();
+  try {
+    if (!await postSetting({ bartender_pin_hash: '' })) throw new Error('post failed');
+  } catch {
+    S.settingsPending = S.settingsPending.filter(f => f !== 'bartender_pin_hash');
+    $('bt-pin-err').textContent = 'Connection error — try again.';
+    updateBartenderPinUI();
+  }
 }
 
 async function postSetting(body) {
@@ -651,6 +739,7 @@ async function poll() {
     S.bartenderEnabled   = d.bartender_enabled !== false;
     S.acceptingRequests  = d.accepting_requests !== false;
     S.kioskMode          = d.kiosk_mode || 'localAndRemote';
+    S.bartenderAccessEnabled = !!d.bartender_access_enabled;
     S.settingsPending    = d.settings_pending || [];
     updatePaymentUI();
     renderRequests(d.requests || []);

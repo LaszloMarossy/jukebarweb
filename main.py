@@ -138,7 +138,11 @@ class BarSession:
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
-    pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for bartender web auth
+    pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for admin.html auth
+    # SHA-256 hex of bartender PIN — separate secret from pin_hash (2026-08). Optional: empty
+    # means the bartender role is entirely off for this bar (no bartender QR, no bartender.html
+    # reachable, no pairing) — admin handles approve/deny/control/settings directly instead.
+    bartender_pin_hash: str = ""
     # token -> {"name": str, "paired_at": float, "ip": str}. Minted by bar_authenticate() on a
     # correct PIN; required by every bartender/admin action endpoint below (approve/deny/control/
     # settings/requests/history) via _require_bartender_token() — the PIN check alone used to be
@@ -147,7 +151,9 @@ class BarSession:
     bartender_tokens: dict[str, dict] = field(default_factory=dict)
     # field -> value an admin/bartender asked for that the host hasn't echoed back yet;
     # presence = pending. Latest write per field wins, no queue — see bar_settings()/host_sync().
-    desired_settings: dict[str, bool] = field(default_factory=dict)
+    # bool for the three toggle fields, str for bartender_pin_hash (empty string is a valid
+    # desired value — it means "admin wants to turn bartender access off").
+    desired_settings: dict[str, bool | str] = field(default_factory=dict)
     # "localOnly" | "localAndRemote" | "remoteOnly" (2026-07-22+) — governs CUSTOMERS only, set at
     # register time from the host's own wizard choice. "localOnly" is a hard lockout enforced here
     # too (bar_request()/bar_create_payment_intent()/bar_payment_confirmed()/bar_page()), not just
@@ -173,11 +179,13 @@ _bars: dict[str, BarSession] = {}        # in-memory only
 _bar_profiles: dict[str, dict] = {}     # bar_id → profile.json contents; refreshed from GCS every PROFILE_CACHE_TTL s
 _profiles_loaded_at: float = 0.0
 
-# Per-(bar, source IP) bartender PIN attempt tracking for /api/bar/{id}/authenticate — deliberately
+# Per-(bar, source IP, role) PIN attempt tracking for /api/bar/{id}/authenticate — deliberately
 # NOT global/per-bar-only, so one IP fumbling the PIN doesn't lock out a different bartender pairing
-# from their own device. In-memory only (matches BarSession) - a relay restart clears all lockouts,
-# same accepted tradeoff as bar.requests.
-_bartender_lockouts: dict[tuple[str, str], dict[str, float]] = {}
+# from their own device, and keyed separately by role (2026-08 PIN split) so repeated bad bartender
+# guesses from a shared bar IP don't also lock out the admin PIN from that same IP, or vice versa.
+# In-memory only (matches BarSession) - a relay restart clears all lockouts, same accepted
+# tradeoff as bar.requests.
+_bartender_lockouts: dict[tuple[str, str, str], dict[str, float]] = {}
 BARTENDER_LOCKOUT_MAX_ATTEMPTS = 3
 BARTENDER_LOCKOUT_SECONDS = 15 * 60
 
@@ -536,6 +544,7 @@ async def host_register(body: dict[str, Any]):
         bar.stripe_publishable_key = pk
         bar.stripe_secret_key = body.get("stripe_secret_key", "")
         bar.pin_hash = body.get("pin_hash", "")
+        bar.bartender_pin_hash = body.get("bartender_pin_hash", "")
         bar.kiosk_mode = body.get("kiosk_mode", "localAndRemote")
         bar.last_seen = time.time()
     else:
@@ -556,6 +565,7 @@ async def host_register(body: dict[str, Any]):
             stripe_secret_key=body.get("stripe_secret_key", ""),
             now_playing=body.get("now_playing"),
             pin_hash=body.get("pin_hash", ""),
+            bartender_pin_hash=body.get("bartender_pin_hash", ""),
             kiosk_mode=body.get("kiosk_mode", "localAndRemote"),
         )
 
@@ -620,8 +630,9 @@ async def host_sync(body: dict[str, Any]):
                              CLAUDE.md's host-broadcasts-state note.
       up_next                — host's live queue, for bar_display() only (not request status —
                              see requests above).
-      settings              — {field: bool}; the host's current values for
-                             bartender_enabled/stripe_enabled/accepting_requests, sent
+      settings              — {field: bool | str}; the host's current values for
+                             bartender_enabled/stripe_enabled/accepting_requests (bool) and
+                             bartender_pin_hash (str, "" meaning bartender role off), sent
                              unconditionally on every call. Trusted outright and applied
                              immediately — the host is the only thing that actually knows
                              its own settings, and it re-sends them every 5s regardless, so
@@ -631,7 +642,7 @@ async def host_sync(body: dict[str, Any]):
       requests         — new customer requests since last sync (status == "pending"), including
                          price/payment_method so the host doesn't have to recompute/guess them
       actions          — queued bartender approve/deny/control actions, then clears the queue
-      desired_settings — {field: bool} for any field an admin/bartender has requested a
+      desired_settings — {field: bool | str} for any field an admin/bartender has requested a
                          change for that this host's echo hasn't matched yet. Host should
                          apply these locally; once a later echo matches, the entry drops out
                          of future responses on its own — no separate ack needed.
@@ -655,6 +666,14 @@ async def host_sync(body: dict[str, Any]):
         setattr(bar, field_name, value)
         if bar.desired_settings.get(field_name) == value:
             bar.desired_settings.pop(field_name, None)
+
+    # bartender_pin_hash: same self-healing echo pattern as the bool settings above, but a
+    # string — empty is a legitimate value (bartender role off), not "field absent".
+    if "bartender_pin_hash" in echoed:
+        pin_value = str(echoed["bartender_pin_hash"] or "")
+        bar.bartender_pin_hash = pin_value
+        if bar.desired_settings.get("bartender_pin_hash") == pin_value:
+            bar.desired_settings.pop("bartender_pin_hash", None)
 
     if "up_next" in body:
         bar.up_next_queue = body["up_next"]
@@ -758,6 +777,11 @@ async def bar_page(jukebar_id: str):
 
 @app.get("/bartender/{jukebar_id}", response_class=HTMLResponse)
 async def bartender_page(jukebar_id: str):
+    # Bartender role is off entirely for this bar when no bartender PIN has been set (2026-08
+    # PIN split) — real 404, not just an unadvertised link, mirroring bar_page()'s localOnly gate.
+    bar = _bars.get(jukebar_id)
+    if bar is not None and not bar.bartender_pin_hash:
+        raise HTTPException(404, "Not found")
     return HTMLResponse((Path("static") / "bartender.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
@@ -791,26 +815,39 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
 async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
     Bartender/admin PIN gate. Client hashes the PIN with SHA-256 (same algorithm as iOS CryptoKit)
-    and posts the hex digest. On success, mints and returns a bartender token that must be sent
-    on every subsequent bartender/admin action (approve/deny/control/settings/requests/history) —
+    and posts the hex digest, plus a "role" of "admin" or "bartender" (admin.html/bartender.html
+    send their own role; role defaults to "admin" for any older client that predates the split).
+    On success, mints and returns a bartender token that must be sent on every subsequent
+    bartender/admin action (approve/deny/control/settings/requests/history) —
     see _require_bartender_token(). Returns 403 Forbidden on a wrong PIN.
-    If the bar has no pin_hash (legacy / not yet set), access is denied — PIN is mandatory.
 
-    Locked out per (bar, source IP) after BARTENDER_LOCKOUT_MAX_ATTEMPTS wrong guesses, for
-    BARTENDER_LOCKOUT_SECONDS — other IPs/bartenders are unaffected.
+    admin and bartender check two independent secrets (bar.pin_hash / bar.bartender_pin_hash,
+    split 2026-08 — previously one shared PIN). If the bar has no pin_hash at all, admin access
+    is denied (PIN is mandatory for admin). If bar.bartender_pin_hash is empty, the bartender
+    role is off for this bar entirely — 404, not 403, so bartender.html's "session ended or bar
+    offline" messaging fires rather than implying a PIN was just typed wrong.
+
+    Locked out per (bar, source IP, role) after BARTENDER_LOCKOUT_MAX_ATTEMPTS wrong guesses, for
+    BARTENDER_LOCKOUT_SECONDS — other IPs/bartenders/the admin PIN are unaffected.
     """
     bar = _customer_bar(jukebar_id, s)
+    role = body.get("role") or "admin"
+    if role not in ("admin", "bartender"):
+        raise HTTPException(400, "role must be admin or bartender")
     client_ip = request.client.host if request.client else "unknown"
-    key = (jukebar_id, client_ip)
+    key = (jukebar_id, client_ip, role)
     now = time.time()
     entry = _bartender_lockouts.get(key)
     if entry and now < entry["locked_until"]:
         remaining = int(entry["locked_until"] - now)
         raise HTTPException(429, f"Too many attempts — try again in {remaining}s")
 
-    if not bar.pin_hash:
+    expected_hash = bar.pin_hash if role == "admin" else bar.bartender_pin_hash
+    if not expected_hash:
+        if role == "bartender":
+            raise HTTPException(404, "Bartender access is not enabled for this bar")
         raise HTTPException(403, "No PIN configured for this bar")
-    if body.get("pin_hash") != bar.pin_hash:
+    if body.get("pin_hash") != expected_hash:
         attempts = (entry["attempts"] if entry else 0) + 1
         locked_until = now + BARTENDER_LOCKOUT_SECONDS if attempts >= BARTENDER_LOCKOUT_MAX_ATTEMPTS else 0
         _bartender_lockouts[key] = {"attempts": attempts, "locked_until": locked_until}
@@ -1112,6 +1149,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s"), to
             "currency": bar.currency, "require_approval": bar.require_approval,
             "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
             "accepting_requests": bar.accepting_requests, "kiosk_mode": bar.kiosk_mode,
+            "bartender_access_enabled": bool(bar.bartender_pin_hash),
             "settings_pending": list(bar.desired_settings.keys())}
 
 
@@ -1231,15 +1269,21 @@ async def bartender_deny(jukebar_id: str, s: str = Query(..., alias="s"), token:
 async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token"), body: dict[str, Any] = ...):
     """
     Admin/bartender: record the desired value for one or more settings fields. Does NOT touch
-    bar.bartender_enabled/stripe_enabled/accepting_requests directly - the host picks up
-    desired_settings on its next /api/host/sync call, applies it locally, and its own echoed
-    current value is what actually updates the field (see host_sync()). A newer request for
-    the same field before the host catches up just overwrites the desired value in place -
-    only the latest matters, nothing is queued or ordered.
+    bar.bartender_enabled/stripe_enabled/accepting_requests/bartender_pin_hash directly - the
+    host picks up desired_settings on its next /api/host/sync call, applies it locally, and its
+    own echoed current value is what actually updates the field (see host_sync()). A newer
+    request for the same field before the host catches up just overwrites the desired value in
+    place - only the latest matters, nothing is queued or ordered.
+
+    bartender_pin_hash is admin-only by UI convention (only admin.html exposes a control for it —
+    bartender.html has no "change PIN" UI), but this endpoint itself doesn't distinguish admin
+    vs bartender tokens for any field, same as the three existing toggles.
     """
     bar = _customer_bar(jukebar_id, s)
     _require_bartender_token(bar, token)
     for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
         if field_name in body:
             bar.desired_settings[field_name] = bool(body[field_name])
+    if "bartender_pin_hash" in body:
+        bar.desired_settings["bartender_pin_hash"] = str(body["bartender_pin_hash"] or "")
     return {"ok": True}

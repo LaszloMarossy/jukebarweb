@@ -373,6 +373,43 @@ must adopt by checking local existence first, not a separately-tracked "have I s
 relay has no way to help by tagging origin, since by design it doesn't track which host any given
 request came from.
 
+**Admin/bartender PIN split (2026-08-01), all three surfaces** — admin and bartender used to share
+one PIN (`BarSession.pin_hash` / iOS `BarConfig.pinHash` / Android `BarDetails.pin`), found while
+scoping the still-pending "Bartender Sessions" admin tab: rotating a shared bartender PIN would have
+silently rotated the admin's own PIN too. Split into two independent secrets. **Bartender PIN is
+optional and empty by default — not derived from or defaulted to the admin PIN** — when empty, the
+bartender role is off entirely for that bar: no bartender QR/URL is shown anywhere, `/bartender/{id}`
+(relay) and both hosts' LAN `/bartender` + `/api/bartender/pair` return 404/503, and pairing is
+rejected without even attempting a PIN compare. Admin does approve/deny/control/settings directly
+instead — nothing new needed there, that capability already existed. Admin sets/changes/clears the
+bartender PIN in place, a genuinely new capability — previously PIN changes were wizard-only on both
+host platforms (still true for the *admin* PIN, untouched). New "Bartender Access" control added to
+every Admin surface: kiosk-native (iOS `AdminView.swift`, Android `AdminScreen.kt`), LAN admin.html
+(both), and render `static/admin.html` (this repo).
+
+Wire contract (relay `main.py`): `BarSession.bartender_pin_hash: str = ""`, sent by the host in
+`host_register()`'s body and every `host_sync()`'s `settings` echo (now `dict[str, bool | str]`, not
+`dict[str, bool]` — empty string is a meaningful desired value, not "field absent"), self-healing
+exactly like the three bool settings. `POST /api/bar/{id}/authenticate` gained a `role` field
+(`"admin"` | `"bartender"`, defaults `"admin"`) so it can check the right secret — `bar.pin_hash` for
+admin, `bar.bartender_pin_hash` for bartender — since previously this one endpoint had no concept of
+which page was calling it. Per-IP lockout is now keyed `(bar, ip, role)`, not just `(bar, ip)`, so
+repeated bad bartender guesses from a shared bar IP no longer also lock out that IP's admin PIN.
+`bar_settings()` accepts `bartender_pin_hash` in its body alongside the three existing toggle fields —
+admin-only by UI convention (only admin.html exposes the control) but the endpoint itself doesn't
+enforce that distinction, same as the three pre-existing toggles which bartender.html can already
+post too.
+
+**PIN comparison is hash-based (SHA-256) for the bartender field on all three surfaces, including
+Android** — a deliberate departure from Android's existing admin-PIN comparison, which stays
+plaintext (`BarDetails.pin`, untouched, pre-existing inconsistency vs iOS/relay not in scope here).
+The bartender field had no existing plaintext-comparison precedent to preserve, and a hash keeps LAN
+and render consistent: render's admin.html hashes client-side (has Web Crypto, served over https) and
+sends a hash straight through; both hosts' plain-http LAN admin.html pages have no `crypto.subtle`
+available, so they send the raw entered PIN over `/api/admin/settings` and the **host hashes it
+server-side** before storing — both iOS and Android converged on this same approach independently.
+Either way, only a hash is ever what's compared against or forwarded to the relay.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

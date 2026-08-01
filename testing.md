@@ -246,7 +246,7 @@ either alone) that flips the mode.
 ## 1. Setup & Onboarding `[Both]`
 
 - [ ] Fresh setup wizard, start to finish, all steps in order
-  - [ ] Kiosk Display Mode step (Local Only / Local+Remote / Remote Only)
+  - [ ok] Kiosk Display Mode step (Local Only / Local+Remote / Remote Only)
   - [ ] Network/Transport step — a transport is **always** chosen here regardless of display mode
   - [ ] Local content/folder step (Android) / equivalent library step (iOS)
   - [ ] Spotify (Android) / Apple Music (iOS) device pairing step
@@ -558,6 +558,9 @@ described, then decide whether it needs fixing" — not "confirm this is secure.
       `/api/bar/{id}/authenticate` (render bartender) — all independently apply a 3-attempt/15-min
       lockout keyed by **(bar, source IP)**, not global — one IP fumbling the PIN doesn't lock out a
       different bartender pairing from their own device or IP. See §Bartender pairing lockout below.
+      Render's lockout key gained a third component, **role** (`(bar, ip, role)`), as part of the
+      PIN-split work below — repeated bad bartender guesses from a shared bar IP no longer also lock
+      out that IP's admin PIN attempts, and vice versa.
 - [ ] **Android-specific**: force `barDetails.pin` to resolve to an empty string at runtime and confirm
       whether kiosk admin PIN entry then accepts **any** input as valid (`adminPin.isEmpty() || entered
       == adminPin` in `KioskView.kt`) — if this state is ever reachable in normal operation (not just a
@@ -641,6 +644,56 @@ minutes on that specific IP only.
 - [ ] While that IP is locked out, **other already-paired bartenders' sessions are unaffected** — they
       can keep approving/denying requests normally
 - [ ] After the 15 minutes elapse, the same IP can attempt again (no permanent lockout)
+
+### Admin/bartender PIN split (new 2026-08-01) — all three surfaces
+
+**Context**: admin and bartender used to share one PIN everywhere. Rotating "the" PIN from a new
+Bartender-Sessions-tab-style control would have silently also changed the admin's own PIN. Fixed by
+giving the bartender role its own independent secret, optional and **empty by default** — when
+empty, the bartender role doesn't exist for that bar at all (no QR, no page, no pairing), not just
+"weakly protected."
+
+- [ ] **Fresh bar / fresh install, all three surfaces**: bartender PIN starts unset. No bartender QR
+      code is shown anywhere (render admin.html's Actions tab, iOS `AdminView.swift`, Android
+      `AdminScreen.kt`). Confirm the setup wizard (either platform) never prompts for a bartender PIN
+      — it's deliberately not part of onboarding.
+- [ ] With bartender PIN unset: `GET /bartender/{id}` (render) returns a real 404, not the bartender
+      page shell. LAN `/bartender` (both platforms) also 404s. `POST /api/bartender/pair` (LAN, both
+      platforms) and the relay's `/api/bar/{id}/authenticate` with `role: "bartender"` both reject
+      (503/404) without attempting a PIN compare at all — confirm via direct call, not just UI.
+- [ ] Admin sets a bartender PIN from each of the 5 admin surfaces in turn (kiosk-native ×2, LAN
+      admin.html ×2, render admin.html): status flips to "on," the bartender QR/URL appears, and
+      `/bartender/{id}` (or LAN `/bartender`) becomes reachable and accepts that PIN.
+- [ ] **Propagation round-trip, render specifically**: set the bartender PIN from render admin.html
+      while the host is running — confirm it lands in the relay's `desired_settings` immediately
+      (control shows "pending"/greyed), then clears once the host's next sync echoes it back, and the
+      bartender QR becomes live on the *host's own* Admin screen too (not just render's).
+- [ ] **Propagation round-trip, kiosk/LAN specifically**: set the bartender PIN from the kiosk Admin
+      screen (or LAN admin.html) — confirm it's usable for LAN bartender pairing immediately (no
+      relay round-trip needed for LAN), and separately confirm it reaches the relay's
+      `bartender_pin_hash` on the next register/sync so render admin.html's status also updates.
+- [ ] **Clear/turn off**: with bartender access on and at least one bartender currently paired, turn
+      it off from admin. Confirm: (a) the confirmation prompt fires before it takes effect, (b) the
+      bartender QR/URL disappears from every admin surface, (c) `/bartender`/`/api/bartender/pair`
+      start rejecting again, (d) **already-paired bartender sessions are NOT killed** — this only
+      blocks *new* pairing, it doesn't revoke `bartender_tokens`/`LocalBartender` records that already
+      exist (confirm this is the accepted behavior, not a bug — killing active sessions was never
+      part of this PIN-split work, only "Kill session" on the still-unbuilt Bartender Sessions tab).
+- [ ] **Independence from "Pay to bartender"**: toggle the `bartender_enabled` payment-mode setting
+      on/off with the bartender PIN unset the whole time — confirm this toggle still works exactly as
+      before (it governs whether customers see a "pay at bar" option, unrelated to whether a
+      bartender-role login exists) and doesn't itself gate or get gated by the PIN.
+- [ ] **Comparison is hash-based everywhere for this field** — unlike Android's existing plaintext
+      admin-PIN comparison (`BarDetails.pin`, deliberately untouched/out of scope here), the new
+      bartender field is SHA-256-hashed on all three surfaces. Render admin.html hashes client-side
+      (Web Crypto, https) before sending; both platforms' plain-http LAN admin.html pages send the
+      raw PIN over `/api/admin/settings` and the **host hashes it server-side** instead — confirm a
+      network capture of the LAN admin.html save request shows the raw PIN in flight (expected, LAN
+      already requires physical network presence) but never leaves the LAN as anything but a hash on
+      the wire to relay.
+- [ ] Admin PIN's own wizard-only-change behavior and its progressive-backoff lockout are completely
+      unaffected by any of the above — regression-check a normal admin PIN entry still works
+      identically to before this change.
 - [ ] A successful pairing before hitting 3 failures clears that IP's attempt counter (doesn't carry
       over to some future unrelated lockout)
 - [ ] Test independently on all three surfaces — LAN Android, LAN iOS, and render — since these are
