@@ -597,6 +597,37 @@ into the admin panel with the new PIN active — no need to re-type it immediate
       (needed for `BiometricPrompt`) didn't disturb anything else app-wide — full regression pass on
       a build with this change, not just the PIN-reset flow in isolation
 
+### Token-based bartender/admin authorization (new 2026-08-01) — critical, test thoroughly
+
+**Context**: until this fix, entering the correct PIN was purely a client-side UI gate — the actual
+action endpoints (approve/deny/settings/control/requests/history) never verified anything beyond
+the same session token the public customer QR code also carries. Anyone who'd seen a bar's customer
+link could call these directly, no PIN needed at all. This is the most severe gap found this
+session; test it like a real security fix, not a UI nicety.
+
+- [ ] **The core regression test**: with a valid `s`/session token but **no** auth token (or a
+      garbage one), directly call each of these and confirm a 401/`Unauthorized` — not a 200:
+  - [ ] Render: `POST /api/bar/{id}/approve`, `/deny`, `/control`, `/settings`; `GET /requests`,
+        `/history`
+  - [ ] Android LAN: `POST /api/request/approve`, `/deny`, `/api/admin/settings`; `GET /api/requests`
+  - [ ] iOS LAN: same three POST + GET as Android
+- [ ] Entering the correct PIN still gets you a real, working token — confirm every one of the
+      above **succeeds** once the token from a successful `/authenticate` (render) or
+      `/api/admin/auth`/`/api/bartender/pair` (LAN) is included
+- [ ] **The "first bartender becomes admin" nuance** — both platforms' LAN: pair as the *first*
+      bartender (no admin PIN ever entered), confirm you can still toggle Stripe/Bartender-pay/
+      Accepting-requests from bartender.html using only your `bartenderId` — this must keep working,
+      it's a legitimate flow, not a bug to close
+  - [ ] A *second* (non-first, non-admin) paired bartender should be **rejected** (401) attempting
+        the same settings toggle — only the first/admin bartender or a real admin token should work
+- [ ] Token survives a page refresh (sessionStorage on render; re-derived from cached PIN on LAN) —
+      confirm you're not silently kicked back to the PIN screen or losing action capability on reload
+- [ ] Render admin.html: confirm the 429 lockout message now displays correctly (it was previously
+      missing here — bartender.html had it, admin.html didn't, both share the same backend endpoint)
+- [ ] **Known, deliberate gap — not yet fixed**: `/api/player/*` (play/pause/next/prev) and
+      `/api/reports/generate` on LAN (both platforms) still accept any request with no token check.
+      Lower priority than money/settings, but worth closing in a follow-up pass.
+
 ### Bartender pairing lockout (new 2026-08-01)
 
 Per-**(bar, source IP)**, not global, on all three surfaces: LAN `/api/bartender/pair` (both
