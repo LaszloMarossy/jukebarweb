@@ -553,9 +553,11 @@ described, then decide whether it needs fixing" — not "confirm this is secure.
 - [ ] **Contrast/confirm**: LAN admin auth on *both* platforms genuinely does lock out after 5 wrong
       attempts for 300s (Android `LocalRequestManager.checkAdminPin`, iOS `LocalServer.swift`'s
       equivalent) — confirm this actually triggers and actually clears after the cooldown.
-- [ ] **LAN bartender pairing (`POST /api/bartender/pair`, both platforms) still has NO brute-force
-      protection at all** — no attempt counter, no lockout, no rate limit, network-reachable. **Not yet
-      fixed** — the agreed design (IP-based, 3 tries/15 min) is written up but not yet implemented.
+- [x] ~~LAN bartender pairing has NO brute-force protection~~ — **fixed 2026-08-01, all three
+      surfaces**: LAN `/api/bartender/pair` on both platforms, and the relay's
+      `/api/bar/{id}/authenticate` (render bartender) — all independently apply a 3-attempt/15-min
+      lockout keyed by **(bar, source IP)**, not global — one IP fumbling the PIN doesn't lock out a
+      different bartender pairing from their own device or IP. See §Bartender pairing lockout below.
 - [ ] **Android-specific**: force `barDetails.pin` to resolve to an empty string at runtime and confirm
       whether kiosk admin PIN entry then accepts **any** input as valid (`adminPin.isEmpty() || entered
       == adminPin` in `KioskView.kt`) — if this state is ever reachable in normal operation (not just a
@@ -565,20 +567,53 @@ described, then decide whether it needs fixing" — not "confirm this is secure.
       session token, which does rotate mid-session. Confirm this is an accepted intentional tradeoff
       (convenience over rotation for a device that's presumably trusted staff hardware), not an oversight.
 
-### Kiosk "Forgot PIN?" reset flow (new 2026-08-01)
+### Kiosk "Forgot PIN?" reset flow (new 2026-08-01, hardened same day)
 
-Gated purely by physical presence at the kiosk — no secondary secret. On both platforms' kiosk PIN
-entry screen, a "Forgot PIN?" link leads to a reset form (new PIN + confirm), during which playback
-pauses and a repeating audible tone plays (Android: `ToneGenerator`; iOS: generated tone, no bundled
-asset) so anyone nearby knows a sensitive action is underway. Confirming logs straight into the admin
-panel with the new PIN active — no need to re-type it immediately.
+Gated by **two** layers, not one: (1) the device's own unlock credential — Face ID/Touch ID/device
+passcode (Android `BiometricPrompt` with `BIOMETRIC_STRONG or DEVICE_CREDENTIAL`; iOS
+`LAContext.evaluatePolicy(.deviceOwnerAuthentication, ...)`) — must succeed *before* the reset form
+even appears; (2) while the form is up, playback pauses and a repeating audible tone plays (Android:
+`ToneGenerator`; iOS: generated tone, no bundled asset) so anyone nearby knows a sensitive action is
+underway. The device-auth gate was added specifically because the beep alone isn't real friction — a
+fast operator could complete the whole reset in a couple seconds otherwise. Confirming logs straight
+into the admin panel with the new PIN active — no need to re-type it immediately.
 
-- [ ] Tap "Forgot PIN?" — music pauses, a repeating tone starts audibly within ~1s
+- [ ] Tap "Forgot PIN?" — device unlock prompt (Face ID/Touch ID/passcode) appears **first**, before
+      any PIN-reset UI is shown
+- [ ] Cancel or fail the device-unlock prompt — back to normal PIN entry, nothing else happens, no
+      beep, no pause
+- [ ] Succeed the device-unlock prompt — **now** the reset form appears: music pauses, a repeating
+      tone starts audibly within ~1s
 - [ ] New PIN + confirm PIN fields — "Set PIN" stays disabled until both are 4-6 digits and match
 - [ ] Confirm — PIN is persisted (`barDetails.pin` / `LocalStorage`'s `pinHash`), tone stops, music
       resumes if it was playing before, admin panel opens directly (no re-entry required)
 - [ ] The *new* PIN is what's required on the next normal kiosk PIN entry — old PIN no longer works
-- [ ] Cancel from the reset form — tone stops, music resumes, back to normal PIN entry, PIN unchanged
+- [ ] Cancel from the reset form (after device auth succeeded) — tone stops, music resumes, back to
+      normal PIN entry, PIN unchanged
 - [ ] This flow is kiosk-only — confirm no equivalent exists or is reachable on LAN/render admin
 - [ ] Settings/Up Next/session are completely untouched by a PIN reset — this never goes through
       End Session or the setup wizard at all
+- [ ] Android-specific: confirm `MainActivity`'s change from `ComponentActivity` to `FragmentActivity`
+      (needed for `BiometricPrompt`) didn't disturb anything else app-wide — full regression pass on
+      a build with this change, not just the PIN-reset flow in isolation
+
+### Bartender pairing lockout (new 2026-08-01)
+
+Per-**(bar, source IP)**, not global, on all three surfaces: LAN `/api/bartender/pair` (both
+platforms) and the relay's `/api/bar/{id}/authenticate` (render). 3 wrong attempts → locked 15
+minutes on that specific IP only.
+
+- [ ] Fail bartender PIN 3 times from one device/IP — 4th attempt (even with the correct PIN) is
+      rejected with a "too many attempts, try again in Ns" message, not a plain "incorrect PIN"
+- [ ] While that IP is locked out, a **different** device/IP can still pair successfully with the
+      correct PIN — confirm the lockout is genuinely per-IP, not global
+- [ ] While that IP is locked out, **other already-paired bartenders' sessions are unaffected** — they
+      can keep approving/denying requests normally
+- [ ] After the 15 minutes elapse, the same IP can attempt again (no permanent lockout)
+- [ ] A successful pairing before hitting 3 failures clears that IP's attempt counter (doesn't carry
+      over to some future unrelated lockout)
+- [ ] Test independently on all three surfaces — LAN Android, LAN iOS, and render — since these are
+      three separate implementations (Android's `LocalRequestManager`, iOS's `LocalServer.swift`,
+      the relay's `main.py`), not one shared code path
+- [ ] Relay restart clears all render-side lockouts (in-memory only, same accepted tradeoff as
+      `bar.requests`) — not a bug, matches existing relay-restart behavior elsewhere
