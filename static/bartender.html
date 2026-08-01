@@ -405,6 +405,13 @@ async function verifyPin() {
       $('pin-input').focus();
       return;
     }
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}));
+      $('pin-err').textContent = body.detail || 'Too many attempts — please wait before trying again.';
+      $('pin-input').value = '';
+      $('pin-btn').disabled = true;
+      return;
+    }
     if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) throw new Error(res.status);
 

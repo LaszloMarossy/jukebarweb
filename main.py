@@ -34,7 +34,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -166,6 +166,14 @@ _map_entries: dict[str, MapEntry] = {}   # persisted to disk
 _bars: dict[str, BarSession] = {}        # in-memory only
 _bar_profiles: dict[str, dict] = {}     # bar_id → profile.json contents; refreshed from GCS every PROFILE_CACHE_TTL s
 _profiles_loaded_at: float = 0.0
+
+# Per-(bar, source IP) bartender PIN attempt tracking for /api/bar/{id}/authenticate — deliberately
+# NOT global/per-bar-only, so one IP fumbling the PIN doesn't lock out a different bartender pairing
+# from their own device. In-memory only (matches BarSession) - a relay restart clears all lockouts,
+# same accepted tradeoff as bar.requests.
+_bartender_lockouts: dict[tuple[str, str], dict[str, float]] = {}
+BARTENDER_LOCKOUT_MAX_ATTEMPTS = 3
+BARTENDER_LOCKOUT_SECONDS = 15 * 60
 
 
 # ---------------------------------------------------------------------------
@@ -765,17 +773,33 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
 
 
 @app.post("/api/bar/{jukebar_id}/authenticate")
-async def bar_authenticate(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     """
     Bartender PIN gate. Client hashes the PIN with SHA-256 (same algorithm as iOS CryptoKit)
     and posts the hex digest. Returns 200 OK or 403 Forbidden.
     If the bar has no pin_hash (legacy / not yet set), access is denied — PIN is mandatory.
+
+    Locked out per (bar, source IP) after BARTENDER_LOCKOUT_MAX_ATTEMPTS wrong guesses, for
+    BARTENDER_LOCKOUT_SECONDS — other IPs/bartenders are unaffected.
     """
     bar = _customer_bar(jukebar_id, s)
+    client_ip = request.client.host if request.client else "unknown"
+    key = (jukebar_id, client_ip)
+    now = time.time()
+    entry = _bartender_lockouts.get(key)
+    if entry and now < entry["locked_until"]:
+        remaining = int(entry["locked_until"] - now)
+        raise HTTPException(429, f"Too many attempts — try again in {remaining}s")
+
     if not bar.pin_hash:
         raise HTTPException(403, "No PIN configured for this bar")
     if body.get("pin_hash") != bar.pin_hash:
+        attempts = (entry["attempts"] if entry else 0) + 1
+        locked_until = now + BARTENDER_LOCKOUT_SECONDS if attempts >= BARTENDER_LOCKOUT_MAX_ATTEMPTS else 0
+        _bartender_lockouts[key] = {"attempts": attempts, "locked_until": locked_until}
         raise HTTPException(403, "Incorrect PIN")
+
+    _bartender_lockouts.pop(key, None)
     return {"ok": True}
 
 
