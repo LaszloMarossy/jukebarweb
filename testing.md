@@ -792,3 +792,25 @@ requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.
         enabled in Settings (there's no API to check, so don't expect or require it to hide itself —
         that's expected platform-limited behavior, not a bug)
   - [ ] Remote Only's card has no such advisory on either platform
+
+### Android: empty admin PIN bypass (new 2026-08-02, item 3) — was a real reachable bug, now fixed
+
+- [ ] **Regression, the core bug**: on an existing bar (has a saved PIN), re-run the setup wizard
+      (End Session → wizard), reach the Admin PIN step, **clear the pre-filled PIN field
+      completely** and leave both fields blank, tap Next — confirm the OLD PIN is still what's
+      required at the kiosk admin lock screen afterward, not a blank/bypassable one
+- [ ] Same scenario, but confirm the wizard's own footer text ("Leave blank to keep your current
+      PIN, or enter a new one to change it") is now actually true — previously the field left blank
+      silently wiped the stored PIN to empty instead of doing what the text promised
+- [ ] **Defense-in-depth check**: even if some other future bug ever left the stored PIN empty
+      again, confirm typing an arbitrary PIN at the kiosk admin lock screen is now **rejected**, not
+      accepted — the `adminPin.isEmpty()` bypass is gone; only the exact stored PIN unlocks admin,
+      or the "Forgot PIN?" biometric-gated reset flow (still fully functional, doesn't depend on
+      knowing/matching the old PIN at all)
+- [ ] Normal cases still work: entering a genuinely new PIN (not leaving it blank) on the wizard
+      step still changes the PIN as expected; first-time setup (no saved PIN yet) still requires a
+      valid 4-6 digit PIN before the wizard lets you proceed past this step
+- [ ] iOS: confirmed via code read (not a live bug there) that `advanceFromPin()`/`verify()` never
+      had either half of this bug — no regression test needed on iOS specifically, but worth a
+      quick sanity pass that "leave blank to keep PIN" still behaves correctly there too, unrelated
+      to this fix

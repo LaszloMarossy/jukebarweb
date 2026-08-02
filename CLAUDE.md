@@ -506,6 +506,25 @@ them. **The two platforms are structurally asymmetric, and this can't be fixed i
   app can detect; `ActivityManager.lockTaskModeState` only reports *current* pinned state, not the
   underlying Settings toggle). This asymmetry is a hard platform limit, not an inconsistency to fix.
 
+**Android: empty admin PIN was a real, reachable full auth bypass — found and fixed 2026-08-02,
+no jukebarweb involvement.** Traced end to end, not just theorized: `AdminPinStep.kt`'s
+`canProceed` lets the operator leave the PIN field blank when re-running the wizard on an existing
+bar (`hasSavedPin == true`), intending "leave blank to keep your current PIN." But
+`SetupWizardScreen.kt`'s `onNext` for `WizardStep.ADMIN_PIN` did `barDetails.copy(pin = pin)`
+unconditionally — an empty field meant `pin = ""`, which **overwrote** the real PIN with an empty
+string rather than preserving it, silently breaking the promise the UI text made. That empty PIN
+then fed straight into `KioskView.kt`'s `AdminPinEntry.verify()`, which had
+`if (adminPin.isEmpty() || enteredPin == adminPin)` — once `adminPin` was empty, **any PIN
+whatsoever unlocked the kiosk admin panel**. Fixed at both points: `SetupWizardScreen.kt` now
+resolves a blank field to the existing PIN (`pin.ifEmpty { barDetails?.pin ?: "" }`) before saving,
+so the "keep current PIN" promise is actually honored; `KioskView.kt` also dropped the
+`isEmpty()` bypass entirely as defense-in-depth (fail closed, not fail open — an empty stored PIN
+should mean "nothing matches," recoverable only via the existing device-biometric-gated "Forgot
+PIN?" flow, never "anyone gets in"). **iOS never had this bug** — `SetupView.swift`'s
+`advanceFromPin()` already left `pinHash` untouched (not overwritten) when the field was blank,
+and `AdminView.swift`'s `verify()` has never had an `isEmpty()` bypass to begin with; Android's fix
+brings it to parity with iOS's already-correct fail-closed design, not the other way around.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
