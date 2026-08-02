@@ -525,6 +525,57 @@ PIN?" flow, never "anyone gets in"). **iOS never had this bug** — `SetupView.s
 and `AdminView.swift`'s `verify()` has never had an `isEmpty()` bypass to begin with; Android's fix
 brings it to parity with iOS's already-correct fail-closed design, not the other way around.
 
+**Bartender pairing has no automatic expiration — confirmed intentional (2026-08-02), not a gap.**
+A paired bartender's credential (Android `LocalBartender.bartenderId`, iOS `BartenderRecord.id` —
+both double as their own bearer token) stays valid indefinitely until either End Session or the
+admin manually revokes it via the Bartender Sessions tab's Kill action. The backlog item that
+raised this compared it against "the customer session token, which does rotate mid-session" —
+that comparison turned out not to hold up: that rotation is a 30-min-idle-pause-triggered
+mechanism for invalidating stale customer QR codes/links, unrelated to credential security
+lifetime, and (see below) has since been removed entirely anyway. A bartender pairs once per
+shift and should stay usable for the whole shift; the actual "revoke a compromised/departed
+bartender" need is already served by Kill. Adding auto-expiry would just log bartenders out
+mid-shift for no real security gain, given LAN already assumes physical presence as the trust
+boundary. No code change — confirmed as-is.
+
+**The 30-minute idle-pause auto-mechanism was removed entirely (2026-08-02), both platforms —**
+**not fixed, deleted.** Investigating the bartender-expiration question above surfaced it: on
+both platforms, whenever playback transitioned to not-playing (any cause — manual pause,
+whatever), a 30-minute timer armed; if still not resumed when it fired, iOS just re-paused
+(itself a fix from earlier this same session, replacing an older version that used to also
+rotate the session/QR and wipe the live queue) while Android rotated the session/QR (invalidating
+old customer links) without touching the queue — the two platforms were themselves inconsistent
+with each other. Its original purpose: stop an overnight session from staying live and acceptable
+if the bartender went home without ending it. **User's call, after discussion**: this mechanism
+is no longer needed at all, given the replacement below — "when the night ends, the admin should
+put the app into End Session... if they fail to do that, it is on them. No need to trigger
+[anything] if they accidentally did this through the Pause button." Fully deleted, not gated
+behind a flag: iOS's `pauseTimerTask`/`hasEverStartedPlaying`/`stopPlaying()`/`startPauseTimer()`/
+`cancelPauseTimer()` and the `MPMusicPlayerControllerPlaybackStateDidChange` observer that armed
+it (`AppState.swift`); Android's `PlaybackCoordinator.onSessionTimeout`/`pauseTimerJob`/
+`hasEverStartedPlaying`/`startPauseTimer()`/`cancelPauseTimer()`, plus the now-dead
+`MainActivity.rotateSession()` and `LocalRequestManager.rotateSession()` it was the sole caller of.
+
+**Replacement: pausing implicitly blocks new request submission, for as long as it's paused, no**
+**timer, no escalation.** New `BarSession.effective_accepting_requests` property (relay, mirrors
+the existing `require_approval`/`effective_stripe` raw-vs-effective pattern) =
+`accepting_requests and is_playing`. Used in `bar_request()`, `bar_create_payment_intent()`
+(blocks submission) and `bar_catalog()`'s echo to `customer.html` (hides/disables the Request
+button proactively, not just a 403 after tapping) — catalog browsing itself is untouched.
+Deliberately **not** used in `bar_payment_confirmed()` (an already-succeeded Stripe payment must
+still be honored even if playback paused in the interim) or in the admin-facing
+`bartender_requests()` response or `host_register()`/`host_sync()`'s `accepting_requests` field —
+those keep echoing the raw stored value, so admin.html's toggle keeps showing the operator's
+actual configured preference rather than getting silently flipped by pause state, same reasoning
+as `effectiveStripeEnabled`'s raw/effective split. Both host platforms' local kiosk Request button
+gained the identical gate (`MusicService.shared.isPlaying` / `coordinator.isPlaying`), so the
+in-person kiosk button and the remote/QR path behave identically. No refund-reconciliation
+mechanism exists anywhere in this codebase for a request that becomes stuck this way (confirmed
+via grep — refunds are documented everywhere else as manual/cash-by-staff, never automated) — not
+a gap introduced by this change, matches how every other refund scenario in this system already
+works, and this new mechanism doesn't wipe or touch existing Up Next entries at all, only blocks
+*new* submissions while paused.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -814,3 +814,52 @@ requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.
       had either half of this bug — no regression test needed on iOS specifically, but worth a
       quick sanity pass that "leave blank to keep PIN" still behaves correctly there too, unrelated
       to this fix
+
+### Item 4: bartender pairing expiration — confirmed intentional, no test needed
+
+Investigated and closed with no code change — a paired bartender's credential correctly stays
+valid until End Session or an explicit admin Kill (Bartender Sessions tab), with no automatic
+timeout. This is the desired behavior (a bartender should stay paired for their whole shift), not
+a gap. Nothing to regression-test here specifically — covered by the existing Bartender Sessions
+tab tests above.
+
+### 30-minute idle-pause auto-mechanism REMOVED entirely (new 2026-08-02) — replaced by pause-blocks-requests
+
+The old timer (armed whenever playback stopped, fired after 30 continuous minutes unresumed —
+iOS just re-paused, Android also rotated the session/QR, the two platforms were inconsistent with
+each other) is gone on both platforms, not just changed. Do not write regression tests expecting
+any session rotation, queue wipe, or re-pause action 30 minutes after a pause — none of that
+exists anymore, by design.
+
+- [ ] **Core behavior, both platforms**: pause playback (any method — admin/bartender manual pause
+      tap is the primary path, but this should hold regardless of cause) — confirm the kiosk's own
+      local Request button immediately hides/disables (not just after some delay)
+- [ ] **Remote/QR customers, render**: while paused, load `customer.html` (or poll it if already
+      loaded) — confirm the Request/Pay button similarly hides/disables, not just fails with an
+      error after tapping. Confirm catalog browsing itself is completely unaffected — songs still
+      list, search/filter still works, only the ability to submit a new request is blocked
+- [ ] **Resume restores it immediately**: un-pause — confirm both the local kiosk button and
+      remote customer.html's Request button become available again within one poll cycle, with no
+      manual re-toggle needed from the admin
+- [ ] **Admin's actual `accepting_requests` setting is never touched by this** — with the admin
+      toggle explicitly ON, pause and confirm: (a) requests are blocked as above, but (b) the
+      Actions-tab toggle itself still visually shows ON, not flipped to OFF — this is the
+      raw-vs-effective split (mirrors `effectiveStripeEnabled`); pausing must never silently
+      change what the toggle displays or what gets restored on resume
+  - [ ] With the admin toggle explicitly OFF (requests already disabled for an unrelated reason),
+        pause and resume — confirm it's still OFF afterward, not accidentally turned back on by
+        the pause/resume cycle
+- [ ] **Stripe payments already in flight are unaffected**: start a Stripe payment (create a
+      payment intent) while playing, then pause before confirming payment — confirm
+      `bar_payment_confirmed()` still succeeds; this endpoint is deliberately NOT gated by the new
+      effective-accepting-requests check, unlike request/create-payment-intent
+- [ ] **No wipe of existing Up Next**: with paid/approved requests already in the queue, pause for
+      an extended period (longer than the old 30-min window used to matter) — confirm Up Next is
+      completely untouched; this new mechanism only ever blocks *new* submissions, never removes
+      existing ones
+- [ ] **Leave the app paused indefinitely (well past 30 minutes)** — confirm nothing automatically
+      happens: no session/QR rotation, no forced re-pause action (redundant since it's already
+      paused), no app termination, no blocking screen. The kiosk should behave identically at 5
+      minutes paused and 5 hours paused — the only way out is admin resuming or ending the session
+- [ ] Regression: End Session still works exactly as before and is unaffected by any of this —
+      it's the one and only mechanism left for "wipe everything and start over"

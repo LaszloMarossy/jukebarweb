@@ -173,6 +173,27 @@ class BarSession:
         effective_stripe = self.stripe_enabled and self.kiosk_mode != "localOnly"
         return effective_stripe or self.bartender_enabled
 
+    @property
+    def effective_accepting_requests(self) -> bool:
+        # Paused playback implicitly blocks new request submission (2026-08-02) — customers can
+        # still browse the catalog, they just can't submit while nothing's playing. Replaces the
+        # old 30-min-idle-pause timer (host-local, iOS/Android only, relay was never involved in
+        # it), which existed to stop an overnight session from still accepting requests if the
+        # bartender went home without ending it. Since paused now always blocks new requests
+        # regardless of how long, that whole timer/session-rotation mechanism became unnecessary
+        # and was removed on both host platforms the same day — an accidental Pause tap no longer
+        # has any escalating consequence, and "did you forget to End Session" is now entirely the
+        # operator's own responsibility (their words: "it is on them").
+        #
+        # Same raw-vs-effective split as require_approval above: bar.accepting_requests itself is
+        # never touched by this — admin.html/bartender.html's toggle keeps showing the operator's
+        # actual configured preference, not silently flipped off. Only the two customer-facing
+        # surfaces that actually gate a submission (bar_request(), bar_create_payment_intent(), and
+        # bar_catalog()'s echo to customer.html so the Request button doesn't even show as usable)
+        # read this property; bar_payment_confirmed() deliberately does not — a payment intent that
+        # already succeeded must still be honored even if playback paused in the meantime.
+        return self.accepting_requests and self.is_playing
+
 
 _map_entries: dict[str, MapEntry] = {}   # persisted to disk
 _bars: dict[str, BarSession] = {}        # in-memory only
@@ -814,7 +835,9 @@ async def bar_catalog(jukebar_id: str, s: str = Query(..., alias="s")):
             "price_for_three":        bar.price_for_three,
             "currency":               bar.currency,
             "stripe_publishable_key": bar.stripe_publishable_key if bar.stripe_enabled else "",
-            "accepting_requests":     bar.accepting_requests,
+            # Effective, not raw: customer.html should hide/disable its own Request button while
+            # paused, not just get a 403 after tapping it — see BarSession.effective_accepting_requests.
+            "accepting_requests":     bar.effective_accepting_requests,
             "kiosk_mode":             bar.kiosk_mode,
             "settings_pending":       list(bar.desired_settings.keys()),
         },
@@ -965,7 +988,7 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
     bar = _customer_bar(jukebar_id, s)
     if bar.kiosk_mode == "localOnly":
         raise HTTPException(404, "Not found")
-    if not bar.accepting_requests:
+    if not bar.effective_accepting_requests:
         raise HTTPException(403, "Not accepting requests right now")
 
     song_ids: list[str] = body.get("song_ids", [])
@@ -1025,7 +1048,7 @@ async def bar_create_payment_intent(
     bar = _customer_bar(jukebar_id, s)
     if bar.kiosk_mode == "localOnly":
         raise HTTPException(404, "Not found")
-    if not bar.accepting_requests:
+    if not bar.effective_accepting_requests:
         raise HTTPException(403, "Not accepting requests right now")
     if not bar.stripe_secret_key:
         raise HTTPException(400, "Stripe not configured")
