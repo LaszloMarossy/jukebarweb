@@ -470,6 +470,42 @@ discussion for this exact action). Row copy changed from "locked"/"failed attemp
 "attempts so far," and the action button from "Clear" to "Let Retry Now," across all three admin
 surfaces (relay + both LAN admin.html files) — copy-only, no endpoint/field/behavior changes.
 
+**Kiosk lock-to-app (2026-08-02), iOS + Android only — no jukebarweb involvement, wire-contract-free.**
+Prevents casual escaping to device Settings/other apps while a kiosk session is live. Gated on
+`kioskDisplayMode` being `localOnly` or `localAndRemote` only — `remoteOnly` means customers never
+touch the kiosk screen directly (their own phones via QR only), so there's nothing to lock down for
+them. **The two platforms are structurally asymmetric, and this can't be fixed in software**:
+- **Android**: `Activity.startLockTask()` is callable by any app, no special device provisioning —
+  real enforcement. `MainActivity.kt` reacts to `(isSetupComplete, barDetails.kioskMode)` via a
+  `LaunchedEffect`, guarded against `IllegalStateException` by checking
+  `ActivityManager.lockTaskModeState` before calling start/stop. Not unbreakable — exiting still
+  needs a physical gesture (back+overview held, or swipe-up-hold depending on nav mode/OS version),
+  optionally gated further by the device's own lock-screen credential if one is set. That's the
+  ceiling of what's achievable without Device Owner provisioning (factory-reset QR/ADB enrollment) —
+  deliberately out of scope, a deployment decision not an app change.
+- **iOS has no programmatic equivalent at all.** Guided Access (the relevant Accessibility feature)
+  can only be started by the *user*, manually, via a triple-click gesture each session — Apple
+  provides zero API for an app to trigger it, only to read current status
+  (`UIAccessibility.isGuidedAccessEnabled`) and observe changes
+  (`UIAccessibility.guidedAccessStatusDidChangeNotification`). `KioskView.swift` detects and shows a
+  small persistent warning caption (same visual slot as the existing `serverError` caption) when
+  Guided Access isn't currently active, live-updating via the notification with no relaunch needed.
+  True forced lockdown on iOS requires Supervised+MDM enrollment (Apple Business Manager or Apple
+  Configurator) — same category as Android's Device Owner path, same reason it's out of scope here.
+- **MDM** (Mobile Device Management — Jamf/Intune/etc.) is the enterprise provisioning layer both
+  platforms' *true* unbreakable kiosk modes ultimately depend on. Neither this feature nor anything
+  else in the app can substitute for it; it's a business/procurement decision for however bar owners
+  buy and set up their hardware, not a toggle. Explicitly not pursued this pass.
+- **Setup-wizard advisory, added same day, asymmetric by necessity**: Local Only / Local + Remote
+  cards on both platforms' `DisplayModeStep.kt`/`DisplayModeGateView.swift` now recommend enabling
+  the platform's lockdown mechanism first. **iOS's version is a real conditional check** (reads
+  `UIAccessibility.isGuidedAccessEnabled` fresh each render, appends the warning only if it's off)
+  since the API to detect it exists. **Android's version is a static recommendation, not
+  conditional** — confirmed via research that no public API exists to query whether the user has
+  pre-enabled Settings → Security → Screen Pinning (unlike Guided Access, this isn't something an
+  app can detect; `ActivityManager.lockTaskModeState` only reports *current* pinned state, not the
+  underlying Settings toggle). This asymmetry is a hard platform limit, not an inconsistency to fix.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -746,3 +746,49 @@ wait, not a defense mechanism itself.
       silently patch over with a fake extra id layer that wouldn't add real protection anyway
 - [ ] Relay restart / LAN session reset (End Session) clears all sessions and lockout state for
       that surface — same in-memory-only tradeoff as everywhere else in this system
+
+### Kiosk lock-to-app (new 2026-08-02, item 14) — iOS + Android, deliberately platform-asymmetric
+
+Not unbreakable on either platform, and not meant to be — this raises the bar against a casual
+patron poking at the kiosk, not a determined attacker. True forced lockdown on either platform
+requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.md).
+
+- [ ] `remoteOnly` mode: neither platform's lockdown mechanism engages at all — confirm no pinning
+      attempt (Android) and no Guided Access warning (iOS) in this mode
+- [ ] **Android, `localOnly` or `localAndRemote`**: launching the kiosk (tapping "Launch Kiosk" at
+      the end of setup) triggers `startLockTask()` — first time ever on a fresh device (Screen
+      Pinning not pre-enabled in Settings), a one-time OS confirmation dialog appears; if the
+      operator pre-enabled Settings → Security → Screen pinning beforehand, it pins silently with
+      no dialog
+  - [ ] While pinned, confirm the standard Android exit gesture (back+overview held, or
+        swipe-up-and-hold on gesture nav — varies by device/OS version) is required to leave the
+        app; a plain back-button tap or app-switcher swipe does NOT escape
+  - [ ] End Session (both the kiosk-native button and, per the earlier "remote Stop/End Session
+        removed" decision, there is no remote trigger to test) → `stopLockTask()` fires, device
+        unpins cleanly, no crash, no dialog
+  - [ ] Cold app launch always shows the setup wizard first (never resumes directly into a pinned
+        kiosk) — confirm pinning never fires before the operator explicitly launches the kiosk
+- [ ] **iOS, `localOnly` or `localAndRemote`, Guided Access OFF**: kiosk shows a small warning
+      caption (same visual slot/style as the existing server-error caption) recommending Guided
+      Access — confirm it's visible but not blocking (Request button and other kiosk UI still fully
+      usable underneath it)
+  - [ ] Enable Guided Access from Settings, then triple-click the side button while the kiosk is
+        foregrounded — confirm the warning caption disappears **live**, without needing to relaunch
+        the app or leave/re-enter the kiosk view (tests the `guidedAccessStatusDidChangeNotification`
+        observer, not just the one-time `onAppear` check)
+  - [ ] Exit Guided Access (triple-click again, authenticate if a passcode was set for it) — confirm
+        the warning caption reappears
+  - [ ] **Cannot be tested in iOS Simulator** — Guided Access is real-hardware-only; this entire
+        section needs a physical device
+- [ ] **Setup wizard advisory, both platforms, Local Only / Local + Remote steps only** (not Remote
+      Only): a recommendation to enable the platform's lockdown mechanism is visible on both cards
+  - [ ] iOS: this is a **live conditional check** — with Guided Access already enabled before
+        reaching this wizard step, confirm the warning text is absent; with it off, confirm the
+        warning text is present. (Reads `isGuidedAccessEnabled` fresh per render — if the operator
+        backgrounds the app, enables Guided Access, and returns mid-wizard, confirm behavior is at
+        least reasonable, even if not instantly live like the runtime KioskView warning.)
+  - [ ] Android: this is a **static recommendation, not conditional** — confirm the caption always
+        appears on these two cards regardless of whether Screen Pinning happens to already be
+        enabled in Settings (there's no API to check, so don't expect or require it to hide itself —
+        that's expected platform-limited behavior, not a bug)
+  - [ ] Remote Only's card has no such advisory on either platform
