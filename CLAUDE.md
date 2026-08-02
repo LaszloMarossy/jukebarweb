@@ -414,8 +414,8 @@ Either way, only a hash is ever what's compared against or forwarded to the rela
 **platforms + render `static/admin.html`, deliberately NOT kiosk-native.** Surfaces data that
 already existed as bookkeeping for other purposes (paired-bartender records, PIN-lockout attempt
 counters) behind a new "Sessions" tab: an **Active Bartender Sessions** list (name, paired-at,
-source IP, per-row **Kill**) and a **Locked-Out IPs** list (IP, last name attempted, attempt
-count, remaining lockout time, per-row **Clear**). All three new endpoints/routes on every
+source IP, per-row **Kill**) and a **Waiting to Retry** list (last name attempted, IP, attempt
+count, remaining wait time, per-row **Let Retry Now**). All three new endpoints/routes on every
 surface require a true **admin** token specifically — deliberately excludes LAN's
 isAdmin-promoted-first-bartender path (`isValidSettingsToken`/Android's equivalent), since
 managing *other* bartenders' sessions and PIN lockouts shouldn't be something even the "admin
@@ -453,6 +453,22 @@ had no `401` case in its status-code `when` block, so all 4 pre-existing `jsonEr
 call sites (approve/deny/list/settings auth failures) were actually returning HTTP 500, not 401 —
 silently wrong for as long as the token-auth layer has existed. Fixed as part of wiring the new
 endpoints' own 401s (which needed it to work at all), incidentally fixing the pre-existing ones too.
+
+**Renamed "Locked-Out IPs" → "Waiting to Retry" the same day, after user pushback**: the original
+framing implied a maintained blocklist of "malicious IPs" worth identifying/tracking — user
+correctly pointed out this doesn't hold up: a determined attacker just retries from a different
+IP (the lockout is per-IP, not global, by earlier deliberate design — see the PIN-split section
+above), and once the PIN itself is changed in response to a real attack, any given IP's lockout
+state is moot anyway. **The underlying per-IP throttle in `bar_authenticate()`/LAN pairing is
+unchanged and still valuable** — it still stops the common case (one unthrottled script hammering
+the endpoint) from brute-forcing a short numeric PIN in seconds, which "just change the PIN
+reactively" can't help with if nobody's watching closely enough to notice first. What changed is
+purely the *framing and purpose* of the admin-facing list: not a security/hacker-tracking view,
+but a courtesy tool for un-sticking a legitimate bartender who fumbled their own PIN and doesn't
+want to wait out the full cooldown ("bail Joe out" — the phrase from the original design
+discussion for this exact action). Row copy changed from "locked"/"failed attempts" to "waiting"/
+"attempts so far," and the action button from "Clear" to "Let Retry Now," across all three admin
+surfaces (relay + both LAN admin.html files) — copy-only, no endpoint/field/behavior changes.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

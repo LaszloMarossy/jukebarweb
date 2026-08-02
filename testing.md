@@ -705,16 +705,21 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
 ### Bartender Sessions admin tab (new 2026-08-02) — LAN admin.html (both platforms) + render admin.html only, NOT kiosk-native
 
 Surfaces existing paired-bartender and PIN-lockout bookkeeping behind a new "Sessions" tab, with
-Kill (per bartender) and Clear (per locked-out IP) actions, admin-token-only.
+Kill (per bartender) and Let Retry Now (per waiting IP) actions, admin-token-only. **Framing note
+(corrected 2026-08-02 after user feedback)**: "Waiting to Retry" is deliberately not a
+"malicious IPs" security list — it's a courtesy tool for un-sticking a legitimate bartender who
+fumbled their own PIN, not a hacker watchlist. The underlying per-IP throttle still runs regardless
+of whether anyone ever looks at this tab; the tab is purely a convenience to shortcut someone's
+wait, not a defense mechanism itself.
 
 - [ ] Pair 2+ bartenders (different names/devices if possible), open the Sessions tab on each of
       the 3 admin surfaces — each shows every currently-paired bartender for **that surface's own**
       transport (LAN sessions and render sessions are separate pools — a bartender paired via LAN
       never appears in render's list or vice versa, confirmed by design, not a bug)
 - [ ] Fail a bartender PIN 1-2 times (not enough to lock out) from one IP — that IP appears in
-      Locked-Out IPs with the correct attempt count and "not locked" status, plus the name that was
-      typed on the last failed attempt
-- [ ] Fail 3 times to trigger the lockout — same row now shows "locked" with a counting-down
+      Waiting to Retry with the correct attempt count and "not waiting yet" status, plus the name
+      that was typed on the last failed attempt
+- [ ] Fail 3 times to trigger the wait — same row now shows "waiting" with a counting-down
       remaining time
 - [ ] **Kill a session**: confirm dialog fires, declining the "also change PIN" follow-up prompt
       still kills the session — that bartender's next poll gets logged out (session/pair screen
@@ -722,8 +727,8 @@ Kill (per bartender) and Clear (per locked-out IP) actions, admin-token-only.
 - [ ] **Kill + bundled PIN change**: accept the "also change PIN" prompt, enter a new PIN — confirm
       BOTH happen: the killed bartender is logged out AND the old PIN no longer works for a fresh
       pairing attempt (new PIN required)
-- [ ] **Clear a lockout**: confirm the target IP can immediately retry the PIN (not waiting out the
-      remaining lockout time), and that this does NOT change the PIN itself — the same PIN that was
+- [ ] **Let Retry Now**: confirm the target IP can immediately retry the PIN (not waiting out the
+      remaining time), and that this does NOT change the PIN itself — the same PIN that was
       failing before still works once entered correctly
 - [ ] **Admin-only enforcement, all three surfaces**: pair as the *first* bartender (LAN only — gets
       auto-promoted to `isAdmin`/settings-capable) and confirm that bartender's own token/id gets

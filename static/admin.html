@@ -459,7 +459,7 @@
       <div id="bt-sessions-list"><div class="empty-state">Loading…</div></div>
     </div>
     <div class="payment-card" style="margin-top:14px">
-      <div class="payment-title">Locked-Out IPs</div>
+      <div class="payment-title">Waiting to Retry</div>
       <div id="bt-lockouts-list"><div class="empty-state">Loading…</div></div>
     </div>
   </div>
@@ -788,19 +788,23 @@ function renderBartenderSessions(sessions, lockouts) {
     sessEl.appendChild(row);
   });
 
-  lockEl.innerHTML = lockouts.length ? '' : '<div class="empty-state">No lockouts.</div>';
+  lockEl.innerHTML = lockouts.length ? '' : '<div class="empty-state">Nobody is waiting to retry.</div>';
   lockouts.forEach(lo => {
     const row = document.createElement('div');
     row.className = 'bt-sess-row';
+    // Framing note (2026-08): this isn't a "blocked IPs" security list — it's a courtesy view for
+    // letting a legitimate bartender who fumbled the PIN back in early, not a hacker watchlist.
+    // We don't try to identify or ban IPs; rotating IP defeats this anyway, so the only thing
+    // worth doing here is helping someone who's genuinely just waiting.
     const status = lo.locked
-      ? `locked — ${Math.max(0, Math.ceil(lo.locked_until - Date.now() / 1000))}s left`
-      : `${lo.attempts} failed attempt${lo.attempts === 1 ? '' : 's'}, not locked`;
+      ? `waiting — ${Math.max(0, Math.ceil(lo.locked_until - Date.now() / 1000))}s left`
+      : `${lo.attempts} attempt${lo.attempts === 1 ? '' : 's'} so far, not waiting yet`;
     row.innerHTML = `
       <div>
-        <div class="bt-sess-main">${esc(lo.ip)}${lo.last_name ? ' · ' + esc(lo.last_name) : ''}</div>
+        <div class="bt-sess-main">${lo.last_name ? esc(lo.last_name) : 'Unknown'} <span class="bt-sess-sub">(${esc(lo.ip)})</span></div>
         <div class="bt-sess-sub${lo.locked ? ' locked' : ''}">${status}</div>
       </div>
-      <button class="btn-act btn-cancel">Clear</button>`;
+      <button class="btn-act btn-cancel">Let Retry Now</button>`;
     row.querySelector('button').onclick = () => clearBartenderLockout(lo.ip);
     lockEl.appendChild(row);
   });
@@ -832,7 +836,7 @@ async function killBartenderSession(sessionId, name) {
 }
 
 async function clearBartenderLockout(ip) {
-  if (!confirm(`Clear the lockout for ${ip}? They'll be able to try the PIN again immediately.`)) return;
+  if (!confirm(`Let this device retry the PIN right now instead of waiting?`)) return;
   try {
     const res = await fetch(`/api/bar/${S.jukebarId}/bartender_sessions/clear_lockout?s=${enc(S.session)}&token=${enc(S.token)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
