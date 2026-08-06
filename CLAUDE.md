@@ -576,6 +576,21 @@ a gap introduced by this change, matches how every other refund scenario in this
 works, and this new mechanism doesn't wipe or touch existing Up Next entries at all, only blocks
 *new* submissions while paused.
 
+**Gap found and closed the same week (2026-08-06): LAN transport was missed by the pause-blocks-**
+**requests work above.** The first pass only touched the relay (internet transport) and the local
+kiosk button — LAN-mode remote customers are served entirely by the host's own `LocalServer` and
+never touch the relay at all, so they'd kept gating purely on the raw `acceptingRequests` value
+with no play-state check. Closed by giving LAN its own copy of the same fix: iOS
+`LocalServer.swift`'s `/api/nowplaying` echo, `/api/request`, and `/api/create-payment-intent`,
+and Android `LocalServer.kt`'s `handleNowPlaying()`/`handleSubmitRequest()`/
+`handleCreatePaymentIntent()`, all now require `isPlaying` alongside the existing
+`acceptingRequests` check. Deliberately left untouched: both platforms' cached full-catalog
+response (`preloadCatalog()`/`catalogJson()`) — baking a live value into a cache that only
+rebuilds occasionally would go stale immediately, so the *live-polled* `/api/nowplaying` is where
+LAN's effective gating has to live, mirroring the relay's own cached-catalog-vs-live-poll split.
+Lesson for next time a fix spans "internet + LAN + kiosk-native": grep for the *other* two
+surfaces before considering a fix done, even when the task at hand only mentions one of them.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -863,3 +863,28 @@ exists anymore, by design.
       minutes paused and 5 hours paused — the only way out is admin resuming or ending the session
 - [ ] Regression: End Session still works exactly as before and is unaffected by any of this —
       it's the one and only mechanism left for "wipe everything and start over"
+
+- [ ] **LAN transport (WiFi/Hotspot) — added 2026-08-06 after an initial gap was found and
+      closed.** The first pass only covered the relay (internet transport) and the local kiosk
+      button — LAN-mode remote customers, served entirely by the host's own `LocalServer` and
+      never touching the relay at all, were still gating purely on the raw
+      `acceptingRequests`/`barDetails.acceptingRequests` value with no play-state check. Fixed the
+      same day: iOS `LocalServer.swift`'s `/api/nowplaying` echo, `/api/request`, and
+      `/api/create-payment-intent` now all use `(cfg?.acceptingRequests ?? true) &&
+      MusicService.shared.isPlaying`; Android `LocalServer.kt`'s `handleNowPlaying()`,
+      `handleSubmitRequest()`, and `handleCreatePaymentIntent()` now use `(...) &&
+      coordinator.isPlaying`. Test independently on LAN, since it's a separate code path from
+      internet transport, not just "the same fix applies automatically":
+  - [ ] On WiFi or Hotspot transport specifically (not internet), pause — confirm LAN
+        `customer.html` (both platforms) hides/disables its Request button on the next
+        `/api/nowplaying` poll, same as the internet/relay path already does
+  - [ ] Confirm LAN's cached full-catalog response (`preloadCatalog()`/`catalogJson()`) is
+        deliberately **left untouched** (still raw, not effective) — this is correct, not a missed
+        spot: the cache would go stale the instant play state changed if it baked in a live value,
+        so the live `/api/nowplaying` poll is where the effective gating actually has to live for
+        LAN, same division of labor as the relay's cached-vs-live split
+  - [ ] Directly call LAN's `/api/request` and `/api/create-payment-intent` while paused (not just
+        through the UI) — confirm both reject (403/400 depending on platform) even if a stale
+        client tries to submit anyway
+  - [ ] LAN's `/api/payment-confirmed` remains **ungated** on both platforms, matching the relay's
+        `bar_payment_confirmed()` — an already-succeeded Stripe payment must still be honored
