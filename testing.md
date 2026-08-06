@@ -888,3 +888,30 @@ exists anymore, by design.
         client tries to submit anyway
   - [ ] LAN's `/api/payment-confirmed` remains **ungated** on both platforms, matching the relay's
         `bar_payment_confirmed()` — an already-succeeded Stripe payment must still be honored
+
+### Android: empty-queue setup now blocked (new 2026-08-06, item 8) — Android only, iOS not checked
+
+- [ ] Skip both the Spotify device step and the local-folder step in setup, reach the Summary
+      step, tap Done — confirm a blocking dialog appears ("No music to play") instead of silently
+      completing setup; confirm the kiosk is NOT launched (still on the Summary/wizard screen)
+- [ ] From that dialog, go back and actually select a Spotify playlist or local folder with at
+      least one track — confirm Done now proceeds normally
+- [ ] Select a Spotify playlist that has zero tracks in it (rather than skipping the step
+      entirely) — confirm the same blocking dialog fires; this is checking the actual resulting
+      catalog size, not just "did you tap Skip"
+- [ ] **Regression, most important one**: while the kiosk is already live, tap into the admin
+      overlay (long-press or however it's normally reached) and tap Done/close — confirm this
+      still just closes the overlay as before, with **no** empty-catalog check applied here. The
+      guard added for setup completion must never affect closing the live admin panel for an
+      unrelated reason (they share the same `AdminScreen` composable but the check only wraps the
+      setup-completion call site)
+- [ ] If a catalog somehow does end up empty while the kiosk is already running (e.g. a playlist
+      gets emptied out from Spotify's side after setup) — confirm the now-playing tile shows "No
+      music to play" instead of the previous ambiguous "—" placeholder, in both portrait and
+      landscape kiosk layouts
+- [ ] Confirm the ordinary "—" placeholder still shows correctly for a normal brief no-current-song
+      moment (e.g. between songs) when the catalog is NOT empty — only the genuinely-empty-catalog
+      case should show the new message
+- [ ] iOS was not investigated for this item (explicitly Android-scoped) — if iOS's setup wizard
+      has an equivalent skip-both-sources path, it's unverified whether the same silent-empty-queue
+      state can happen there too

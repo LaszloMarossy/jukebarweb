@@ -591,6 +591,25 @@ LAN's effective gating has to live, mirroring the relay's own cached-catalog-vs-
 Lesson for next time a fix spans "internet + LAN + kiosk-native": grep for the *other* two
 surfaces before considering a fix done, even when the task at hand only mentions one of them.
 
+**Android: setup now blocks launching a kiosk with nothing to play (2026-08-06), Android only —**
+**iOS not investigated, out of scope for this item.** Skipping both the Spotify device step and
+the local-folder step during setup (a two-tap path, no gating existed) used to complete setup
+silently with an empty `coordinator.fullCatalog` — the kiosk would show a frozen "—" now-playing
+tile with the Request button hidden, indistinguishable from a normal pause, no explanation
+anywhere. Two fixes: (1) `SetupWizardScreen.kt`'s SUMMARY step (which reuses the same `AdminScreen`
+composable as the *live* in-kiosk admin overlay) now checks `coordinator.fullCatalog.isEmpty()`
+before calling through to `onLaunchKiosk`, showing a blocking `AlertDialog` instead — checked
+*here*, not inside `AdminScreen.kt` itself, because `AdminScreen`'s `onDone` means something
+completely different when shown live (`KioskView.kt`: just closes the admin overlay) — the guard
+must only ever fire during setup completion, never when an operator is just dismissing the live
+admin panel for an unrelated reason. (2) `KioskView.kt`'s now-playing tile (both portrait and
+landscape layouts) now shows "No music to play" instead of the generic "—" specifically when
+`fullCatalog.isEmpty()`, as a backstop for any other path that could still leave the catalog empty
+(e.g. a selected Spotify playlist that turns out to have zero tracks — the wizard-level check
+catches this too, since it looks at the actual resulting catalog size, not just "did you skip the
+steps") — the normal "—" placeholder for an ordinary paused moment with a non-empty catalog is
+unchanged.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
