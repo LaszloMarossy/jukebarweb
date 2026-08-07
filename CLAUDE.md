@@ -610,6 +610,75 @@ catches this too, since it looks at the actual resulting catalog size, not just 
 steps") — the normal "—" placeholder for an ordinary paused moment with a non-empty catalog is
 unchanged.
 
+**Report generation redesigned + mirrored to the relay (2026-08-07), all three repos — closes**
+**backlog items 9/10/11 together, not separately.** Old behavior (both platforms had near-identical
+independent implementations, clearly ported from one to the other, same bugs in both): silently
+no-op on an empty session with zero feedback; dumped every request regardless of status (pending/
+approved included, not just finalized); no dedup between runs (two reports in one session fully
+overlapped); no file retention limit.
+
+**New unified generation logic** (Android: new `local/ReportManager.kt`, extracted out of
+`LocalServer` so `RelayService` — no `LocalServer` instance in internet-only mode — can trigger it
+identically; iOS: `LocalStorage.archiveSession(sessionId:)`), used by every trigger (kiosk button,
+LAN admin.html button, session-end teardown, and the new remote trigger below) with no third,
+subtly-different path:
+- **Played + denied requests** (both terminal/finalized) get written into the report, then
+  **deleted from live memory** — a real deletion (`LocalRequestManager.removeRequests()` /
+  `LocalStorage.deleteRequest()`), not just excluded from the report, so they also disappear from
+  anything reading the same store (e.g. LAN admin.html's own Played/Denied history sections).
+  Once reported, the CSV is the permanent record — deliberate, confirmed with the user.
+- **Pending + approved/approved-jump** get a snapshot in the same report, every time, **never**
+  deleted — still live/unresolved, the admin screen is where those are managed. Can legitimately
+  reappear in a later report if still unresolved by then.
+- **No-op gate**: exactly "are there any played+denied requests right now" — since they're deleted
+  immediately after being reported, their mere presence already means "not yet reported," no
+  separate tracking needed. Empty → no file written, explicit "No report created — no unreported
+  requests yet" feedback on every UI trigger (previously identical visual feedback whether a report
+  was actually created or silently skipped). A pending-only session with zero plays also produces
+  nothing — not even the snapshot alone; the gate checks played+denied specifically.
+- **Retention**: newest 20 report files kept locally, oldest deleted on any new generation
+  (sorted by file mtime, not filename, so this stays correct regardless of naming) — unconditional,
+  even if a file was never downloaded.
+
+**New remote trigger + relay report mirror**, since render admin.html can't reach the kiosk
+directly (that's the whole reason the relay exists): a new "Generate Report Now" button on render
+queues a `{"type": "generate_report"}` action via the existing `pending_actions` delivery
+mechanism (same as approve/deny/control), applied by the host on its next sync through the
+identical `ReportManager`/`archiveSession` path as the two local buttons.
+
+The relay now mirrors whatever reports exist on the kiosk (`BarSession.reports: dict[filename,
+{content, created_at}]`, no cap of its own — the host's 20-file local retention is the only real
+limit) so render can list/download without LAN access, and so the "accounting record" doesn't live
+in exactly one fragile place:
+- Every `/api/host/register`/`/api/host/sync` call now also sends `report_filenames` (just names,
+  cheap, full current list every call — same self-healing full-reassert pattern as
+  settings/requests, not a delta) — `_reconcile_reports()` prunes anything cached that's no longer
+  in this list (kiosk-local delete → relay's mirror drops it too, no separate propagation needed
+  for that direction).
+- Both endpoints' responses now include `reports_needed` — filenames the relay has no content
+  cached for (after a relay restart, a genuine new session replacing the `BarSession` outright, or
+  a dropped upload) — the host reads this and re-uploads via the new dedicated
+  `POST /api/host/report_upload` (kept out of the regular 5s sync payload; CSV content isn't cheap
+  enough to resend every tick the way settings fields are — event-driven, called once right after
+  local generation, and once per `reports_needed` entry).
+- **Downloading a report IS the cleanup action** — no separate delete endpoint. Render's
+  `GET /api/bar/{id}/reports/{filename}` removes it from the relay's mirror immediately on success
+  and queues `{"type": "delete_report", "filename": ...}` for the host to remove its own local copy
+  on the next sync. User's explicit framing: "after a client admin downloaded the report, the
+  system needs to be cleaned."
+- Report endpoints gated by `_require_admin_token` (not the looser `_require_bartender_token`) —
+  stricter than the three payment toggles bartender.html can already touch, since these are
+  financial/accounting records.
+- Render's pre-existing "Download CSV" button (`downloadCSV()`, a live client-side export built
+  from whatever's currently in `bar_history()`) is architecturally unrelated and untouched — kept
+  as its own always-fresh live view, distinct from the new file-mirror system. No wipe/dedup
+  concept applies to it since it was never a stored file to begin with.
+
+All three build-verified (`py_compile`, `xcodebuild`, `./gradlew :app:compileDebugKotlin`) and the
+full wire contract spot-checked directly against the actual diffs on both platforms (not just
+trusted from agent reports) — field names, endpoint shapes, and the no-op gate's exact behavior
+all confirmed to match.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

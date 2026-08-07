@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # ---------------------------------------------------------------------------
@@ -160,6 +160,16 @@ class BarSession:
     # on the host's LAN server — a bar using Internet transport with kioskMode=localOnly must not
     # have its relay-served customer page/endpoints reachable either.
     kiosk_mode: str = "localAndRemote"
+    # filename -> {"content": str (raw CSV text), "created_at": float}. Mirrors the host's local
+    # report files (2026-08-07) — the relay imposes no cap of its own (the host's own local
+    # retention, capped at 20, is the only real limit); this dict is reconciled to exactly match
+    # whatever the host currently has on every register/sync (see host_register()/host_sync()),
+    # same self-healing full-reassert pattern as bar.requests/settings — a relay restart just
+    # refills from the host's next sync, no special recovery logic needed. Content only arrives via
+    # the dedicated host_report_upload() endpoint (event-driven, called once when the host actually
+    # generates a new report) — kept out of the regular 5s sync payload since CSVs can be
+    # nontrivially sized and most ticks have nothing new to send.
+    reports: dict[str, dict] = field(default_factory=dict)
 
     @property
     def require_approval(self) -> bool:
@@ -527,6 +537,32 @@ async def map_bars():
 # Host endpoints (iOS, internet mode only)
 # ---------------------------------------------------------------------------
 
+def _reconcile_reports(bar: BarSession, filenames: list[str] | None) -> list[str]:
+    """Drop any cached report the host no longer has locally, and return the filenames the host
+    says exist that the relay has no content for yet — same full-reassert-not-delta pattern as
+    bar.requests/settings, extended with a backfill signal since report content (unlike small
+    settings fields) isn't cheap enough to resend in full every tick.
+
+    `filenames` is the host's complete current list, sent on every register/sync call:
+    - Anything cached here but absent from it was deleted on the host (locally by an admin, or by
+      a delete_report pending_action already applied) and should vanish from the relay's mirror too.
+    - Anything in it the relay has no content for (a fresh register after a genuine new session
+      replaced the BarSession outright, a relay restart, or a previous upload that never landed)
+      gets returned here so the caller can ask the host to re-upload it — content only ever
+      arrives via the dedicated upload endpoint, so reconciliation alone can prune but never
+      restore it; without this the relay's mirror would silently go stale after any of those resets.
+
+    Missing/None `filenames` (older host build) leaves the cache untouched and requests nothing,
+    rather than wiping everything on a stale-client false assumption.
+    """
+    if filenames is None:
+        return []
+    keep = set(filenames)
+    for stale in [f for f in bar.reports if f not in keep]:
+        del bar.reports[stale]
+    return [f for f in filenames if f not in bar.reports]
+
+
 @app.post("/api/host/register")
 async def host_register(body: dict[str, Any]):
     """
@@ -540,6 +576,12 @@ async def host_register(body: dict[str, Any]):
     payload carries) would go blank on every settings toggle until the next natural song change
     or sync. A different (or missing) session means a genuine new session - build fresh so state
     from the previous session doesn't leak in.
+
+    Optional `report_filenames` (list[str]): the host's complete current local report list -
+    reconciled against bar.reports the same self-healing way as everything else here (see
+    _reconcile_reports()). Returns `reports_needed` (list[str]): filenames the host should
+    (re-)upload via POST /api/host/report_upload - always the full list on a genuine new session
+    (the fresh BarSession has no cached content yet), otherwise just whatever isn't already cached.
     """
     jukebar_id = body.get("jukebar_id", "")
     session = body.get("session", "")
@@ -567,6 +609,7 @@ async def host_register(body: dict[str, Any]):
         bar.pin_hash = body.get("pin_hash", "")
         bar.bartender_pin_hash = body.get("bartender_pin_hash", "")
         bar.kiosk_mode = body.get("kiosk_mode", "localAndRemote")
+        reports_needed = _reconcile_reports(bar, body.get("report_filenames"))
         bar.last_seen = time.time()
     else:
         _bars[jukebar_id] = BarSession(
@@ -589,12 +632,16 @@ async def host_register(body: dict[str, Any]):
             bartender_pin_hash=body.get("bartender_pin_hash", ""),
             kiosk_mode=body.get("kiosk_mode", "localAndRemote"),
         )
+        # Fresh BarSession's reports dict starts empty regardless of what the host already has
+        # locally (a genuine new session replaces the object outright) - everything the host
+        # lists needs re-uploading, same as any other reconcile-found-nothing-cached case.
+        reports_needed = _reconcile_reports(_bars[jukebar_id], body.get("report_filenames"))
 
     # Keep map entry's last_seen fresh if the bar is registered there
     if jukebar_id in _map_entries:
         _map_entries[jukebar_id].last_seen = time.time()
 
-    return {"ok": True}
+    return {"ok": True, "reports_needed": reports_needed}
 
 
 @app.post("/api/host/nowplaying")
@@ -667,6 +714,14 @@ async def host_sync(body: dict[str, Any]):
                          change for that this host's echo hasn't matched yet. Host should
                          apply these locally; once a later echo matches, the entry drops out
                          of future responses on its own — no separate ack needed.
+      reports_needed    — filenames (from the optional report_filenames the host sent) the relay
+                         has no content cached for and the host should (re-)upload via
+                         POST /api/host/report_upload. See _reconcile_reports().
+
+    Host may also send `report_filenames` (list[str], optional) — same reconciliation as
+    host_register()'s. `actions` can now include {"type": "generate_report"} (queued by
+    POST /api/bar/{id}/reports/generate) and {"type": "delete_report", "filename": ...} (queued
+    when an admin successfully downloads a report via GET /api/bar/{id}/reports/{filename}).
     """
     jukebar_id = body.get("jukebar_id", "")
     session    = body.get("session", "")
@@ -760,7 +815,38 @@ async def host_sync(body: dict[str, Any]):
     actions = list(bar.pending_actions)
     bar.pending_actions.clear()
 
-    return {"requests": new_requests, "actions": actions, "desired_settings": dict(bar.desired_settings)}
+    reports_needed = _reconcile_reports(bar, body.get("report_filenames"))
+
+    return {
+        "requests": new_requests,
+        "actions": actions,
+        "desired_settings": dict(bar.desired_settings),
+        "reports_needed": reports_needed,
+    }
+
+
+@app.post("/api/host/report_upload")
+async def host_report_upload(body: dict[str, Any]):
+    """
+    Event-driven, not part of the regular 5s sync — called once by the host right after it
+    actually generates a new local report file, and again for any filename the relay names in a
+    register/sync response's `reports_needed` (backfill after a relay restart, a genuine new
+    session, or a previously-dropped upload). Kept separate from host_sync()'s payload since CSV
+    content can be nontrivially sized and most ticks have nothing new to send.
+    """
+    jukebar_id = body.get("jukebar_id", "")
+    session    = body.get("session", "")
+    filename   = body.get("filename", "")
+    content    = body.get("content", "")
+    bar = _get_bar(jukebar_id)
+    _validate_session(bar, session)
+    if not filename:
+        raise HTTPException(400, "filename required")
+    bar.reports[filename] = {
+        "content": content,
+        "created_at": body.get("created_at") or time.time(),
+    }
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1410,4 +1496,60 @@ async def bartender_sessions_clear_lockout(jukebar_id: str, s: str = Query(..., 
     _require_admin_token(bar, token)
     ip = body.get("ip", "")
     _bartender_lockouts.pop((jukebar_id, ip, "bartender"), None)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Report mirror (2026-08-07) — admin-only. bar.reports mirrors whatever the host currently has
+# locally (see _reconcile_reports()); the relay never generates or interprets report content
+# itself, purely a pass-through so render admin.html can list/download/trigger-generation without
+# needing LAN/physical access to the kiosk. Gated by _require_admin_token (not the looser
+# _require_bartender_token) since these are financial/accounting records — stricter than the three
+# payment toggles bartender.html can already touch.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/bar/{jukebar_id}/reports")
+async def bar_reports_list(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    reports = sorted(
+        (
+            {"filename": name, "created_at": r["created_at"], "size": len(r["content"])}
+            for name, r in bar.reports.items()
+        ),
+        key=lambda r: r["created_at"], reverse=True,
+    )
+    return {"reports": reports}
+
+
+@app.get("/api/bar/{jukebar_id}/reports/{filename}")
+async def bar_reports_download(jukebar_id: str, filename: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
+    """
+    Downloading a report IS the cleanup action — no separate delete endpoint. On success, removes
+    it from the relay's mirror immediately and queues a delete_report action for the host to remove
+    its own local copy on the next sync, per the user's explicit design: "after a client admin
+    downloaded the report, the system needs to be cleaned."
+    """
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    report = bar.reports.get(filename)
+    if report is None:
+        raise HTTPException(404, "Report not found")
+    del bar.reports[filename]
+    bar.pending_actions.append({"type": "delete_report", "filename": filename})
+    return Response(
+        content=report["content"],
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/bar/{jukebar_id}/reports/generate")
+async def bar_reports_generate(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
+    """Admin-only. Queues a generate_report action; the host applies it on its next sync (builds
+    the report synchronously, wipes played/denied requests locally, uploads the result) — same
+    up-to-~5s latency as every other relay-mediated action, nothing special-cased for this one."""
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    bar.pending_actions.append({"type": "generate_report"})
     return {"ok": True}

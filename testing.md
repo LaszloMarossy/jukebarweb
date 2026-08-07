@@ -915,3 +915,50 @@ exists anymore, by design.
 - [ ] iOS was not investigated for this item (explicitly Android-scoped) — if iOS's setup wizard
       has an equivalent skip-both-sources path, it's unverified whether the same silent-empty-queue
       state can happen there too
+
+### Report generation redesign + relay mirror (new 2026-08-07, items 9/10/11) — both platforms + relay
+
+- [ ] **No-op, empty session**: fresh session, no requests at all — generate a report (any
+      trigger) — confirm no file is written and "No report created — no unreported requests yet"
+      shows on the button that triggered it
+- [ ] **No-op, pending-only**: submit a request, approve it, don't let it play yet — generate a
+      report — confirm this is ALSO a no-op (no file, not even a snapshot-only file) — the gate is
+      specifically "any played+denied requests," not "any requests at all"
+- [ ] **Core split**: get a mix — some requests played, some denied, some still pending/approved —
+      generate a report. Confirm the resulting CSV contains all of them (played+denied AND the
+      pending/approved snapshot), but only played+denied are gone from the LIVE admin view
+      afterward (LAN admin.html's own Played/Denied history sections, and the kiosk's own report
+      list source) — pending/approved still show normally, unaffected
+- [ ] **Repeatability**: generate a report, then immediately generate again with nothing new having
+      played/denied in between — confirm the second call is a no-op (the first call already wiped
+      what would have been reported) — no duplicate/overlapping file
+- [ ] **Then generate a third time after something new plays** — confirm the new report contains
+      ONLY the newly-played/denied request(s), not a re-dump of what was already reported and wiped
+- [ ] **Retention**: generate 21+ reports in one long test session (or manually drop file count to
+      confirm behavior at the boundary) — confirm only the newest 20 remain, oldest deleted, even
+      if never downloaded
+- [ ] **Remote trigger, render admin.html**: tap "Generate Report Now" on the new Kiosk Reports
+      section — confirm it takes effect on the kiosk (up to ~5s) and becomes visible/downloadable
+      on render (up to another ~5s, so ~10s worst case) — same latency shape as approve/deny/control,
+      nothing special-cased
+- [ ] **Render list/download/cleanup**: with reports waiting, confirm render's Kiosk Reports
+      section lists them (name, relative time, size) — download one — confirm it disappears from
+      render's list AND from the kiosk's own local report list/storage (both sides cleaned up by
+      one action, no separate delete button on render)
+- [ ] **Kiosk-side delete still propagates**: with a report showing on both kiosk and render, delete
+      it directly from the kiosk's own admin screen (not via render) — confirm it disappears from
+      render's list on the next sync too (via `report_filenames` reconciliation, not a
+      `delete_report` action — this direction is a passive full-reassert, not an explicit command)
+- [ ] **Relay restart recovery**: with reports on the kiosk and mirrored to render, restart the
+      relay process (or simulate by clearing render's session) — confirm the next kiosk sync
+      re-populates render's list from scratch, including reports that existed *before* the restart,
+      not just newly-generated ones (`reports_needed` backfill)
+- [ ] **New session backfill**: end the kiosk session and start a genuinely new one (new session
+      token) while old undownloaded reports still exist locally — confirm those old reports still
+      show up on render once the new session registers (same backfill mechanism as the restart
+      case, since a new session also replaces the relay's `BarSession` object outright)
+- [ ] Confirm render's pre-existing "↓ Download CSV" button (the live history export, in the
+      Reports tab above the new Kiosk Reports section) is **completely unaffected** by any of the
+      above — it's a different, always-live mechanism, not reading from the file mirror at all
+- [ ] Confirm the new report endpoints reject a non-admin bartender token (403) — these are
+      admin-only, stricter than the three payment toggles a bartender token can already touch

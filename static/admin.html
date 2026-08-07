@@ -413,6 +413,19 @@
       <div class="summary-card pending"><div class="summary-num" id="sum-pending">—</div><div class="summary-label">Pending</div></div>
     </div>
     <div id="history-list"><div class="empty-state">Loading history…</div></div>
+
+    <div class="payment-card" style="margin-top:14px">
+      <div class="payment-title">Kiosk Reports</div>
+      <div class="bt-sess-sub" style="margin-bottom:8px">
+        Accounting records generated on the kiosk itself, mirrored here for download. Downloading
+        a report removes it from this list and from the kiosk — it's a one-time pickup, not a
+        live view (that's what Requests/Reports above are for).
+      </div>
+      <div class="report-actions">
+        <button class="btn-report" onclick="generateKioskReport()">Generate Report Now</button>
+      </div>
+      <div id="kiosk-reports-list"><div class="empty-state">Loading…</div></div>
+    </div>
   </div>
 
   <div id="pane-actions" class="tab-pane">
@@ -623,7 +636,7 @@ function switchTab(name) {
     $('tab-btn-' + t)?.classList.toggle('active', t === name);
     $('pane-' + t)?.classList.toggle('active', t === name);
   });
-  if (name === 'reports') loadReports();
+  if (name === 'reports') { loadReports(); loadKioskReports(); }
   if (name === 'sessions') loadBartenderSessions();
 }
 
@@ -1116,6 +1129,67 @@ function downloadCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `jukebar-${S.jukebarId}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
+}
+
+// ── Kiosk Reports (2026-08-07) — mirrors the kiosk's own generated report files, distinct from
+// downloadCSV() above (a live export of the current history view). Downloading here removes the
+// report from both the relay's mirror and the kiosk itself — a one-time pickup, not a live list.
+async function loadKioskReports() {
+  const el = $('kiosk-reports-list');
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/reports?s=${enc(S.session)}&token=${enc(S.token)}`);
+    if (res.status === 403) return showError('Session expired', 'The session has expired — ask the host to rescan the QR code.');
+    if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
+    if (!res.ok) { if (el) el.innerHTML = '<div class="empty-state">Could not load — try again.</div>'; return; }
+    const d = await res.json();
+    renderKioskReports(d.reports || []);
+  } catch {
+    if (el) el.innerHTML = '<div class="empty-state">Connection error.</div>';
+  }
+}
+
+function renderKioskReports(reports) {
+  const el = $('kiosk-reports-list');
+  el.innerHTML = reports.length ? '' : '<div class="empty-state">No reports waiting on the kiosk.</div>';
+  reports.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'bt-sess-row';
+    const sizeKb = (r.size / 1024).toFixed(1);
+    row.innerHTML = `
+      <div>
+        <div class="bt-sess-main">${esc(r.filename)}</div>
+        <div class="bt-sess-sub">${fmtElapsed(r.created_at)} · ${sizeKb} KB</div>
+      </div>
+      <button class="btn-act btn-approve">↓ Download</button>`;
+    row.querySelector('button').onclick = () => downloadKioskReport(r.filename);
+    el.appendChild(row);
+  });
+}
+
+function downloadKioskReport(filename) {
+  // A real navigation, not fetch+blob — the browser handles the Content-Disposition download
+  // directly, and the GET itself is what triggers the relay to remove the report from its mirror
+  // and queue the kiosk-side delete, so no separate confirmation step is needed here.
+  const a = document.createElement('a');
+  a.href = `/api/bar/${S.jukebarId}/reports/${encodeURIComponent(filename)}?s=${enc(S.session)}&token=${enc(S.token)}`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Give the download a moment to actually start before refreshing the now-stale list.
+  setTimeout(loadKioskReports, 1500);
+}
+
+async function generateKioskReport() {
+  try {
+    const res = await fetch(`/api/bar/${S.jukebarId}/reports/generate?s=${enc(S.session)}&token=${enc(S.token)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!res.ok) throw new Error('generate failed');
+    alert('Requested — the kiosk will generate it shortly (up to ~10s), then it\'ll appear here.');
+  } catch {
+    alert('Could not request report generation — try again.');
+  }
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
