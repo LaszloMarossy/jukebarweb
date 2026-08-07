@@ -682,6 +682,19 @@ full wire contract spot-checked directly against the actual diffs on both platfo
 trusted from agent reports) — field names, endpoint shapes, and the no-op gate's exact behavior
 all confirmed to match.
 
+**Follow-up, same day: "can the kiosk get a report onto its own device's file system" — resolved**
+**with no code change.** Considered making reports land in a genuinely public location (Android:
+`MediaStore.Downloads`, safe and straightforward; iOS: exposing the reports folder via
+`UIFileSharingEnabled` in the Files app) — but iOS has no way to expose just one subfolder of
+Documents without exposing the whole thing, and Documents is exactly where `config.json` (Stripe
+secret key, admin PIN hash) and all session/request/bartender data already live. Doing this safely
+on iOS would have meant relocating everything else out of Documents into Application Support
+first — real, security-sensitive scope, not a small addition. Turned out to be unnecessary: the
+user's actual underlying goal was "get reports off the host to somewhere people can consolidate
+them" — and both platforms' kiosk Reports sections already have this via their existing Share
+buttons (Android's `Intent.ACTION_SEND` chooser; iOS's `ShareLink`) — email, Drive, AirDrop,
+Messages, Save-to-Files, whatever's installed. No redundant second export path added.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
