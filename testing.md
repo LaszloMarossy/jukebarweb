@@ -918,6 +918,17 @@ exists anymore, by design.
 
 ### Report generation redesign + relay mirror (new 2026-08-07, items 9/10/11) — both platforms + relay
 
+**Why the relay mirror exists, corrected 2026-08-07**: not a data-durability/backup concern
+(reports living only on the kiosk is already the normal, accepted case for WiFi/Hotspot/Local
+transport, same as everywhere else in this system) — it's specifically so an admin using **internet**
+transport can pull a report down to their own phone/device **without needing physical or LAN access
+to the kiosk at all**. The primary scenario below tests exactly that.
+
+- [ ] **Primary use case — genuinely remote download**: with the bar on internet transport, from a
+      device that is NOT on the same network as the kiosk (a different WiFi, cellular data, etc.) —
+      open render admin.html, generate and/or download a report. Confirm this works end-to-end with
+      zero physical/LAN proximity to the kiosk required at any point — this is the actual reason the
+      feature exists, not just "list some files"
 - [ ] **No-op, empty session**: fresh session, no requests at all — generate a report (any
       trigger) — confirm no file is written and "No report created — no unreported requests yet"
       shows on the button that triggered it

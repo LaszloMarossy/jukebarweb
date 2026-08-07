@@ -646,10 +646,13 @@ queues a `{"type": "generate_report"}` action via the existing `pending_actions`
 mechanism (same as approve/deny/control), applied by the host on its next sync through the
 identical `ReportManager`/`archiveSession` path as the two local buttons.
 
-The relay now mirrors whatever reports exist on the kiosk (`BarSession.reports: dict[filename,
-{content, created_at}]`, no cap of its own — the host's 20-file local retention is the only real
-limit) so render can list/download without LAN access, and so the "accounting record" doesn't live
-in exactly one fragile place:
+**Why the mirror exists, corrected**: NOT a data-durability/backup concern — reports living only on
+the kiosk is already the normal, accepted case for WiFi/Hotspot/Local transport, same as everywhere
+else in this system. It's specifically so an admin on **internet** transport can pull a report down
+to their own phone/device without needing physical or LAN access to the kiosk at all — a reachability
+problem, not a fragility one. The relay mirrors whatever reports exist on the kiosk (`BarSession.
+reports: dict[filename, {content, created_at}]`, no cap of its own — the host's 20-file local
+retention is the only real limit) so render can list/download without that LAN/physical dependency:
 - Every `/api/host/register`/`/api/host/sync` call now also sends `report_filenames` (just names,
   cheap, full current list every call — same self-healing full-reassert pattern as
   settings/requests, not a delta) — `_reconcile_reports()` prunes anything cached that's no longer
