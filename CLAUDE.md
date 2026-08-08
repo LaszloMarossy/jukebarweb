@@ -695,58 +695,66 @@ them" — and both platforms' kiosk Reports sections already have this via their
 buttons (Android's `Intent.ACTION_SEND` chooser; iOS's `ShareLink`) — email, Drive, AirDrop,
 Messages, Save-to-Files, whatever's installed. No redundant second export path added.
 
-**Spotify never silently skips a song anymore (2026-08-08), Android only — two separate failure**
-**surfaces, two deliberately different treatments.** Backlog item 12 originally flagged one gap
-(the per-song "no device" cooldown-skip below the 3-consecutive-failure breaker threshold); turned
-into a full redesign of both of Android's Spotify failure paths after discussion, landing on the
-user's own framing: **"in no case would we 'skip' any tracks on our list"** for the startup case,
-but **"it is OK to go to the next song, skipping the current one"** for mid-song trouble, as long
-as it's made visible and actionable rather than silent. The two paths are structurally distinct
-and must stay that way:
+**Spotify never silently skips a song anymore (2026-08-08), Android only — settled after three**
+**rounds of design on the same day, landing on one unified mechanism.** Backlog item 12 originally
+flagged one gap (the per-song "no device" cooldown-skip below the old 3-consecutive-failure breaker
+threshold). The design went through real back-and-forth the same day — worth recording the
+progression since the final shape isn't obvious from just the end state:
 
-- **Startup failure** (`playSpotify()`, trying to *start* a song) — now trips the existing
-  outage-recovery screen (`tripSpotifyOutage()`) **immediately on the first failure**, not after 3
-  consecutive ones. Deleted the now-dead cooldown/counter machinery entirely
-  (`spotifyUnavailableUntil`, `spotifyConsecutiveFailures`, and `advance()`'s cooldown-skip block)
-  rather than leaving it disabled. This is the "fatal going forward until fixed" case — user's own
-  words — meaning every subsequent Spotify song would fail identically until someone physically
-  reconnects at the kiosk, so a hard stop is correct here specifically.
-- **Mid-song failure** (`pollSpotifyEnd()`, watching a song that already started) — three separate
-  failure modes (Spotify unreachable/null state, wrong track playing, Spotify paused itself), each
-  with its own retry ladder, still end in a skip after giving up — **deliberately NOT routed
-  through `tripSpotifyOutage()`** ("we do not have to pause our system for this kind of error, only
-  for Spotify disconnect issue that is fatal going forward" — user's own words). These are
-  isolated, song-specific hiccups, not evidence the whole connection is broken. What changed: if
-  the abandoned song belonged to a live customer request, a new `RequestStatus.UNFULFILLED` gets
-  set (visible with requester name + price on LAN admin.html and render `static/admin.html`, so
-  the bartender can offer a manual refund) instead of the request silently vanishing. Filler
-  (non-request) songs are completely unaffected — still just `advance()`, no behavior change.
-  `PlaybackCoordinator` still has zero direct reference to `LocalRequestManager` (a new
-  `onSongUnfulfilled` callback preserves the existing architectural boundary, same wiring pattern
-  `onSessionTimeout` used before its removal) — the "is this a request" check
-  (`requestedSongIds.contains(trackId)`) happens inside `PlaybackCoordinator`, the actual status
-  mutation happens externally via `MainActivity.kt`'s wiring, mirroring how `markPlayed()` already
-  works. Unlike `markPlayed()` (last-song-only), `markUnfulfilled()` matches **any** song in a
-  multi-song request — the failing song could be at any position, and this data model still only
-  has one status per whole request (same limitation already accepted for item 5, applied
-  consistently here rather than building new per-song tracking).
+1. **First pass**: treat the two failure surfaces — `playSpotify()`'s startup failure (trying to
+   *start* a song) vs. `pollSpotifyEnd()`'s mid-song failure (a song that already started going
+   wrong) — completely differently. Startup trips the outage-recovery screen immediately on the
+   first failure; mid-song never trips at all, just marks the request `UNFULFILLED` and skips.
+2. **User caught a real problem with that split**: the *old* pre-this-session behavior (before any
+   of today's changes) was exactly "keep skipping Spotify songs and playing local ones instead,
+   indefinitely" during a genuine disconnect — and the user was explicit that this must never
+   happen again in any form: **"in no case we should do that."** A purely "mid-song never trips"
+   rule would silently recreate that exact failure mode if a disconnect happened to manifest
+   through the mid-song path instead of the startup path.
+3. **Final, unified design** (what's actually implemented): one mechanism for *both* surfaces, via a
+   new `consecutiveSpotifyFailures` counter in `PlaybackCoordinator` and a shared
+   `handleSpotifyFailure(song)` function called from all 5 failure-exhaustion points (1 in
+   `playSpotify()`, 4 in `pollSpotifyEnd()`):
+   - **1st consecutive Spotify failure** (any type, any path, any payment status): if the song
+     belongs to a currently **paid** request (`requestedSongPaid[trackId] == true` — narrower than
+     the first pass's `requestedSongIds.contains()`, since "we only need to mark PAID requests as
+     unfulfilled - we don't care about FREE requests"), mark it `RequestStatus.UNFULFILLED` and
+     pull that request's other not-yet-played songs off Up Next via the existing
+     `cancelRequestedSongs()` (reused from the bartender Cancel-button feature, not reimplemented).
+     Free/filler failures aren't marked or removed. Either way: `advance()`, keep playing.
+   - **2nd consecutive failure**: instead of advancing again, call `tripSpotifyOutage()` — full
+     stop, same PIN-gated recovery screen as before. The counter deliberately counts *every*
+     Spotify failure toward this threshold, not just paid ones ("count any Spotify failure, not
+     just paid ones" — user's explicit call after I flagged that a paid-only counter would let a
+     bar running only free/filler Spotify songs never escalate during a real outage).
+   - Resets to 0 on any Spotify song actually playing successfully (both success branches in
+     `playSpotify()`, the healthy end-of-track branch in `pollSpotifyEnd()`, and a fresh
+     `buildQueue()`) — **deliberately NOT reset inside `reconnectSpotify()`**: if a reconnect
+     attempt doesn't actually fix anything, the very next failure should re-trip immediately
+     rather than requiring two more strikes first.
 
-`UNFULFILLED` joins `PLAYED`/`DENIED` in `ReportManager`'s report-and-wipe bucket (also a terminal
-outcome — once reported, the CSV is the record). Found and fixed along the way: `RelayClient.kt`'s
-exhaustive `when` on `RequestStatus` (building the host→relay requests sync payload) didn't have
-an `UNFULFILLED` branch — Kotlin's compiler caught this as an error, not a runtime gap, but worth
-noting since it's exactly the kind of thing that's easy to miss when adding an enum case with
-several existing exhaustive matches over it elsewhere. Relay itself needed no logic changes (status
-is stored/forwarded as a raw string, no server-side enum validation) — only `static/admin.html`
-needed a new badge (`⚠ Couldn't play`) and summary card. **Kiosk-native `AdminScreen.kt` has zero
-request-status display of any kind and was left that way, deliberately out of scope** — bartender
-visibility is via LAN admin.html and render admin.html, both of which already have full
-request-list UIs to extend; building a new one on the kiosk screen from scratch wasn't asked for.
+`PlaybackCoordinator` still has zero direct reference to `LocalRequestManager` — `onSongUnfulfilled`
+is now typed `(songId: String) -> Set<String>?` (returns the matched request's full `songIds`, not
+just `Unit`) so `handleSpotifyFailure()` can feed them straight into `cancelRequestedSongs()`;
+`markUnfulfilled()`'s return type changed from `Boolean` to `LocalRequest?` to supply this. Unlike
+`markPlayed()` (last-song-only), `markUnfulfilled()` matches **any** song in a multi-song request —
+the failing song could be at any position, and this data model still only has one status per whole
+request (same limitation already accepted for item 5).
 
-Both repos build-verified (`py_compile`, `./gradlew :app:compileDebugKotlin`) and the key pieces
-spot-checked directly against the diffs — the four `pollSpotifyEnd()` call sites, the any-song
-matching in `markUnfulfilled()`, and the `RelayClient.kt` fix — not just trusted from the fork's
-report.
+`UNFULFILLED` joins `PLAYED`/`DENIED` in `ReportManager`'s report-and-wipe bucket. Found along the
+way: `RelayClient.kt`'s exhaustive `when` on `RequestStatus` (building the host→relay sync payload)
+had no `UNFULFILLED` branch — Kotlin's compiler caught it as a build error, not a silent runtime
+gap. Relay itself needed no logic changes for any of this (status is stored/forwarded as a raw
+string, no server-side validation) beyond what was already built for the outage-broadcast wire
+protocol (`spotify_outage_active`, Play disabled on all three surfaces while it's active) — that
+part of the design didn't change across any of the three rounds, only *when* it gets triggered did.
+**Kiosk-native `AdminScreen.kt` has zero request-status display of any kind, deliberately out of
+scope** — LAN and render admin.html are the intended bartender-facing surfaces.
+
+Both repos build-verified across all three rounds, and the final consolidated implementation
+spot-checked directly against the diffs (all 5 `handleSpotifyFailure()` call sites, the 4 reset
+points, the `onSongUnfulfilled`/`markUnfulfilled()` signature change) — not just trusted from the
+forks' reports.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

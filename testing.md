@@ -974,33 +974,51 @@ to the kiosk at all**. The primary scenario below tests exactly that.
 - [ ] Confirm the new report endpoints reject a non-admin bartender token (403) — these are
       admin-only, stricter than the three payment toggles a bartender token can already touch
 
-### Spotify never silently skips a song (new 2026-08-08, item 12) — Android only, two separate paths
+### Spotify never silently skips a song (new 2026-08-08, item 12) — Android only, unified 2-strike design
 
-- [ ] **Startup failure still trips immediately (regression from earlier this session's first
-      pass — re-verify after the cooldown/counter deletion)**: force a "no Spotify device" failure
-      at the moment a new song is about to *start* — confirm the outage-recovery screen appears on
-      the very first failure, not after 2 more attempts. Confirm Play is disabled on LAN, render,
-      and the kiosk's own admin screen while this is active, and that reconnecting via the existing
-      PIN-gated flow clears it and resumes correctly
-- [ ] **Mid-song failure does NOT trip the outage screen**: force one of the three
-      `pollSpotifyEnd()` failure modes (unreachable state / wrong track playing / Spotify paused
-      itself) on a song that's already playing — confirm the outage-recovery screen never appears,
-      `spotifyOutageActive` stays false, Play stays enabled everywhere throughout
-  - [ ] Confirm this eventually gives up and moves to the next song (not stuck retrying forever) —
-        after the retry ladder in whichever branch you triggered plays out
-- [ ] **Filler song, mid-song failure**: with a non-requested (shuffle filler) Spotify song
-      currently playing, force a mid-song failure — confirm it just skips to the next song exactly
-      as before, no status change anywhere, nothing new to see on any admin surface
-- [ ] **Requested song, mid-song failure**: approve a paid or free request for a Spotify song, let
-      it become current, force a mid-song failure — confirm: (a) it skips to the next song, (b) the
-      request now shows an "⚠ Couldn't play" badge (not Played, not Denied, not stuck at
-      "In queue") on LAN admin.html, and on render admin.html if the bar is on internet transport,
-      with requester name and price visible so a bartender could decide on a manual refund
-- [ ] **Multi-song request, middle song fails**: a 2-3 song request where the *first* song already
-      played successfully and the *second* hits a mid-song failure — confirm the whole request
-      still gets marked unfulfilled correctly (not silently ignored because it's not the last song
-      in the request — this is the specific case `markUnfulfilled()`'s any-song matching, unlike
-      `markPlayed()`'s last-song-only matching, needs to handle)
+The design went through three rounds the same day before landing here — see CLAUDE.md for the
+full progression. **The final rule: one consecutive-failure counter shared by both the startup**
+**and mid-song failure paths.** 1st failure (any type, any path) → mark+skip if paid, keep
+playing. 2nd consecutive failure → full stop (outage-recovery screen), regardless of payment
+status. Any successful Spotify play resets the counter to 0.
+
+- [ ] **Single isolated failure, either path (1st strike)**: force exactly one Spotify failure —
+      either at song startup ("no device") or mid-song (unreachable/wrong-track/stuck-paused) —
+      then let the *next* Spotify song play normally. Confirm: the outage-recovery screen never
+      appears, `spotifyOutageActive` stays false, Play stays enabled everywhere, and the kiosk just
+      moved on to the next song
+- [ ] **Two consecutive failures (2nd strike) — mix the failure types**: force a failure, let it
+      skip to the next song, then force *another* failure on that very next song (can be a
+      different failure type, and can span across the startup/mid-song boundary — e.g. first
+      failure is mid-song, second is a startup failure on the following track, or vice versa).
+      Confirm the **second** one trips the full outage-recovery screen instead of skipping again —
+      this is the core of the unified design, don't test the two paths in isolation only
+- [ ] **Counter resets on success**: one failure, then a Spotify song plays successfully, then
+      another isolated failure — confirm the second failure does NOT trip the outage screen (i.e.
+      it's correctly treated as a fresh 1st strike, not a continuation of the earlier one)
+- [ ] **Reconnect does not pre-arm the counter**: trigger the outage screen (2 consecutive
+      failures), reconnect via the existing PIN-gated flow, then immediately force one more
+      failure — confirm this single post-reconnect failure trips the outage screen again right
+      away (1 strike, not 2) rather than requiring two more — deliberate: if reconnecting didn't
+      actually fix anything, don't make staff sit through a second false start before finding out
+- [ ] **Filler song, any failure type**: with a non-requested (shuffle filler) Spotify song
+      currently playing/starting, force a failure — confirm no request gets marked, no song gets
+      pulled from Up Next — but this failure still counts toward the 2-strike escalation counter
+      (confirm via the "two consecutive failures" test above using filler songs specifically, since
+      the counter must count these too, not just paid-request failures)
+- [ ] **Free request, any failure type**: same as filler — no marking, no Up Next removal, but
+      still counts toward the escalation counter
+- [ ] **Paid request, 1st-strike failure**: approve a paid request for a Spotify song, let it
+      become current, force a failure (either path). Confirm: (a) it's marked with an "⚠ Couldn't
+      play" badge (not Played, not Denied, not stuck "In queue") on LAN admin.html and render
+      admin.html (if on internet transport) — with requester name and price visible — (b) the
+      kiosk moves on to the next song rather than stopping, since this was only the 1st strike
+- [ ] **Multi-song paid request, middle song fails**: a 2-3 song paid request where the *first*
+      song already played successfully and the *second* hits a failure — confirm: (a) the whole
+      request gets marked unfulfilled (not silently ignored for not being the last song — this is
+      `markUnfulfilled()`'s any-song matching, unlike `markPlayed()`'s last-song-only matching),
+      (b) the *third*, not-yet-played song is pulled off Up Next too (`cancelRequestedSongs()`),
+      not left sitting there to be attempted later
 - [ ] **Report generation picks it up**: with an unfulfilled request sitting on the kiosk, generate
       a report (any trigger) — confirm it's included in the CSV and gets wiped from live memory
       afterward, same as played/denied — and that a *second* immediate report generation is a
@@ -1008,6 +1026,9 @@ to the kiosk at all**. The primary scenario below tests exactly that.
 - [ ] Confirm the render admin.html Reports tab's summary cards show a count for "Couldn't Play"
       alongside Approved/Denied/Played/Pending, and that the item appears in the Past Requests list
       with the same badge
+- [ ] Confirm Play is disabled on LAN, render, and the kiosk's own admin screen while the outage
+      screen is active (2nd-strike trip only — 1st-strike skips should never disable Play anywhere),
+      and that reconnecting via the existing PIN-gated flow clears it and resumes correctly
 - [ ] Kiosk-native `AdminScreen.kt` has **no** request-status display at all — confirm this is
       still true and expected, not a missed spot (LAN/render admin.html are the intended surfaces
       for this)
