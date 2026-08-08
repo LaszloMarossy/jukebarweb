@@ -695,6 +695,59 @@ them" — and both platforms' kiosk Reports sections already have this via their
 buttons (Android's `Intent.ACTION_SEND` chooser; iOS's `ShareLink`) — email, Drive, AirDrop,
 Messages, Save-to-Files, whatever's installed. No redundant second export path added.
 
+**Spotify never silently skips a song anymore (2026-08-08), Android only — two separate failure**
+**surfaces, two deliberately different treatments.** Backlog item 12 originally flagged one gap
+(the per-song "no device" cooldown-skip below the 3-consecutive-failure breaker threshold); turned
+into a full redesign of both of Android's Spotify failure paths after discussion, landing on the
+user's own framing: **"in no case would we 'skip' any tracks on our list"** for the startup case,
+but **"it is OK to go to the next song, skipping the current one"** for mid-song trouble, as long
+as it's made visible and actionable rather than silent. The two paths are structurally distinct
+and must stay that way:
+
+- **Startup failure** (`playSpotify()`, trying to *start* a song) — now trips the existing
+  outage-recovery screen (`tripSpotifyOutage()`) **immediately on the first failure**, not after 3
+  consecutive ones. Deleted the now-dead cooldown/counter machinery entirely
+  (`spotifyUnavailableUntil`, `spotifyConsecutiveFailures`, and `advance()`'s cooldown-skip block)
+  rather than leaving it disabled. This is the "fatal going forward until fixed" case — user's own
+  words — meaning every subsequent Spotify song would fail identically until someone physically
+  reconnects at the kiosk, so a hard stop is correct here specifically.
+- **Mid-song failure** (`pollSpotifyEnd()`, watching a song that already started) — three separate
+  failure modes (Spotify unreachable/null state, wrong track playing, Spotify paused itself), each
+  with its own retry ladder, still end in a skip after giving up — **deliberately NOT routed
+  through `tripSpotifyOutage()`** ("we do not have to pause our system for this kind of error, only
+  for Spotify disconnect issue that is fatal going forward" — user's own words). These are
+  isolated, song-specific hiccups, not evidence the whole connection is broken. What changed: if
+  the abandoned song belonged to a live customer request, a new `RequestStatus.UNFULFILLED` gets
+  set (visible with requester name + price on LAN admin.html and render `static/admin.html`, so
+  the bartender can offer a manual refund) instead of the request silently vanishing. Filler
+  (non-request) songs are completely unaffected — still just `advance()`, no behavior change.
+  `PlaybackCoordinator` still has zero direct reference to `LocalRequestManager` (a new
+  `onSongUnfulfilled` callback preserves the existing architectural boundary, same wiring pattern
+  `onSessionTimeout` used before its removal) — the "is this a request" check
+  (`requestedSongIds.contains(trackId)`) happens inside `PlaybackCoordinator`, the actual status
+  mutation happens externally via `MainActivity.kt`'s wiring, mirroring how `markPlayed()` already
+  works. Unlike `markPlayed()` (last-song-only), `markUnfulfilled()` matches **any** song in a
+  multi-song request — the failing song could be at any position, and this data model still only
+  has one status per whole request (same limitation already accepted for item 5, applied
+  consistently here rather than building new per-song tracking).
+
+`UNFULFILLED` joins `PLAYED`/`DENIED` in `ReportManager`'s report-and-wipe bucket (also a terminal
+outcome — once reported, the CSV is the record). Found and fixed along the way: `RelayClient.kt`'s
+exhaustive `when` on `RequestStatus` (building the host→relay requests sync payload) didn't have
+an `UNFULFILLED` branch — Kotlin's compiler caught this as an error, not a runtime gap, but worth
+noting since it's exactly the kind of thing that's easy to miss when adding an enum case with
+several existing exhaustive matches over it elsewhere. Relay itself needed no logic changes (status
+is stored/forwarded as a raw string, no server-side enum validation) — only `static/admin.html`
+needed a new badge (`⚠ Couldn't play`) and summary card. **Kiosk-native `AdminScreen.kt` has zero
+request-status display of any kind and was left that way, deliberately out of scope** — bartender
+visibility is via LAN admin.html and render admin.html, both of which already have full
+request-list UIs to extend; building a new one on the kiosk screen from scratch wasn't asked for.
+
+Both repos build-verified (`py_compile`, `./gradlew :app:compileDebugKotlin`) and the key pieces
+spot-checked directly against the diffs — the four `pollSpotifyEnd()` call sites, the any-song
+matching in `markUnfulfilled()`, and the `RelayClient.kt` fix — not just trusted from the fork's
+report.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

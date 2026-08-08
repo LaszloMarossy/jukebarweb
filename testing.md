@@ -973,3 +973,41 @@ to the kiosk at all**. The primary scenario below tests exactly that.
       above — it's a different, always-live mechanism, not reading from the file mirror at all
 - [ ] Confirm the new report endpoints reject a non-admin bartender token (403) — these are
       admin-only, stricter than the three payment toggles a bartender token can already touch
+
+### Spotify never silently skips a song (new 2026-08-08, item 12) — Android only, two separate paths
+
+- [ ] **Startup failure still trips immediately (regression from earlier this session's first
+      pass — re-verify after the cooldown/counter deletion)**: force a "no Spotify device" failure
+      at the moment a new song is about to *start* — confirm the outage-recovery screen appears on
+      the very first failure, not after 2 more attempts. Confirm Play is disabled on LAN, render,
+      and the kiosk's own admin screen while this is active, and that reconnecting via the existing
+      PIN-gated flow clears it and resumes correctly
+- [ ] **Mid-song failure does NOT trip the outage screen**: force one of the three
+      `pollSpotifyEnd()` failure modes (unreachable state / wrong track playing / Spotify paused
+      itself) on a song that's already playing — confirm the outage-recovery screen never appears,
+      `spotifyOutageActive` stays false, Play stays enabled everywhere throughout
+  - [ ] Confirm this eventually gives up and moves to the next song (not stuck retrying forever) —
+        after the retry ladder in whichever branch you triggered plays out
+- [ ] **Filler song, mid-song failure**: with a non-requested (shuffle filler) Spotify song
+      currently playing, force a mid-song failure — confirm it just skips to the next song exactly
+      as before, no status change anywhere, nothing new to see on any admin surface
+- [ ] **Requested song, mid-song failure**: approve a paid or free request for a Spotify song, let
+      it become current, force a mid-song failure — confirm: (a) it skips to the next song, (b) the
+      request now shows an "⚠ Couldn't play" badge (not Played, not Denied, not stuck at
+      "In queue") on LAN admin.html, and on render admin.html if the bar is on internet transport,
+      with requester name and price visible so a bartender could decide on a manual refund
+- [ ] **Multi-song request, middle song fails**: a 2-3 song request where the *first* song already
+      played successfully and the *second* hits a mid-song failure — confirm the whole request
+      still gets marked unfulfilled correctly (not silently ignored because it's not the last song
+      in the request — this is the specific case `markUnfulfilled()`'s any-song matching, unlike
+      `markPlayed()`'s last-song-only matching, needs to handle)
+- [ ] **Report generation picks it up**: with an unfulfilled request sitting on the kiosk, generate
+      a report (any trigger) — confirm it's included in the CSV and gets wiped from live memory
+      afterward, same as played/denied — and that a *second* immediate report generation is a
+      no-op if nothing else changed (consistent with the existing report no-op gate)
+- [ ] Confirm the render admin.html Reports tab's summary cards show a count for "Couldn't Play"
+      alongside Approved/Denied/Played/Pending, and that the item appears in the Past Requests list
+      with the same badge
+- [ ] Kiosk-native `AdminScreen.kt` has **no** request-status display at all — confirm this is
+      still true and expected, not a missed spot (LAN/render admin.html are the intended surfaces
+      for this)

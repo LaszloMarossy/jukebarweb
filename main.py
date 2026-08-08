@@ -133,6 +133,12 @@ class BarSession:
     stripe_secret_key: str = ""
     now_playing: dict | None = None    # full song dict pushed by host on song change
     is_playing: bool = True            # pushed by host on play/pause; inferred True by default for iOS compat
+    # True while Android's PlaybackCoordinator is blocked waiting for someone to physically
+    # reconnect Spotify at the kiosk (2026-08-08) — distinct from is_playing==False so
+    # admin.html can tell "someone tapped pause" apart from "the system had to stop because
+    # Spotify disconnected" and disable/warn on the Play button instead of letting a remote
+    # admin resume into an immediate re-failure. iOS has no equivalent, always False for it.
+    spotify_outage_active: bool = False
     created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     requests: dict[str, SongRequest] = field(default_factory=dict)
@@ -647,8 +653,9 @@ async def host_register(body: dict[str, Any]):
 @app.post("/api/host/nowplaying")
 async def host_nowplaying(body: dict[str, Any]):
     """
-    Called by iOS immediately when the now-playing item changes.
-    Lightweight alternative to waiting for the next /sync cycle.
+    Called by iOS/Android immediately when the now-playing item (or play state) changes.
+    Lightweight alternative to waiting for the next /sync cycle — despite the name, this is
+    Android's actual per-change push path for is_playing/spotify_outage_active too, not host_sync().
     """
     jukebar_id = body.get("jukebar_id", "")
     session    = body.get("session", "")
@@ -658,6 +665,8 @@ async def host_nowplaying(body: dict[str, Any]):
     bar.now_playing = body.get("now_playing")  # full song dict or null
     if "is_playing" in body:
         bar.is_playing = bool(body["is_playing"])
+    if "spotify_outage_active" in body:
+        bar.spotify_outage_active = bool(body["spotify_outage_active"])
     return {"ok": True}
 
 
@@ -1017,7 +1026,11 @@ async def bar_genres(jukebar_id: str, playlist: str | None = Query(default=None)
 @app.get("/api/bar/{jukebar_id}/nowplaying")
 async def bar_nowplaying(jukebar_id: str, s: str = Query(..., alias="s")):
     bar = _customer_bar(jukebar_id, s)
-    return {"now_playing": bar.now_playing, "is_playing": bar.is_playing}
+    return {
+        "now_playing": bar.now_playing,
+        "is_playing": bar.is_playing,
+        "spotify_outage_active": bar.spotify_outage_active,
+    }
 
 
 @app.get("/api/bar/{jukebar_id}/display")
@@ -1356,6 +1369,13 @@ async def bartender_control(jukebar_id: str, s: str = Query(..., alias="s"), tok
     action = body.get("action", "")
     if action not in ("play", "pause", "next", "prev"):
         raise HTTPException(400, "action must be play, pause, next, or prev")
+    # Reject remote Play while Spotify is disconnected (2026-08-08) — resuming without actually
+    # reconnecting at the kiosk first would just immediately re-trip the same outage on the next
+    # Spotify song. The host enforces this too (belt and suspenders), but rejecting here also
+    # skips the optimistic is_playing flip below, so admin.html doesn't show a misleading
+    # "now playing" state for the ~5s until the host's own echo corrects it.
+    if action == "play" and bar.spotify_outage_active:
+        raise HTTPException(409, "Spotify is disconnected — reconnect at the kiosk first")
     bar.pending_actions.append({"type": "control", "action": action})
     # Optimistically update is_playing so fetchNowPlaying reflects the new state
     # immediately — before Android picks up the action on its next sync cycle.

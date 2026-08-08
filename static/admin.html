@@ -175,6 +175,7 @@
     .req-badge.acted    { background: #1f2937; color: #6b7280; border: 1px dashed #374151; font-style: italic; }
     .req-badge.played   { background: #1e1b4b; color: #a5b4fc; }
     .req-badge.denied   { background: #3a1a1a; color: #f87171; }
+    .req-badge.unfulfilled { background: #422006; color: #fbbf24; }
     .req-free-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #1f2937; color: #9ca3af; }
     .req-time   { font-size: 10px; color: var(--muted); white-space: nowrap; }
     .req-device { font-size: 11px; color: var(--text); font-weight: 600; white-space: nowrap; margin-left: auto; }
@@ -284,6 +285,7 @@
     .summary-card.denied   .summary-num { color: var(--red); }
     .summary-card.played   .summary-num { color: var(--accent); }
     .summary-card.pending  .summary-num { color: var(--muted); }
+    .summary-card.unfulfilled .summary-num { color: #fbbf24; }
     #history-list { display: flex; flex-direction: column; gap: 10px; }
 
     /* ── loading overlay ── */
@@ -373,6 +375,10 @@
 
   <div class="now-playing-card">
     <div class="np-label">Now Playing</div>
+    <div id="spotify-outage-warning" class="pay-warning" style="display:none; margin-bottom:8px">
+      ⚠ Spotify disconnected — the kiosk stopped itself rather than skip any songs. Someone needs
+      to reconnect it at the kiosk (Admin → Re-attach to Spotify) before playback can resume.
+    </div>
     <div class="np-row">
       <img id="np-art" class="np-art" alt="Album art">
       <div id="now-playing" class="np-info"><div class="np-idle">Nothing playing</div></div>
@@ -411,6 +417,7 @@
       <div class="summary-card denied"><div class="summary-num" id="sum-denied">—</div><div class="summary-label">Denied</div></div>
       <div class="summary-card played"><div class="summary-num" id="sum-played">—</div><div class="summary-label">Played</div></div>
       <div class="summary-card pending"><div class="summary-num" id="sum-pending">—</div><div class="summary-label">Pending</div></div>
+      <div class="summary-card unfulfilled"><div class="summary-num" id="sum-unfulfilled">—</div><div class="summary-label">Couldn't Play</div></div>
     </div>
     <div id="history-list"><div class="empty-state">Loading history…</div></div>
 
@@ -479,7 +486,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote', bartenderAccessEnabled: false };
+const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote', bartenderAccessEnabled: false, spotifyOutageActive: false };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
@@ -897,11 +904,11 @@ async function fetchNowPlaying() {
     const res = await fetch(`/api/bar/${S.jukebarId}/nowplaying?s=${enc(S.session)}`);
     if (!res.ok) return;
     const data = await res.json();
-    renderNowPlaying(data.now_playing, data.is_playing);
+    renderNowPlaying(data.now_playing, data.is_playing, data.spotify_outage_active);
   } catch {}
 }
 
-function renderNowPlaying(song, isPlayingFlag) {
+function renderNowPlaying(song, isPlayingFlag, spotifyOutageActive) {
   $('now-playing').innerHTML = song
     ? `<div class="np-track">${esc(song.title || '')}</div><div class="np-artist">${esc(song.artist || '')}</div>`
     : `<div class="np-idle">Nothing playing</div>`;
@@ -918,22 +925,37 @@ function renderNowPlaying(song, isPlayingFlag) {
     $('btn-play-pause').classList.toggle('playing', S.isPlaying);
     S.playStateReady = true;
   }
+  // Spotify outage (2026-08-08): distinct from a plain pause — the kiosk itself decided it had
+  // to stop rather than skip any song, and only a physical reconnect at the kiosk fixes it.
+  // Disable Play (not just warn) so a remote admin can't resume into an immediate re-failure —
+  // this is the same guard the kiosk's own local Play button and LAN admin.html now also apply,
+  // all driven by the one state the kiosk itself sets and broadcasts out.
+  S.spotifyOutageActive = !!spotifyOutageActive;
+  $('spotify-outage-warning').style.display = S.spotifyOutageActive ? 'block' : 'none';
+  $('btn-play-pause').disabled = S.spotifyOutageActive && !S.isPlaying;
+  $('btn-play-pause').classList.toggle('btn-disabled', S.spotifyOutageActive && !S.isPlaying);
 }
 
 // ── Player controls ──────────────────────────────────────────────────────────
 async function sendControl(action) {
   try {
-    await fetch(`/api/bar/${S.jukebarId}/control?s=${enc(S.session)}&token=${enc(S.token)}`, {
+    const res = await fetch(`/api/bar/${S.jukebarId}/control?s=${enc(S.session)}&token=${enc(S.token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     });
-  } catch {}
+    return res.ok;
+  } catch { return false; }
 }
 
-function togglePlayPause() {
-  sendControl(S.isPlaying ? 'pause' : 'play');
-  S.isPlaying = !S.isPlaying;
+async function togglePlayPause() {
+  // Defensive, in case the disabled styling above doesn't catch every interaction path — the
+  // relay itself also rejects this (409) so nothing bad happens even without this check, but
+  // skipping the optimistic UI flip below avoids a flash of the wrong button state.
+  if (S.spotifyOutageActive && !S.isPlaying) return;
+  const wasPlaying = S.isPlaying;
+  sendControl(wasPlaying ? 'pause' : 'play');
+  S.isPlaying = !wasPlaying;
   $('btn-play-pause').textContent = S.isPlaying ? '▮▮' : '►';
   $('btn-play-pause').classList.toggle('playing', S.isPlaying);
   S.playStateReady = true;
@@ -1014,7 +1036,16 @@ function requestCard(r, showActions) {
             ? `<span class="req-badge played">Played</span>`
             : r.status === 'denied'
               ? `<span class="req-badge denied">Denied</span>`
-              : `<span class="req-badge">Pending</span>`;
+              // Android-only (2026-08-08): a request whose song hit a mid-playback Spotify
+              // failure (unreachable / stuck on wrong track / stuck paused) that couldn't be
+              // recovered after retrying — the song was skipped rather than played, on purpose
+              // (not worth stalling the whole queue over one troublesome song), but the request
+              // itself is still shown here with its price so the bartender can offer a manual
+              // refund. Distinct from "denied" (an active bartender decision) and "played" (it
+              // never actually played).
+              : r.status === 'unfulfilled'
+                ? `<span class="req-badge unfulfilled">⚠ Couldn't play</span>`
+                : `<span class="req-badge">Pending</span>`;
   const songRows = (r.song_details || []).map(s =>
     `<div class="song-row">
       <span class="song-col song-artist">${esc(s.artist)}</span>
@@ -1094,23 +1125,25 @@ async function loadReports() {
 }
 
 function renderReports(requests) {
-  const counts = { approved: 0, denied: 0, played: 0, pending: 0 };
+  const counts = { approved: 0, denied: 0, played: 0, pending: 0, unfulfilled: 0 };
   requests.forEach(r => {
     const k = (r.status === 'approved' || r.status === 'approved_jump') ? 'approved'
-      : r.status === 'denied' ? 'denied' : r.status === 'played' ? 'played' : 'pending';
+      : r.status === 'denied' ? 'denied' : r.status === 'played' ? 'played'
+      : r.status === 'unfulfilled' ? 'unfulfilled' : 'pending';
     counts[k] = (counts[k] || 0) + 1;
   });
   $('sum-approved').textContent = counts.approved;
   $('sum-denied').textContent   = counts.denied;
   $('sum-played').textContent   = counts.played;
   $('sum-pending').textContent  = counts.pending;
+  $('sum-unfulfilled').textContent = counts.unfulfilled;
 
-  // Reports lists resolved history only (played/denied) - anything still pending or "in queue"
-  // already shows on the Requests tab, no need to duplicate it here. Sorted by when each one
-  // actually resolved, not when it was created - a request that sat in queue a while before
-  // playing shouldn't jump the line ahead of one created earlier but played more recently.
+  // Reports lists resolved history only (played/denied/unfulfilled) - anything still pending or
+  // "in queue" already shows on the Requests tab, no need to duplicate it here. Sorted by when
+  // each one actually resolved, not when it was created - a request that sat in queue a while
+  // before playing shouldn't jump the line ahead of one created earlier but played more recently.
   const past = requests
-    .filter(r => r.status === 'played' || r.status === 'denied')
+    .filter(r => r.status === 'played' || r.status === 'denied' || r.status === 'unfulfilled')
     .sort((a, b) => (b.resolved_at || b.created_at || 0) - (a.resolved_at || a.created_at || 0));
   $('history-list').innerHTML = past.length
     ? past.map(r => requestCard(r, false)).join('')
