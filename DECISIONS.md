@@ -199,3 +199,18 @@ play that darn song again, if that is what luck brings." Agreed and shipped the 
 requested songs (kept untouched, in place) and filler (freely shuffled) — no deduplication between the
 two groups, no windowing, no recursion. Android-only, no relay/iOS involvement. This closes the entire
 13-item gap-review backlog opened 2026-08-01.
+
+## 2026-08-08 — Closed two "deliberately out of scope" gaps: LAN player/reports auth, Android admin-PIN hashing
+
+Reviewing the session's accumulated scope-boundary notes, user picked two of four to actually close:
+"Go ahead on both 1 and 2" (LAN's unauthenticated `/api/player/*` + `/api/reports*` endpoints, and
+Android's plaintext admin-PIN comparison). Left alone: LAN's exposed bartender credential (real refactor,
+LAN's physical-presence threat model still holds) and the MDM/kiosk-lockdown ceiling (not fixable from
+app code at all, removed from the tracked list entirely rather than carried as a pending item).
+
+Both fixes are Android + iOS only, no relay changes. Player/reports endpoints now require
+`isValidAdminToken` on both platforms (previously reachable by anyone on the bar's LAN, no PIN needed).
+Android's admin PIN is now SHA-256 hashed everywhere (was the only plaintext holdout — iOS and the relay
+already hashed it), with an in-place migration for existing installs' saved plaintext PIN and a small,
+deliberate UX change: the wizard's PIN step no longer prefills the old PIN when re-running setup, since
+there's nothing meaningful left to prefill with once only a hash is stored.

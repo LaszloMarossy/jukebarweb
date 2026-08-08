@@ -780,6 +780,69 @@ native/opaque, no equivalent flat-list reshuffle exists to fix. This fix does no
 `injectSongs()` places a newly-approved request added mid-shuffle — it still lands near-term exactly as
 before.
 
+**Two "deliberately out of scope" gaps closed, Android + iOS only, no relay involvement**
+**(2026-08-08).** Reviewing the standing list of scope boundaries this session had accumulated
+(LAN's unauthenticated player/report endpoints, Android's plaintext admin PIN, LAN's exposed
+bartender credential, MDM's hard platform ceiling), the user asked to close the first two —
+cheap, real hardening — and leave the latter two as-is (LAN credential separation is a genuine
+refactor; MDM isn't fixable from app code at all).
+
+1. **LAN playback control and report endpoints had zero auth gate.** `/api/player/{play,pause,
+   next,prev}` and all of `/api/reports*` (list/generate/download/delete) on both platforms'
+   `LocalServer` took no token at all — confirmed by direct code read, not assumption. Anyone on
+   the bar's wifi/hotspot, no PIN needed, could pause/skip the live show or pull/delete session
+   report CSVs. Both only ever get called from admin.html (bartender.html has no player section
+   and never touches reports on either platform, confirmed via grep) — gated with
+   `isValidAdminToken` specifically (not the looser `isValidActionToken`/`isValidSettingsToken`),
+   same admin-only reasoning already applied to the relay's own report endpoints and the
+   Bartender Sessions tab (financial records, least-privilege). Android: routing in
+   `LocalServer.kt` now threads `session` through to `playerCmd()`/`handleListReports()`/
+   `handleGenerateReport()`/`handleDownloadReport()`/`handleDeleteReport()`, each checking
+   `requestManager.isValidAdminToken(session.parms["token"] ?: "")` before doing anything. iOS:
+   the same 6 `LocalServer.swift` closures gained `[weak self]` + `self.isValidAdminToken(req.
+   queryDict["token"])`, with `/api/player/*`'s pre-existing `checkSession`/`sessionExpired()`
+   check kept as a separate, prior guard (a different, general "is this a live LAN session at
+   all" check, not actor authorization — the two are complementary, not redundant). Both
+   `assets/admin.html` and `WebApps/admin.html` updated identically to append
+   `&token=`/`?token=` (already-cached `barConfig.token` from the existing PIN-auth flow) to
+   every one of these fetch calls.
+
+2. **Android's admin PIN was compared in plaintext** (`BarDetails.pin`), inconsistent with the
+   bartender PIN (SHA-256, added earlier this session) and with iOS/relay, both of which already
+   hash the admin PIN (iOS: `BarConfig.pinHash`, hashed on-device via `CryptoKit` at every
+   compare/save site — confirmed by reading `AdminView.swift`/`SetupView.swift`/`LocalServer.swift`
+   directly, used as the exact template for Android's fix). Renamed `BarDetails.pin` →
+   `BarDetails.pinHash`; every write site now hashes (`SetupWizardScreen.kt`'s wizard PIN step,
+   `KioskView.kt`'s on-device Forgot-PIN reset flow) and every compare site hashes-then-compares
+   (`KioskView.kt`'s on-device `AdminPinEntry.verify()`, `LocalRequestManager.checkAdminPin()` for
+   LAN auth, called from `LocalServer.kt`'s `handleAdminAuth()`) — mirrors the exact idiom
+   `LocalRequestManager.pairBartender()` already used for the bartender field (hash internally,
+   caller always passes the raw value). `RelayClient.kt`'s register/sync payload used to compute
+   `sha256(barDetails.pin)` client-side on every call — now sends `barDetails.pinHash` directly,
+   since it's already hashed (leaving the old `sha256()` helper in place would have double-hashed
+   silently, desyncing the relay's copy from what LAN/kiosk accept — caught and fixed before it
+   shipped, not after).
+   - **On-device storage migration, not a breaking change**: existing installs have a plaintext
+     PIN already saved in `SharedPreferences` under `bar_pin`. `MainActivity.kt`'s restore-state
+     read now migrates it in place, once: a real SHA-256 hex digest is always 64 characters, a
+     stored plaintext 4-6 digit PIN never is, so a value that isn't 64 chars gets hashed and
+     immediately re-persisted under the same key. No forced Forgot-PIN recovery on update.
+   - **Real, deliberate UX side effect**: the wizard's PIN step (`AdminPinStep.kt`) used to
+     prefill both PIN fields with the actual current plaintext PIN when re-running setup on an
+     existing bar — convenient (just tap Next to keep it unchanged) but only possible because the
+     value was plaintext. With only a hash on hand, there's nothing meaningful left to prefill
+     with. Changed to start blank always; leaving it blank and tapping Next still means "keep my
+     current PIN" (unchanged `hasSavedPin`-driven behavior, just without ever displaying the old
+     PIN on screen) — arguably a small security improvement in its own right (the PIN no longer
+     flashes on screen just from re-entering the wizard), and matches iOS's `SetupView.swift`,
+     which was already built this way from the start (never prefilled, since it was always
+     hash-only on that platform).
+
+   Both platforms build-verified (`./gradlew :app:compileDebugKotlin`, `xcodebuild ... build`).
+   No relay changes for either fix — purely host-app hardening. Not committed as of this
+   writing in this pass; per the standing [[feedback_relay_push_policy]] policy, ship together
+   with jukebarweb once this doc update lands.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

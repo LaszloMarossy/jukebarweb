@@ -922,9 +922,12 @@ exists anymore, by design.
 - [ ] Confirm the ordinary "—" placeholder still shows correctly for a normal brief no-current-song
       moment (e.g. between songs) when the catalog is NOT empty — only the genuinely-empty-catalog
       case should show the new message
-- [ ] iOS was not investigated for this item (explicitly Android-scoped) — if iOS's setup wizard
-      has an equivalent skip-both-sources path, it's unverified whether the same silent-empty-queue
-      state can happen there too
+- [x] **iOS: confirmed not needed, no code change (2026-08-08).** iOS doesn't have Android's
+      two-source setup shape (a separate Spotify-device step and a separate local-folder step, either
+      of which can be independently skipped) — so there's no equivalent "skipped both, silently ended
+      up with an empty catalog" path to guard against. User's call: if an operator picks an empty
+      Apple Music playlist on iOS, that's a straightforwardly avoidable operator choice, not a
+      structural gap worth a blocking dialog for. No parity gap with Android.
 
 ### Report generation redesign + relay mirror (new 2026-08-07, items 9/10/11) — both platforms + relay
 
@@ -1042,3 +1045,49 @@ status. Any successful Spotify play resets the counter to 0.
 - [ ] Kiosk-native `AdminScreen.kt` has **no** request-status display at all — confirm this is
       still true and expected, not a missed spot (LAN/render admin.html are the intended surfaces
       for this)
+
+### LAN player/reports auth gate + Android admin-PIN hashing (new 2026-08-08) — both platforms, no relay involvement
+
+Two previously-flagged "deliberately out of scope" gaps, closed together. See CLAUDE.md for the
+full rationale (why player/reports had no gate, why Android's admin PIN was still plaintext, and
+the on-device migration/UX-prefill tradeoffs).
+
+**LAN player/reports auth:**
+- [ ] From a browser NOT authenticated to admin.html (no valid `token` in hand), hit
+      `/api/player/play` (or pause/next/prev) directly with a POST — confirm 401, and confirm the
+      kiosk does **not** actually pause/skip
+- [ ] Same for `GET /api/reports`, `POST /api/reports/generate`, `GET /api/reports/{filename}`,
+      `DELETE /api/reports/{filename}` — all four reject with 401 when `token` is missing/invalid
+- [ ] From a properly authenticated admin.html session (valid PIN entered), confirm all of the
+      above — play/pause/next/prev buttons, the Reports tab's list/download/delete/generate — still
+      work exactly as before; this should be purely invisible to a legitimate admin
+- [ ] Confirm a paired **bartender** token (not admin) is rejected by all of these — bartender.html
+      never had a player or reports UI to begin with, so this should never come up in normal use,
+      but the backend should still reject it explicitly, not just "never get called with one"
+- [ ] iOS specifically: confirm `/api/player/*`'s pre-existing session-expired check (a stale/
+      wrong-network `s` param) still returns its own distinct message, separate from a missing/bad
+      `token` returning a plain 401 — the two checks are independent, don't let a fix to one mask
+      the other's distinct error message
+
+**Android admin-PIN hashing + migration:**
+- [ ] **Existing install migration**: on a device with a pre-2026-08-08 build already set up (a
+      real plaintext PIN saved), install the updated build and relaunch — confirm the existing PIN
+      still works for kiosk-native unlock, LAN admin.html auth, and the render admin.html PIN
+      (relay `pin_hash`) without needing to re-enter or reset it. No Forgot-PIN flow should be
+      required just from updating.
+- [ ] **Fresh install**: set a new admin PIN via the wizard, confirm kiosk-native unlock, LAN
+      admin.html auth, and render admin.html auth all accept it
+- [ ] **Wizard re-run, leave PIN blank**: re-run setup on an existing bar, leave both PIN fields
+      blank (now start empty, not prefilled — this is a deliberate UX change, confirm it's
+      expected not a regression), tap Next — confirm the *previous* PIN still works afterward, not
+      wiped
+- [ ] **Wizard re-run, set a new PIN**: type a new PIN + confirm, tap Next — confirm the *new* PIN
+      works and the *old* one no longer does, everywhere (kiosk-native, LAN, render)
+- [ ] **Kiosk Forgot-PIN flow**: use the existing device-biometric-gated Forgot-PIN reset (from the
+      admin-lockout screen) to set a new PIN — confirm it works and propagates the same way as a
+      wizard-set PIN (kiosk-native, LAN, and — since this also calls `propagateBarDetails()` —
+      render, once the host's next sync tick lands)
+- [ ] Confirm the relay's copy of `pin_hash` still matches what LAN/kiosk actually accept after
+      any of the above — this is the exact bug class that would recur if the register/sync payload
+      ever re-hashed an already-hashed value (`RelayClient.kt` previously did `sha256(barDetails.
+      pin)` on every call; now sends the already-hashed `barDetails.pinHash` directly)
