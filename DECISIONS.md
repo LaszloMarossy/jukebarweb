@@ -189,3 +189,13 @@ a feature for all modes... that can be a runtime determination, not something we
 future feature that depends on outbound connectivity should default to attempting the call and letting
 it fail naturally rather than gating on the configured transport mode, unless (like `hostRegisterOnRelay`)
 there's a real structural dependency, not just a plausible-sounding restriction.
+
+## 2026-08-08 — Item 13 (final backlog item): exhaustion-reshuffle no longer scatters pending requests
+
+User's own words closing out the design discussion, after walking through and rejecting two more
+elaborate dedup-window alternatives themselves: "why not just freely shuffle the entire playlist, and
+play that darn song again, if that is what luck brings." Agreed and shipped the simplest version:
+`PlaybackCoordinator.advance()`'s exhaustion-reshuffle now partitions the queue into not-yet-played
+requested songs (kept untouched, in place) and filler (freely shuffled) — no deduplication between the
+two groups, no windowing, no recursion. Android-only, no relay/iOS involvement. This closes the entire
+13-item gap-review backlog opened 2026-08-01.

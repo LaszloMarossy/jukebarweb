@@ -413,6 +413,16 @@ Origins to test: **kiosk-native**, **LAN web** (wifi/hotspot customer), **render
       2026-07 discussion; only flag if behavior has changed)
 - [ ] "Requests" vs "Up Next" computed display status: a Stripe-paid or pure-auto-accept-mode request
       never shows in the pending/needs-review section, appears straight in Up Next
+- [ ] **(new 2026-08-08, item 13)** Approve a request, let the queue exhaust and reshuffle while that
+      request is still sitting unplayed in Up Next — confirm the request stays exactly where it was
+      (not moved/delayed), while everything else around it gets freshly shuffled. With 2+ pending
+      requests at reshuffle time, confirm they keep their existing relative order rather than getting
+      scattered relative to each other. With zero pending requests at reshuffle time, confirm it's a
+      plain full shuffle exactly as before — no behavior change. Note: the fix does **not** prevent a
+      requested song from also coincidentally appearing again soon after in the freshly-shuffled filler
+      portion — that near-term-duplicate case was deliberately left unhandled (considered and rejected
+      as not worth the complexity/edge-case risk); only flag it if it looks like more than occasional
+      shuffle luck.
 
 ## 8. Spotify Connectivity & Outage Recovery (Android, new 2026-07)
 

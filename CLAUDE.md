@@ -756,6 +756,30 @@ spot-checked directly against the diffs (all 5 `handleSpotifyFailure()` call sit
 points, the `onSongUnfulfilled`/`markUnfulfilled()` signature change) — not just trusted from the
 forks' reports.
 
+**Exhaustion-reshuffle no longer scatters not-yet-played requests (fixed 2026-08-08, item 13, Android
+only)** — `PlaybackCoordinator.advance()`'s exhaustion branch (fires when the queue wraps at the end of a
+full pass) used to do a flat `queue = queue.shuffled()` over the whole list, with no distinction between
+ordinary filler songs and a customer-requested song still sitting unplayed in Up Next. A request could
+land anywhere in the reshuffled order, worst case delayed by up to a full catalog length before its turn
+came back around. (The existing "resurrection fix" in `RelayService.kt` only prunes a song from
+`requestedSongIds` once it's actually played — it never addressed *position* for a request that hadn't
+played yet.) Fixed by partitioning the queue at reshuffle time: `val (upNextLeftover, filler) =
+queue.partition { it.id in requestedSongIds }`, then `queue = upNextLeftover + filler.shuffled()` — Up
+Next leftovers stay exactly where they were, in their existing relative order, completely untouched;
+only the filler portion gets freshly shuffled. Deliberately **no deduplication** between the two groups —
+an earlier design draft considered removing an Up-Next song from the first N positions of the fresh
+shuffle if it also appeared there (to avoid a played-then-immediately-replayed near-term repeat), first
+with N = Up Next size, then reconsidered as a larger constant window (10-15) once the dynamic N was
+found not to fully prevent near-term repeats — but a constant window needs a recursive "reshuffle until
+clean" loop to actually guarantee no near-term duplicate, which risks a starvation bug on a small
+playlist (everything eligible could get excluded, leaving nothing to select). Rejected as not worth the
+complexity for what's ultimately a minor cosmetic imperfection — a requested song coincidentally landing
+again soon after in the freshly-shuffled filler is accepted as ordinary shuffle luck, not something worth
+engineering around. iOS was not touched — `MPMusicPlayerController.applicationQueuePlayer`'s shuffle is
+native/opaque, no equivalent flat-list reshuffle exists to fix. This fix does not change how
+`injectSongs()` places a newly-approved request added mid-shuffle — it still lands near-term exactly as
+before.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
