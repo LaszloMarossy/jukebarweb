@@ -750,11 +750,12 @@ wait, not a defense mechanism itself.
       `isValidAdminToken`) since the two checks look similar everywhere else in this codebase.
 - [ ] Kiosk-native admin (iOS `AdminView.swift`, Android `AdminScreen.kt`) has **no** Sessions tab —
       confirm this is still true (deliberately out of scope, not an oversight)
-- [ ] **Known, accepted gap — LAN only, not a bug to fix here**: the sessions list on LAN
-      necessarily shows each bartender's actual working credential (`bartenderId` IS the bearer
-      token on LAN, unlike render's opaque `session_id`) — confirm this is understood as an accepted
-      LAN/render asymmetry (LAN requires physical network presence already), not something to
-      silently patch over with a fake extra id layer that wouldn't add real protection anyway
+- [ ] **Closed 2026-08-09 — LAN now matches render's opaque-id split, see the new section near the**
+      **end of this file for full test coverage of the fix.** `bartenderId`/`BartenderRecord.id`
+      is still the real bearer token used for approve/deny/list, unchanged — but LAN's
+      `GET .../bartender_sessions` and `POST .../kill` now go through a separate `session_id`, same
+      as render already did, so a bartender's actual working credential is no longer present in the
+      Sessions tab's network traffic at all
 - [ ] Relay restart / LAN session reset (End Session) clears all sessions and lockout state for
       that surface — same in-memory-only tradeoff as everywhere else in this system
 
@@ -1092,3 +1093,37 @@ the on-device migration/UX-prefill tradeoffs).
       any of the above — this is the exact bug class that would recur if the register/sync payload
       ever re-hashed an already-hashed value (`RelayClient.kt` previously did `sha256(barDetails.
       pin)` on every call; now sends the already-hashed `barDetails.pinHash` directly)
+
+### LAN bartender-credential exposure closed (new 2026-08-09) — both platforms, no relay involvement
+
+Closes the previously "known, accepted" gap in the Bartender Sessions section above. LAN's Sessions
+tab now uses an opaque `session_id` for its own list/kill endpoints, same as render already did —
+`bartenderId`/`BartenderRecord.id` (the actual bearer token) is unchanged everywhere else.
+
+- [ ] **The core fix**: with a bartender paired on LAN, open a network inspector (browser dev tools
+      on the admin device, or a packet capture on the LAN) while loading the Sessions tab — confirm
+      the `GET /api/bartender/sessions` response contains a `session_id` field, and that this value
+      does **not** work as a bearer token — try it directly against `/api/requests?token=<that
+      value>` or `/api/bartender/pair`'s approve/deny flow and confirm it's rejected (401), unlike
+      the bartender's actual `bartenderId`
+- [ ] **Kill still works end-to-end**: from the Sessions tab, Kill a paired bartender — confirm
+      their *next* poll/approve/deny call gets 401 and they're bounced to the pair/PIN screen with
+      the explanatory message (unchanged existing behavior), even though Kill's request body now
+      carries `session_id` instead of the real id
+- [ ] **Approve/deny/list still work unmodified**: confirm a paired bartender can still
+      approve/deny requests and see the request list normally — these flows still authenticate with
+      the real `bartenderId`, completely untouched by this fix; only the Sessions tab's own two
+      endpoints changed
+- [ ] **iOS migration — existing paired bartender from before this update**: if you have a
+      pre-2026-08-09 build with an already-paired bartender, install the updated build without
+      re-pairing, then open the Sessions tab — confirm the bartender still appears (not silently
+      dropped), gets a fresh `session_id` assigned on that first read, and Kill still works against
+      them afterward. Android needs no equivalent test — its bartender list is in-memory only and
+      is already cleared by the same app-update process restart, so there's no persisted
+      pre-migration state to reconcile
+- [ ] **Multiple paired bartenders**: with 2+ bartenders paired, confirm each gets its own distinct
+      `session_id` and Kill only removes the intended one, never a different row
+- [ ] Confirm `bartender_id` is still the field name used by the actual pairing/approve/deny/status
+      flows (`POST /api/bartender/pair`'s response, `GET /api/bartender/status`, etc.) — this fix
+      deliberately only touches the two Sessions-tab endpoints, not the wire contract bartenders'
+      own devices depend on

@@ -214,3 +214,14 @@ Android's admin PIN is now SHA-256 hashed everywhere (was the only plaintext hol
 already hashed it), with an in-place migration for existing installs' saved plaintext PIN and a small,
 deliberate UX change: the wizard's PIN step no longer prefills the old PIN when re-running setup, since
 there's nothing meaningful left to prefill with once only a hash is stored.
+
+## 2026-08-09 — Closed item #3: LAN bartender-credential exposure via the Sessions tab
+
+Left as "a real refactor, not worth it" the day before. Revisited after walking through the actual
+exploit path concretely (passive LAN sniffing, no detection signal since a stolen token is
+indistinguishable from the real bartender using it) — user: "I would not think checking the
+bartender tab would be a regular event at all... But if we can implement a prevention of this, then
+let's do it!" Turned out much cheaper than the original assessment: added an opaque `session_id`
+used only by the Sessions tab's list/kill endpoints, mirroring the relay's existing pattern exactly
+— bartenders' actual bearer token (`bartenderId`/`BartenderRecord.id`) is untouched everywhere else.
+Both platforms, no relay changes.

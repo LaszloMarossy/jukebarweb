@@ -431,13 +431,11 @@ admin token specifically, closing what was previously only a UI convention.
 **Kill** revokes one bartender's credential immediately — their next call to any protected
 endpoint 401s. Relay mints a separate opaque `session_id` per token (alongside the real bearer
 token) specifically so admin.html never has to hold or display a working bartender credential to
-list/kill sessions. **LAN has no equivalent separation** — a bartender's `bartenderId` (Android)
-/ `BartenderRecord.id` (iOS) **is** its bearer token by existing design, so the LAN sessions list
-necessarily exposes each bartender's actual working credential to the admin viewing it. Accepted
-as a known, deliberate scope boundary rather than a bug to fix here — restructuring LAN's
-identity/credential split is a real refactor, and LAN already requires physical network presence
-(a different threat model than the relay's full internet exposure, the same reasoning already
-applied elsewhere to other LAN/render asymmetries in this doc).
+list/kill sessions. **LAN gained the identical separation on 2026-08-09** (was previously a known,
+accepted scope boundary — see the entry below, "LAN bartender-credential exposure closed," for why
+it turned out cheaper than originally assessed) — `bartenderId`/`BartenderRecord.id` remains the
+actual bearer token used for approve/deny/list, but the Sessions tab's list/kill endpoints now go
+through a separate opaque `sessionId`, mirroring the relay exactly.
 
 **Kill's confirm flow bundles a convenience**: "also change the bartender PIN so they can't just
 re-pair" — reuses the existing bartender-PIN-set mechanism (the Actions-tab control from the PIN
@@ -845,6 +843,43 @@ refactor; MDM isn't fixable from app code at all).
    No relay changes for either fix — purely host-app hardening. Not committed as of this
    writing in this pass; per the standing [[feedback_relay_push_policy]] policy, ship together
    with jukebarweb once this doc update lands.
+
+**LAN bartender-credential exposure closed (2026-08-09), Android + iOS only, no relay involvement**
+**— the third "deliberately out of scope" item from the previous day, revisited and fixed.** The
+concern (see the entry above): `GET /api/bartender/sessions` had to return each paired bartender's
+real identifier so admin.html could offer per-row Kill — but that identifier doubled as the actual
+bearer token checked on every approve/deny/list call, so the response (sent over plain LAN HTTP)
+carried a working credential for every currently-paired bartender, not just a display id. Originally
+assessed as a real refactor and left alone alongside the render fixes the day before. On revisiting
+with the user (prompted by walking through the actual exploit path — passive LAN sniffing gated on
+the admin visiting the Sessions tab at some point during the capture window, with no way for the
+admin to detect after the fact that a token had been skimmed, unlike PIN brute-forcing which shows
+up as failed-attempt counters), the fix turned out much smaller than the original assessment: **it
+doesn't require splitting identity from credential everywhere** — bartenders still authenticate
+with `bartenderId`/`BartenderRecord.id` exactly as before, unchanged, everywhere except the Sessions
+tab's own two endpoints. Added one new field, `sessionId` (opaque, minted alongside the real id at
+pairing time, mirrors the relay's identical `session_id`/token split in `bar_authenticate()`):
+`GET /api/bartender/sessions` now returns `session_id` instead of the real id; `POST .../kill` now
+accepts `session_id` and looks up the matching bartender internally before deleting by its real id.
+The admin's browser — and anything sniffing the LAN traffic in transit — now only ever sees an id
+that's useless for authenticating as that bartender.
+
+**iOS needed a migration, Android didn't** — Android's bartender records are in-memory only
+(`CopyOnWriteArrayList`, cleared on process restart), so every instance goes through the current
+constructor and always has a `sessionId` from the moment the updated build runs; no existing state
+to reconcile. iOS's `BartenderRecord` is disk-persisted (one JSON file per bartender via
+`LocalStorage`), so a bartender paired before this update has no `session_id` key in their saved
+file. Added `sessionId: String?` (Optional, mirroring the exact precedent this same struct already
+set for `ip: String?` — "records persisted before this field existed still decode fine") and a
+self-healing migration at the point of first read: `GET /api/bartender/sessions`'s handler assigns
+and persists a fresh `sessionId` for any record still missing one, the same lazy-migrate-on-read
+shape as the Android admin-PIN-hash migration from the day before.
+
+Both platforms build-verified (`./gradlew :app:compileDebugKotlin`, `xcodebuild ... build`) and the
+diffs spot-checked directly — confirmed the pairing/approve/deny/list code paths that authenticate
+*as* a bartender were untouched, only the two Sessions-tab endpoints and their `assets/admin.html`/
+`WebApps/admin.html` call sites changed. No relay changes — this was purely a LAN-only asymmetry
+the relay never had in the first place.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
