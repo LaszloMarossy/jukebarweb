@@ -786,7 +786,12 @@ before.
 (LAN's unauthenticated player/report endpoints, Android's plaintext admin PIN, LAN's exposed
 bartender credential, MDM's hard platform ceiling), the user asked to close the first two —
 cheap, real hardening — and leave the latter two as-is (LAN credential separation is a genuine
-refactor; MDM isn't fixable from app code at all).
+refactor; MDM isn't fixable from app code at all). **Update, 2026-08-09: the third item (LAN's**
+**exposed bartender credential) turned out cheaper than assessed and was also closed** — see its
+own entry further below. **The fourth (MDM) was removed from the tracked list entirely the same
+day** — it was never a deferred-but-doable item, just a fact about what app code can and can't
+achieve; see the "Kiosk lock-to-app" entry above for the full explanation, which stands
+permanently and isn't expected to change.
 
 1. **LAN playback control and report endpoints had zero auth gate.** `/api/player/{play,pause,
    next,prev}` and all of `/api/reports*` (list/generate/download/delete) on both platforms'

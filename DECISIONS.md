@@ -225,3 +225,11 @@ let's do it!" Turned out much cheaper than the original assessment: added an opa
 used only by the Sessions tab's list/kill endpoints, mirroring the relay's existing pattern exactly
 — bartenders' actual bearer token (`bartenderId`/`BartenderRecord.id`) is untouched everywhere else.
 Both platforms, no relay changes.
+
+## 2026-08-09 — Removed item #4 (MDM/kiosk-lockdown ceiling) from the tracked list
+
+User: "close item 4 too, remove it from the tracked list." Unlike items 1-3, this was never a
+deferred-but-doable fix — it's a fact about what's achievable in app code (true unbreakable kiosk
+lockdown on either platform requires enterprise MDM device provisioning, a hardware/procurement
+decision, not a code change). No code touched; only cleaned up a cross-reference that read as if it
+were still an open item. All four items from the 2026-08-08 scope-boundary review are now resolved.
