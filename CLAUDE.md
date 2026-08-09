@@ -401,9 +401,12 @@ enforce that distinction, same as the three pre-existing toggles which bartender
 post too.
 
 **PIN comparison is hash-based (SHA-256) for the bartender field on all three surfaces, including
-Android** — a deliberate departure from Android's existing admin-PIN comparison, which stays
-plaintext (`BarDetails.pin`, untouched, pre-existing inconsistency vs iOS/relay not in scope here).
-The bartender field had no existing plaintext-comparison precedent to preserve, and a hash keeps LAN
+Android** — at the time this shipped (2026-08-01), a deliberate departure from Android's admin-PIN
+comparison, which was still plaintext (`BarDetails.pin`, pre-existing inconsistency vs iOS/relay,
+not in scope for this pass). **That inconsistency was closed on 2026-08-08** — see the entry further
+below ("Two 'deliberately out of scope' gaps closed") — Android's admin PIN is now hashed
+(`BarDetails.pinHash`) the same way. The bartender field had no existing plaintext-comparison
+precedent to preserve, and a hash keeps LAN
 and render consistent: render's admin.html hashes client-side (has Web Crypto, served over https) and
 sends a hash straight through; both hosts' plain-http LAN admin.html pages have no `crypto.subtle`
 available, so they send the raw entered PIN over `/api/admin/settings` and the **host hashes it

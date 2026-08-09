@@ -693,9 +693,10 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
       on/off with the bartender PIN unset the whole time — confirm this toggle still works exactly as
       before (it governs whether customers see a "pay at bar" option, unrelated to whether a
       bartender-role login exists) and doesn't itself gate or get gated by the PIN.
-- [ ] **Comparison is hash-based everywhere for this field** — unlike Android's existing plaintext
-      admin-PIN comparison (`BarDetails.pin`, deliberately untouched/out of scope here), the new
-      bartender field is SHA-256-hashed on all three surfaces. Render admin.html hashes client-side
+- [ ] **Comparison is hash-based everywhere for this field** — matching Android's admin-PIN
+      comparison (`BarDetails.pinHash`, itself hashed as of 2026-08-08; see the new section near
+      the end of this file), the bartender field is also SHA-256-hashed on all three surfaces.
+      Render admin.html hashes client-side
       (Web Crypto, https) before sending; both platforms' plain-http LAN admin.html pages send the
       raw PIN over `/api/admin/settings` and the **host hashes it server-side** instead — confirm a
       network capture of the LAN admin.html save request shows the raw PIN in flight (expected, LAN
