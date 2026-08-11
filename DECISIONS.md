@@ -233,3 +233,15 @@ deferred-but-doable fix — it's a fact about what's achievable in app code (tru
 lockdown on either platform requires enterprise MDM device provisioning, a hardware/procurement
 decision, not a code change). No code touched; only cleaned up a cross-reference that read as if it
 were still an open item. All four items from the 2026-08-08 scope-boundary review are now resolved.
+
+## 2026-08-11 — Added a relay integration-test harness (FakeHost + pytest)
+
+User asked whether the request-flow work could be integration-tested with a "kiosk-simulator,
+remote admin, remote customer page." Rather than a full iOS/Android build in CI, built a
+lightweight FakeHost (tests/fake_host.py) that speaks the real host_register/host_sync wire
+protocol against main.py directly via FastAPI's TestClient — no device, no browser. Two tests cover
+the free/auto-accept and pay-to-bartender request lifecycles end-to-end. Deliberately relay-only
+scope: doesn't touch Kotlin/Swift, so a PlaybackCoordinator.kt or AppState.swift bug wouldn't be
+caught here. Verified the suite's own validity by temporarily breaking a real assertion path
+(bartender_requests()'s display-status override) and confirming the test actually failed, not just
+trusting green results.

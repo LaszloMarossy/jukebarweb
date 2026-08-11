@@ -1,0 +1,3 @@
+# Dev/test-only dependencies -- not installed in production (see render.yaml / Dockerfile).
+-r requirements.txt
+pytest>=8.0.0

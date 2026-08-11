@@ -5,3 +5,4 @@ __pycache__/
 .env
 .idea/
 gcs-key.json
+.pytest_cache/
