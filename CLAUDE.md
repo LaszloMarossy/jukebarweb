@@ -886,44 +886,6 @@ diffs spot-checked directly — confirmed the pairing/approve/deny/list code pat
 `WebApps/admin.html` call sites changed. No relay changes — this was purely a LAN-only asymmetry
 the relay never had in the first place.
 
-**Integration test harness added (2026-08-11), relay-only, no app-code involvement.** This
-codebase had zero automated tests before this — `testing.md` is (and remains) a manual checklist.
-Prompted by a question about testing the request-lifecycle wire protocol end-to-end without a real
-kiosk device: rather than a full iOS/Android build in CI (heavy, flaky, and doesn't isolate what
-was actually being asked about — the relay's own protocol correctness), built a lightweight
-integration harness around the relay alone. `tests/fake_host.py`'s `FakeHost` class speaks
-`/api/host/register`/`/api/host/sync` the same way the real host apps do — its own local
-`requests`/`up_next` store, echoed out on every `sync()` call, adopting new pending requests from
-the response exactly like `LocalRequestManager`/`LocalStorage` do — driven against `main.py`
-directly via FastAPI's `TestClient` (`tests/conftest.py`), no HTTP server process, no browser, no
-mobile build. `tests/test_request_flow.py` covers both request-lifecycle shapes end-to-end: free/
-auto-accept (a customer request needs no human review, so `bartender_requests()`'s computed-
-display-status override must show "approved" immediately, even though the underlying stored status
-stays "pending" until the kiosk's own echo confirms it) and pay-to-bartender (the request must
-display as still-pending until an explicit approve, which round-trips through `pending_actions` to
-the next sync and marks `paid`/`payment_method` correctly).
-
-**Explicit, deliberate scope boundary — this is relay + web-surface coverage only.** `FakeHost` is
-not a reimplementation of either host app's actual logic (no playback engine, no Spotify/local-file
-catalog scanning, no Kotlin/Swift code touched at all) — it only speaks the wire protocol closely
-enough to drive realistic request-lifecycle scenarios through the relay's real code. A regression in
-`PlaybackCoordinator.kt`'s queue logic or `AppState.swift`'s request handling would not be caught
-here; getting real device/simulator builds into an automated loop was considered and explicitly
-not pursued (heavier, flakier, and out of scope for what was actually asked). Sanity-checked the
-suite's own validity before considering it done: temporarily broke `bartender_requests()`'s
-display-status override mid-session and confirmed the auto-accept test actually failed with the
-expected assertion error, then restored the real code and confirmed both tests passed again — not
-just trusting that green tests meant correct tests.
-
-`requirements-dev.txt` (new, `-r requirements.txt` plus `pytest`) keeps this out of the production
-dependency set (`requirements.txt`, what Render actually installs) — this is dev-only tooling.
-`DATA_DIR` is redirected to a scratch temp directory for the test run (`tests/conftest.py`, set via
-`os.environ` before `main` is ever imported, since `main.py` reads it at module import time) so
-tests never touch the real `./data` directory `_bars`/map entries would otherwise live in. `_bars`
-and `_bartender_lockouts` (both process-global in-memory dicts, by existing design — see
-`BarSession`'s own docstring) are cleared after every test via a fixture, so tests don't leak state
-into each other.
-
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

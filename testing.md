@@ -12,19 +12,6 @@ relay (`jukebarweb`). Checkboxes are per-test; tag each run with the platform(s)
 - Items marked **(regression)** were real bugs found and fixed this session (2026-07) — keep these in
   the permanent suite, don't drop them after one clean pass.
 
-**Automated coverage (new 2026-08-11):** `tests/` has a small `pytest` integration suite that
-exercises the relay's real request-lifecycle wire protocol end-to-end — a `FakeHost` helper
-(`tests/fake_host.py`) speaks `/api/host/register`/`/api/host/sync` the way iOS/Android actually do,
-against `main.py` directly via FastAPI's `TestClient` (no real device/simulator, no browser). Covers
-the free/auto-accept and pay-to-bartender request lifecycles end-to-end: customer submits →
-correct display status on admin's Requests/Up Next view → approve action round-trips through
-`pending_actions` → kiosk's echo updates the relay → played/history state. Run with
-`.venv/bin/pip install -r requirements-dev.txt && .venv/bin/python -m pytest tests/ -v`. This is
-**relay + web-surface coverage only** — it does not exercise real iOS/Android app code
-(`PlaybackCoordinator.kt`, `AppState.swift`, etc.), so it complements this manual checklist rather
-than replacing any of it. See CLAUDE.md's "Integration test harness" entry for the full design
-rationale and what's deliberately out of scope.
-
 ---
 
 ## Surface Reference Matrix
