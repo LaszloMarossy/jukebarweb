@@ -192,7 +192,9 @@ up to the bar's own device and using its Request button directly.
 
 ### Setup — this test starts from scratch, during setup itself
 1. On the host device, start setup fresh (or use "End Session" first if it's already set up).
-2. When asked how customers should connect, choose **"Local Only"**.
+2. When asked how customers should connect, choose **"Local Only"**. When asked how the device
+   itself should connect, choose **"Internet / Relay"** — this test uses an admin browser and a
+   customer web link, which need the internet-based connection to exist.
 3. On the payments screen, notice that **"Stripe — Pay Online"** is still shown, but it should
    look **dimmed/disabled**, with a message like *"Not usable in Local Only mode — no customer
    page exists to pay from."* Confirm you can still see it (it's not hidden), but you genuinely
@@ -253,7 +255,10 @@ needing to fully stop the music.
 - An admin browser and a customer browser.
 
 ### Setup
-1. Get the bar to a state where **at least one song is already sitting in "Up Next"** — submit and
+1. Set up the host device choosing **"Internet / Relay"** for how the device connects, and **"Local
+   + Remote"** for how customers connect (so both the host device and the browsers below can reach
+   it).
+2. Get the bar to a state where **at least one song is already sitting in "Up Next"** — submit and
    (if needed) approve one request before you begin the actual test, using whatever payment mode
    you've got configured (free is easiest). This part matters — the whole point of the test is
    confirming this song is left alone.
@@ -300,6 +305,8 @@ right on the device, not silently break the Request button.
 
 ### Setup
 1. Set up the host device with:
+   - Connection: any of "Internet / Relay," "Bar WiFi," or "Android Hotspot" — this test doesn't
+     care which, pick whichever is easiest for you to set up.
    - Customer connection mode: **"Local Only"**.
    - Payments: **"Stripe — Pay Online"** turned **ON**, **"Pay to bartender"** left **OFF**.
 2. Finish setup so it's playing.
@@ -442,9 +449,10 @@ correctly switches to free-for-everyone mode — but only once **both** are off,
   them work for this test).
 
 ### Setup
-1. Set up the host device with customer connection mode **"Local + Remote"** (not Local Only —
-   this test needs Stripe to be genuinely usable, not just visible-but-inactive, so the two
-   "still needs approval" checks below are meaningful).
+1. Set up the host device with any connection option ("Internet / Relay," "Bar WiFi," or "Android
+   Hotspot" all work equally for this test) and customer connection mode **"Local + Remote"** (not
+   Local Only — this test needs Stripe to be genuinely usable, not just visible-but-inactive, so
+   the two "still needs approval" checks below are meaningful).
 2. On the payments screen, turn **ON** both **"Stripe — Pay Online"** and **"Pay to bartender"**.
 3. Finish setup so it's playing.
 

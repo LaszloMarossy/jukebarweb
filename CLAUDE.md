@@ -914,6 +914,24 @@ scratch (same fact already documented earlier in this file). The guide's kiosk-m
 (test cases 6 and 8) were written this way from the start after cross-checking against that
 existing note, not assumed.
 
+**Android's "Local Only" setup-wizard copy was factually wrong, found and fixed 2026-08-16,**
+**Android only.** Surfaced while writing the beta tester guide above — comparing the wizard's three
+display-mode cards against iOS's found Remote Only and Local + Remote already at good wording
+parity, but Android's Local Only card claimed *"Requests are auto-accepted"* (badge) and *"Requests
+are auto-accepted — no QR code"* (detail). That's wrong: display mode and payment/approval mode are
+independent choices (see `KioskDisplayMode` vs. payment-mode notes elsewhere in this file) — a bar
+in Local Only can still pick "Pay to bartender" on the very next wizard screen, which requires
+approval same as any other mode. iOS's copy already got this right (*"free vs. pay-to-bartender is
+still your choice on the next screen"*) and additionally clarified that admin/bartender stay
+reachable over WiFi/Hotspot/Internet regardless of display mode, a point Android's copy omitted
+entirely. Fixed `DisplayModeStep.kt`'s Local Only card to match iOS's accurate framing verbatim for
+the first two sentences, keeping Android's own correct Screen Pinning recommendation (vs. iOS's
+Guided Access one) as the platform-specific third sentence — same pattern the Local + Remote card
+already used successfully. Build-verified (`./gradlew :app:compileDebugKotlin`). This was a real
+operator-facing bug, not cosmetic verbosity — a bar owner reading the old copy could reasonably
+have believed Local Only forced auto-accept and picked "Pay to bartender" thinking it wouldn't
+actually apply.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

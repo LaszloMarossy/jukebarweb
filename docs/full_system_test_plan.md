@@ -80,6 +80,9 @@ the scenario isn't accidentally testing free/auto-accept mode too) — any catal
 (so `accepting_requests` stays effective and the request-flow checks aren't confounded by a paused bar).
 
 **Branch 1 — internet transport:**
+- [ ] During host setup, when asked how the device itself should connect, choose **"Internet /
+      Relay"** — this branch is specifically testing render (the internet-hosted admin/customer
+      pages), so this choice is required, not optional.
 - [ ] Start with Stripe **ON**. On **render admin**, toggle Stripe OFF.
 - [ ] Immediately after clicking: the Stripe control on **render admin itself** shows dimmed/locked
       (`settings_pending`) — it does not just silently flip.
@@ -94,6 +97,8 @@ the scenario isn't accidentally testing free/auto-accept mode too) — any catal
       full propagation happens in reverse, proving it's not a one-directional fluke.
 
 **Branch 2 — wifi/hotspot transport (repeat independently, separate session):**
+- [ ] During host setup, choose **"Bar WiFi"** or **"Android Hotspot"** instead of Internet/Relay —
+      either works for this branch, since both are the non-render path.
 - [ ] Same sequence, substituting **wifi/hotspot admin/bartender/customer** for the render surfaces.
       This path applies directly to host state with no relay round-trip at all — confirm the unlock is
       correspondingly near-instant, not lagging by a sync-cycle's worth of latency the way the
@@ -195,13 +200,15 @@ through setup, unlike most others which assume a bar is already live.
 
 **Lockout scope — run both branches for real, separate sessions:**
 
-*Branch 1 — wifi/hotspot transport:*
+*Branch 1 — wifi/hotspot transport:* redo setup (still Local Only display mode) choosing **"Bar
+WiFi"** or **"Android Hotspot"** this time.
 - [ ] **wifi/hotspot customer** page: write endpoints (request, payment-intent, payment-confirmed,
       request status) return real 404/503 — not a friendly error page.
 - [ ] **wifi/hotspot admin** can still list pending requests, approve, deny — full functionality.
 - [ ] **wifi/hotspot bartender** can still pair, list, approve, deny — full functionality.
 
-*Branch 2 — internet transport:*
+*Branch 2 — internet transport:* redo setup (still Local Only display mode) choosing **"Internet /
+Relay"** this time.
 - [ ] **render customer** page: same 404/503 behavior on the 4 customer-exclusive endpoints.
 - [ ] **render admin** and **render bartender**: fully functional, unaffected.
 
@@ -218,6 +225,7 @@ pending or approved** (submit and, if not auto-accept, approve one) — this is 
 not just a nice-to-have, since the whole point of the scenario is confirming those are left alone.
 
 **Branch 1 — internet transport:**
+- [ ] During host setup, choose **"Internet / Relay"** — this branch specifically tests render.
 - [ ] With 1+ requests already pending/approved, toggle **accepting_requests OFF** from render admin.
 - [ ] kiosk's local Request button hides/disables — kiosk still shows now-playing and QR (not blank).
 - [ ] render customer: Request submission UI disabled/hidden.
@@ -226,8 +234,9 @@ not just a nice-to-have, since the whole point of the scenario is confirming tho
 - [ ] Toggle back ON — Request capability returns on kiosk and render customer simultaneously, no
       restart needed.
 
-**Branch 2 — wifi/hotspot transport (repeat independently, separate session):** same sequence,
-substituting wifi/hotspot admin/customer for the render surfaces.
+**Branch 2 — wifi/hotspot transport (repeat independently, separate session):**
+- [ ] During host setup, choose **"Bar WiFi"** or **"Android Hotspot"** instead.
+- [ ] Same sequence, substituting wifi/hotspot admin/customer for the render surfaces.
 
 ### A6. `effective_stripe` — Local Only + Stripe ON + Bartender OFF behaves as free, without losing the raw preference
 
