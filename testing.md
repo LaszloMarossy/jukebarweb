@@ -66,6 +66,12 @@ at all (confirmed architectural, not unverified — see testing.md §8 and CLAUD
 
 Proves: `desired_settings` single-slot propagation (`CLAUDE.md` — settings section).
 
+**Setup** (both branches): host platform per the reminder above (run once per platform) — Local+Remote
+kiosk mode (need both kiosk-native and a remote admin/customer surface reachable) — Stripe **ON**,
+Bartender Pay ON (Stripe is the toggle target; Bartender ON just keeps approval-required throughout so
+the scenario isn't accidentally testing free/auto-accept mode too) — any catalog, actively playing
+(so `accepting_requests` stays effective and the request-flow checks aren't confounded by a paused bar).
+
 **Branch 1 — internet transport:**
 - [ ] Start with Stripe **ON**. On **render admin**, toggle Stripe OFF.
 - [ ] Immediately after clicking: the Stripe control on **render admin itself** shows dimmed/locked
@@ -100,7 +106,12 @@ capability (Cancel pulling a song out of the live playback queue) exists on iOS 
 `MusicService.cancelRequest()`, so run this on iOS as well when possible rather than assuming a
 clean Android pass covers it.
 
-- [ ] Bar in free/auto-accept mode, Local+Remote or Local Only kiosk mode, **internet transport**.
+**Setup**: free/auto-accept mode (Stripe OFF, Bartender Pay OFF — the request needs to auto-approve
+with no human step, since the scenario starts from an already-live Up Next entry) — Local+Remote or
+Local Only kiosk mode (either works, since the request originates from the kiosk's own local button
+either way, not a web surface) — **internet transport** (structural requirement, not a choice — this
+is the one bug that only existed in the relay-mediated path) — any catalog, actively playing.
+
 - [ ] Submit a request via the **kiosk's own local Request button** (not a web surface).
 - [ ] Confirm it auto-approves and appears in Up Next on: **kiosk itself**, **render customer**,
       **render admin**.
@@ -115,6 +126,14 @@ clean Android pass covers it.
 
 Proves: the full Stripe → `new_requests` upstream → host adoption → live queue → played-detection →
 `bar.requests` downstream loop, across the whole surface set.
+
+**Setup**: host platform per the reminder above — **internet transport** (structural requirement:
+Stripe payment only exists via render customer, `bar_create_payment_intent`/`bar_payment_confirmed`
+are internet-only endpoints) — kiosk mode Local+Remote or Remote Only (**not** Local Only — its
+customer page 404s, see A4 — the whole scenario depends on reaching render customer) — Stripe
+**ON** with a real **test** secret key configured (a live key isn't needed, but a placeholder/empty
+one is — Stripe calls will fail before the scenario even starts) — catalog must include at least one
+track whose id you'll submit, actively playing.
 
 - [ ] Submit and pay for a request via **render customer** page (Stripe test key + card, or Apple
       Pay/Google Pay per §4).
@@ -138,7 +157,11 @@ below are transport-independent (on-device or connectivity-only, not gated by wh
 chosen) — only the lockout-scope part genuinely needs both branches run for real, since LAN and relay
 enforce it via two separate implementations.
 
-**Setup:**
+**Setup**: host platform per the reminder above (the wizard/kiosk-lockout code is per-platform, so
+this genuinely needs both passes, not just the lockout-scope branches). Payment mode and catalog are
+established by the setup steps themselves below, not a precondition — this scenario tests going
+through setup, unlike most others which assume a bar is already live.
+
 - [ ] During the setup wizard, select Local Only kiosk display mode with Stripe toggled ON.
 - [ ] Wizard's Stripe step shows it visible but **disabled**, with the "no customer page exists to pay
       from" caption — not hidden, not silently editable.
@@ -180,6 +203,13 @@ enforce it via two separate implementations.
 
 ### A5. `accepting_requests` OFF hides the ask everywhere, without touching in-flight requests
 
+**Setup** (both branches): host platform per the reminder above — Local+Remote kiosk mode — payment
+mode doesn't matter structurally (this gate is independent of Stripe/Bartender/free), but free/
+auto-accept keeps the "get 1+ requests pending/approved" precondition below quick to reach — any
+catalog, actively playing. Before toggling, get the bar into a state with **1+ requests already
+pending or approved** (submit and, if not auto-accept, approve one) — this is a required precondition,
+not just a nice-to-have, since the whole point of the scenario is confirming those are left alone.
+
 **Branch 1 — internet transport:**
 - [ ] With 1+ requests already pending/approved, toggle **accepting_requests OFF** from render admin.
 - [ ] kiosk's local Request button hides/disables — kiosk still shows now-playing and QR (not blank).
@@ -199,6 +229,11 @@ Proves the 2026-07-22 bug: this combination used to hide the kiosk's own Request
 computation itself doesn't depend on transport, so this only needs one run — pick either transport,
 using kiosk admin plus whichever remote admin surface matches (render or wifi/hotspot).
 
+**Setup**: host platform per the reminder above — Local Only kiosk mode specifically (this is a
+Local-Only-only bug — `effective_stripe` is a no-op in the other two kiosk modes) — Stripe **ON**
+(raw), Bartender Pay **OFF** — either transport, one run, per the note above — any catalog, actively
+playing.
+
 - [ ] Bar in Local Only kiosk mode, Stripe toggle **ON** (raw), Bartender Pay **OFF**.
 - [ ] kiosk local Request button is **visible and usable** (not hidden) — this is the actual regression.
 - [ ] A request submitted this way auto-approves with no payment step and no approval wait — behaves as
@@ -215,10 +250,18 @@ Proves the 2026-07-30/31 outage-recovery feature end-to-end, including the surfa
 internet-transport scenario — the interesting part is render admin staying in control while the kiosk
 itself is locked, which only makes sense to test where render is actually the relevant remote surface.
 
+**Setup**: **Android only** (see the platform reminder above — iOS has no equivalent code path) —
+internet transport (structural) — **catalog must include real Spotify tracks, not a local-files-only
+catalog** — there's nothing to fail if nothing in the queue is ever routed through Spotify at all —
+Local+Remote or Local Only kiosk mode, either works — payment mode: mix of paid and free as the first
+step below establishes, not a precondition on its own.
+
 - [ ] Bar on internet transport. While Spotify is connected and stable, queue 2+ paid or
       free-approved requests into Up Next.
-- [ ] Force/observe a Spotify outage (3 consecutive no-device failures) — kiosk drops to the blocked
-      "ask staff" screen; confirm **all** customer interaction is blocked, only the Staff button is live.
+- [ ] Force/observe a Spotify outage (2 consecutive failures, any type/path — the design was
+      consolidated to a single shared counter 2026-08-08, see CLAUDE.md/item 12; a single isolated
+      failure now just marks+skips instead of escalating) — kiosk drops to the blocked "ask staff"
+      screen; confirm **all** customer interaction is blocked, only the Staff button is live.
 - [ ] While the kiosk is blocked: from **render admin/bartender**, confirm approve/deny/Cancel actions on
       *other* requests still work — the host's relay sync loop is not paused by the outage, only local
       playback is. (If this fails, that's a real gap: admin should not lose control just because
@@ -235,6 +278,13 @@ itself is locked, which only makes sense to test where render is actually the re
 
 Proves the `hostRegisterOnRelay`/`registerOnMap` split confirmed this session (§13's note).
 
+**Setup**: host platform per the reminder above — wifi/hotspot transport to start (the scenario
+switches to internet partway through, on the same bar) — device needs a genuine internet uplink even
+on wifi/hotspot (map registration is always-on regardless of transport, but still needs real
+connectivity to reach the relay) — **catalog should be a real, already-profiled playlist** (matching
+an existing Last.fm genre profile), not a synthetic test catalog with made-up artist names — the
+genre-coloring assertion is meaningless if there's no profile data to ever populate.
+
 - [ ] Host on wifi/hotspot transport (device has a real internet uplink), `listOnMap` **ON**.
 - [ ] Confirm the bar appears on `/discover` — name, location, playlist visible.
 - [ ] Confirm it shows **no genre coloring** in its pie chart (expected — no relay `BarSession` exists
@@ -247,6 +297,11 @@ Proves the `hostRegisterOnRelay`/`registerOnMap` split confirmed this session (�
 Proves the `require_approval`/`effective_stripe` computation genuinely re-evaluates and takes effect
 live, mid-session, not just at setup time — and that it's the combination of *both* being off (not
 either alone) that flips the mode.
+
+**Setup**: host platform per the reminder above — `require_approval` doesn't depend on transport
+(same reasoning as A6's `effective_stripe`), so one run on either transport is sufficient — Local+
+Remote kiosk mode (not Local Only, or Stripe would already read as inert regardless of its raw
+toggle — that's A6's scenario, don't conflate them) — any catalog, actively playing.
 
 - [ ] Start with Stripe **ON** and Bartender Pay **ON** (approval required either way).
 - [ ] From any admin surface, turn Stripe **OFF** alone.
