@@ -3,6 +3,13 @@
 Covers both host platforms (iOS `~/dev/giffy/JukeBar`, Android `~/dev/giffy/spotonjukebar`) and the
 relay (`jukebarweb`). Checkboxes are per-test; tag each run with the platform(s) it applies to.
 
+**This document is for developers/QA who already know the codebase** — it uses internal names
+(`AppState.swift`, `RelayService.kt`, `effective_stripe`, etc.) throughout. **For external/novice
+testers who need plain-English setup and pass/fail instructions with no code knowledge assumed**,
+see `docs/beta_tester_guide.md` instead — it covers the same 9 scenarios as section A below, each
+rewritten as a fully self-contained, standalone case (deliberately repetitive rather than
+cross-referenced, since a given tester may only ever read the one case they're assigned).
+
 **Conventions**
 - `[Both]` = run once per platform (iOS and Android), unless noted otherwise.
 - WiFi and Hotspot are tested as **one** case each below — same functional surface, different network setup.

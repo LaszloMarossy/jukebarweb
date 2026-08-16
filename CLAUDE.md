@@ -886,6 +886,34 @@ diffs spot-checked directly — confirmed the pairing/approve/deny/list code pat
 `WebApps/admin.html` call sites changed. No relay changes — this was purely a LAN-only asymmetry
 the relay never had in the first place.
 
+**Novice/external beta-tester guide added (2026-08-16), `docs/beta_tester_guide.md`.** User needs
+12 outside, non-developer testers to run through the request-flow scenarios — `testing.md`'s
+section A (9 end-to-end cross-surface scenarios) is written for developers and leans on internal
+names throughout (`AppState.swift`, `effective_stripe`, `desired_settings`, etc.), which isn't
+usable by someone with no codebase knowledge. Rather than multiple small per-case files (considered
+and explicitly rejected — user wants one file people can be handed a section of, not a folder to
+navigate), this is one document with 9 sections, each covering the same ground as testing.md's
+A1–A9 but **fully self-contained and deliberately repetitive** — a tester assigned one section
+should never need to read another section or scroll elsewhere for context, so setup steps are
+restated in full every time rather than cross-referenced. Every section follows the same shape:
+What You'll Need → Setup → What To Do → Success Looks Like → Something's Wrong If.
+
+**UI copy was verified against the actual code, not invented** — every button/toggle/label name
+quoted in the guide ("Stripe 💳", "Pay to bartender", "Accepting requests", "Local Only" / "Local +
+Remote" / "Remote Only", "Use Internet Mode", "Enter the admin PIN to continue", "Request", "Please
+ask staff for assistance", "Re-attach to Spotify", "Cancel", etc.) was grepped directly from
+`static/admin.html`/`static/customer.html` (platform-shared, so exact wording is trustworthy for
+any host) and Android's setup-wizard/kiosk Compose files. Where iOS's exact wizard copy wasn't
+independently verified with the same confidence, instructions were phrased descriptively rather
+than risk quoting wrong text to an iOS tester (e.g., "the screen where you choose how customers
+should connect" instead of assuming an exact iOS button label matches Android's).
+
+**Setup-flow accuracy, worth remembering**: kiosk display mode (Local Only / Local + Remote /
+Remote Only) has no live in-session toggle — changing it requires End Session + redoing setup from
+scratch (same fact already documented earlier in this file). The guide's kiosk-mode-switching steps
+(test cases 6 and 8) were written this way from the start after cross-checking against that
+existing note, not assumed.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
