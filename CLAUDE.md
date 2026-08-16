@@ -947,6 +947,49 @@ only render the editable name field in that case — when detection succeeds (th
 behavior now matches iOS exactly: green badge only, no redundant/editable duplicate. Android-only,
 no iOS or relay involvement (iOS was already correct). Build-verified.
 
+**Kiosk-native Admin screen brought to full parity between platforms (2026-08-16), both**
+**`AdminScreen.kt` and `AdminView.swift` — content/order/labels, not a visual redesign.** User
+audited the two screens side by side (this doubles as the wizard's SUMMARY step, since both
+platforms reuse the same live-admin composable there) and found several real divergences:
+
+1. **Section order didn't match, and neither matched the remote admin pages.** Payments, Requests,
+   and Bartender Access were scattered after Session/Setup on both platforms — nowhere near each
+   other. `static/admin.html`'s Actions tab already groups these three back-to-back (Payments →
+   Requests → Bartender Access). Both kiosk screens now use that same order, moved up to sit right
+   after the player-controls card, with Session and Setup pushed down below them.
+2. **iOS never showed kiosk display mode (Local Only / Local + Remote / Remote Only) anywhere on
+   the admin screen at all** — its Setup section had a row simply labeled "Mode," which is
+   actually *network* mode (wifi/hotspot/internet), not kiosk mode. This ambiguity is exactly what
+   led to the confusion in the first place — the user's own description of "where iOS shows kiosk
+   mode" pointed at this mislabeled row. Fixed two ways: renamed to "Network mode" (matching
+   Android's existing correct label) and added a genuinely new "Kiosk mode" row to the Session
+   section on iOS, matching Android's (which already had it, just needed to move — see above).
+3. **"For three" (iOS) vs "Bundle (3 songs)" (Android)** — unified on Android's clearer wording.
+4. **Session ID / Jukebar ID question — kept on both, deliberately not prominent.** These aren't
+   operationally useful to a bar owner day to day, but they're the one lightweight way to trace a
+   specific device/session against relay-side records if something needs debugging (e.g. during
+   beta testing with external testers who can't read logs themselves) — worth keeping for that
+   reason alone, at the low cost of two de-emphasized rows. Android didn't show them before; both
+   platforms now do, in the same truncated (`.take(8)`) style already used for other identifiers
+   on this screen.
+5. **Bartender Access status text didn't explain cause and effect.** Old copy ("no bartender QR
+   code or bartender page exists...") stated the *symptom* without saying *why*. Reworded on both
+   platforms to state the cause explicitly: "Off — no bartender PIN has been set, so no bartenders
+   can register or use the bartender page." / "On — a bartender PIN is set, so the bartender QR
+   code and page are active."
+6. **Android's "Generate Report Now" button was at the bottom of the Reports section, styled as an**
+   **outlined/ghost button** — unlike iOS, which already had it as the section's first row. Moved
+   to the top on Android (list of past reports now follows it, matching iOS's order) and restyled
+   to the same filled Coral button used for every other primary action on this screen (Save, Turn
+   Off, End Session) instead of the one-off outline style it had.
+
+Section title wording was also aligned where it had silently drifted (iOS's "Pricing & Payments" →
+"💳  Payments", "Bartender Access" → "🍸  Bartender Access", matching Android's emoji-prefixed
+titles exactly). Both platforms build-verified (`./gradlew :app:compileDebugKotlin`,
+`xcodebuild ... build`) and the full diffs spot-checked directly — confirmed final section order
+matches exactly (`grep`'d both files' card/section titles top to bottom) and that no functional
+logic (toggle handlers, report generation, QR generation) changed, only presentation/order/copy.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
