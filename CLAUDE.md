@@ -1020,6 +1020,24 @@ logic (toggle handlers, report generation, QR generation) changed, only presenta
 
 Both platforms build-verified. No relay changes.
 
+**Stripe publishable-key display fixed on both platforms (2026-08-16) — the displayed key looked**
+**like it "didn't match" what was typed, but the underlying data pipeline was fine.** User reported
+the key shown on Android didn't match what was set on the pricing wizard step. Traced the actual
+data flow (`PricingStep.kt`'s pre-filled/editable `stripePublishableKey` state → `onFinish` →
+`SetupWizardScreen.kt`'s `barDetails.copy(stripePublishableKey = stripePk, ...)` → `AdminScreen`'s
+`barDetails` param) before touching anything — no structural bug found there. The real cause:
+Android's display only ever showed the **last 6 characters** (`"pk_…${key.takeLast(6)}"`), which
+is close to impossible to visually cross-check against the full key on the previous screen. iOS
+showed more (first 14 chars) but still truncated, plus a separate "Secret key: ✓ Stored" row that
+added noise without telling the operator anything actionable. Since a *publishable* key is
+explicitly safe to expose — that's the entire reason Stripe calls it that, distinct from the
+secret key — there's no security reason to truncate it at all. Both platforms now show the full,
+untruncated publishable key as a plain caption under the Stripe toggle; the "Secret key: Stored"
+row is gone from iOS entirely (Android never had one). iOS kept its "⚠ No publishable key"
+warning (a genuinely actionable message, unlike the routine "stored" status) and added
+`.textSelection(.enabled)` so it can be long-pressed to copy/compare. Both platforms build-
+verified. No relay changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
