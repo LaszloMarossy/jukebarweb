@@ -990,6 +990,36 @@ titles exactly). Both platforms build-verified (`./gradlew :app:compileDebugKotl
 matches exactly (`grep`'d both files' card/section titles top to bottom) and that no functional
 logic (toggle handlers, report generation, QR generation) changed, only presentation/order/copy.
 
+**Admin screen parity follow-up (2026-08-16), both platforms — four more fixes found in the same**
+**audit pass as the section above.**
+
+1. **"Approve/deny... happen here in Admin" was factually wrong on the kiosk-native screens
+   specifically.** `AdminScreen.kt`/`AdminView.swift` have zero request-approval UI of their own
+   (confirmed elsewhere in this file: "Kiosk-native `AdminScreen.kt` has zero request-status
+   display of any kind... LAN and render admin.html are the intended bartender-facing surfaces")
+   — so when Bartender Access is off, approve/deny does NOT happen "here" on this exact screen,
+   it happens on whichever Admin page (LAN or render) is actually connected to the kiosk. Fixed on
+   both platforms: "Approve/deny/settings happen on the Admin pages connected to this kiosk
+   instead." `static/admin.html`'s identical-looking copy was deliberately left unchanged — "here
+   in Admin" is accurate there, since that page genuinely is where the action happens.
+2. **iOS never showed the bar's own name anywhere on the admin screen — not in Session, not in the
+   header, nowhere.** Android's header already does (logo + "JukeBar" + bar name + "· Admin," a
+   custom Compose Row). Added the same content to iOS via a `.principal` toolbar item (SwiftUI's
+   `NavigationStack`/`Form` combo doesn't support a rich custom title the way Android's plain
+   `Column` header does, so this is the closest equivalent — reused the exact same
+   `GrapefruitLogoView`/`RainbowText` views the app's own setup-wizard screens already use for
+   their headers, not new components) — `.navigationTitle("Admin")` kept alongside it purely for
+   VoiceOver, since the principal view is what actually renders.
+3. **Once the bar name is in the header on both platforms, the "Bar" row in the Session section is
+   redundant** — removed from Android (which had it in both places); iOS never had it duplicated
+   to begin with, so no change needed there beyond not adding it.
+4. **Android's Refresh Catalog button was a one-off tonal/light-Coral style** — every other
+   primary action on this screen (Save, Turn Off, End Session, Generate Report Now) uses solid
+   filled Coral with black text. Unified to match; iOS's equivalent buttons were already
+   self-consistent (plain default Form-row style throughout) and didn't need a change.
+
+Both platforms build-verified. No relay changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
