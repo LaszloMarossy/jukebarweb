@@ -1031,12 +1031,16 @@ is close to impossible to visually cross-check against the full key on the previ
 showed more (first 14 chars) but still truncated, plus a separate "Secret key: ✓ Stored" row that
 added noise without telling the operator anything actionable. Since a *publishable* key is
 explicitly safe to expose — that's the entire reason Stripe calls it that, distinct from the
-secret key — there's no security reason to truncate it at all. Both platforms now show the full,
-untruncated publishable key as a plain caption under the Stripe toggle; the "Secret key: Stored"
-row is gone from iOS entirely (Android never had one). iOS kept its "⚠ No publishable key"
-warning (a genuinely actionable message, unlike the routine "stored" status) and added
-`.textSelection(.enabled)` so it can be long-pressed to copy/compare. Both platforms build-
-verified. No relay changes.
+secret key. Both platforms briefly showed the full, untruncated key as a plain caption under the
+Stripe toggle — **corrected same day**: the full key doesn't fit on a narrower device at this font
+size, wrapping/truncating unpredictably (this is what actually produced the "pk_ … end-of-key"
+layout the user then noticed on Android). Settled on first 15 characters + "…" on both platforms
+(`key.take(15)` / `pk.prefix(15)`, identical truncation point) — long enough to visually confirm
+against the pricing step's value (distinguishing test/live and catching a wrong paste), short
+enough to always fit on one line. The "Secret key: Stored" row is still gone from iOS entirely
+(Android never had one). iOS kept its "⚠ No publishable key" warning (a genuinely actionable
+message, unlike the routine "stored" status) and `.textSelection(.enabled)` so the truncated key
+can still be long-pressed to copy/compare. Both platforms build-verified. No relay changes.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
