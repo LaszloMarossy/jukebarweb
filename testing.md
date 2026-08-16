@@ -50,6 +50,18 @@ so it's the only surface that can validly appear alongside *either* branch. Wher
 running on both transports, it says so explicitly with two branches — don't mix wifi/hotspot and render
 surfaces into one "simultaneous" checklist for a single session.
 
+**Platform reminder, same idea, different dimension**: "the host" in every scenario below is either the
+iOS app or the Android app — never both at once, and their settings-propagation/request-lifecycle/
+effective-value logic is implemented **independently** (`AppState.swift`+`LocalServer.swift` vs
+`MainActivity.kt`+`RelayService.kt`+`LocalServer.kt`), so a pass on one platform is not evidence the
+other works — this session alone found several real platform-specific divergences (Android's PIN
+plaintext-vs-hash gap, Android's `jsonError()` missing status branches). **Unless a scenario says
+otherwise, run it once per host platform, as two independent passes** — same convention as the
+`[Both]` tag used throughout sections 1–15, just not repeated inline here for every scenario. A2 is
+platform-specific by construction (the bug it regression-tests lived in Android's `RelayService.kt`
+only — see its own note); A7 is Android-only because iOS has no Spotify-outage-equivalent code path
+at all (confirmed architectural, not unverified — see testing.md §8 and CLAUDE.md).
+
 ### A1. Settings toggle propagates to every surface, with correct lock/unlock timing
 
 Proves: `desired_settings` single-slot propagation (`CLAUDE.md` — settings section).
@@ -81,6 +93,12 @@ Proves: host-is-source-of-truth request lifecycle + the kiosk-origin Cancel bug 
 scenario is internet-transport-specific by nature — the bug it guards against only existed in the
 relay-mediated action path (`RelayService`'s action queue); wifi/hotspot Cancel applies directly to
 host state via `LocalServer`, a different code path entirely that never had this bug.
+
+**Platform note**: the specific bug this regression-tests was Android-only (`RelayService.kt`'s
+action-queue handling) — if only one platform can be run, prioritize Android. But the general
+capability (Cancel pulling a song out of the live playback queue) exists on iOS too via
+`MusicService.cancelRequest()`, so run this on iOS as well when possible rather than assuming a
+clean Android pass covers it.
 
 - [ ] Bar in free/auto-accept mode, Local+Remote or Local Only kiosk mode, **internet transport**.
 - [ ] Submit a request via the **kiosk's own local Request button** (not a web surface).
