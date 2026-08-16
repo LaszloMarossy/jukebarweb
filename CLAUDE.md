@@ -932,6 +932,21 @@ operator-facing bug, not cosmetic verbosity — a bar owner reading the old copy
 have believed Local Only forced auto-accept and picked "Pay to bartender" thinking it wouldn't
 actually apply.
 
+**Android's Bar WiFi setup card duplicated the detected network name in a redundant, editable**
+**field — found and fixed 2026-08-16.** User noticed the WiFi step showed the joined network in
+green (correct, matches iOS) but Android *also* showed a separate, editable "WiFi network name"
+text field pre-filled with the same value — implying the two might legitimately diverge, when
+they shouldn't. iOS's equivalent card (`NetworkGateView.swift`'s `wifiCard`) never shows an
+editable field at all, only the green detected-network badge plus a password field. Checked why
+Android has the field before just deleting it to match: `wifiStatus()`'s own comment explains SSID
+detection genuinely can fail on Android without `ACCESS_WIFI_STATE`/location permission (iOS
+doesn't have this failure mode) — so the field isn't pure duplication, it's an undifferentiated
+fallback shown unconditionally instead of only when actually needed. Fixed
+`NetworkModeStep.kt` to compute `ssidDetectionFailed = wifiConnected && detectedSsid == null` and
+only render the editable name field in that case — when detection succeeds (the common case),
+behavior now matches iOS exactly: green badge only, no redundant/editable duplicate. Android-only,
+no iOS or relay involvement (iOS was already correct). Build-verified.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
