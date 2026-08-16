@@ -1042,6 +1042,41 @@ enough to always fit on one line. The "Secret key: Stored" row is still gone fro
 message, unlike the routine "stored" status) and `.textSelection(.enabled)` so the truncated key
 can still be long-pressed to copy/compare. Both platforms build-verified. No relay changes.
 
+**Kiosk lock-to-app, item 14 follow-up (2026-08-16), Android only: re-lock after an unpin,**
+**without restarting the app or session.** User noticed the standard Android unpin gesture (hold
+Back+Overview, or swipe-up-hold on gesture nav) works for anyone, not just staff — the original
+item 14 design already documented this as the ceiling of what `startLockTask()`-only pinning can
+do without Device Owner provisioning, but hadn't built a mitigation. Two real Android platform
+facts surfaced while building this, both confirmed directly rather than assumed after the first
+one turned out wrong:
+
+- **`Activity.onLockTaskModeChanged(Int)` does not exist.** Checked directly against the compileSdk
+  36 stubs via `javap` — `Activity` only exposes `startLockTask()`/`stopLockTask()`/
+  `showLockTaskEscapeMessage()`, no mode-changed callback at all. (This was a wrong recollection on
+  my part — worth remembering not to assume a plausible-sounding Android API exists without
+  checking, same lesson as elsewhere in this file about not trusting memory over the current
+  state of things.)
+- **`DevicePolicyManager.ACTION_LOCK_TASK_ENTERING`/`ACTION_LOCK_TASK_EXITING` exist but are**
+  **`@SystemApi`-restricted** — present in the stub jar's bytecode (hence visible to `javap`) but
+  genuinely unusable from a normal third-party app; referencing either produces a real "Unresolved
+  reference" compile error, not just a runtime permission issue.
+
+With no callback or broadcast available, the actual mechanism is **polling**
+`ActivityManager.lockTaskModeState` once a second inside the existing pinning `LaunchedEffect`
+(`MainActivity.kt`) — at a 1s interval this is indistinguishable from a true callback in practice,
+since whoever did the unpin gesture is bounced into a full-screen block (`KioskUnpinnedScreen`,
+new in `KioskView.kt`, styled identically to the existing `SpotifyOutageScreen` block-and-recover
+pattern) well before they could realistically reach the home screen or another app. Re-entering
+the admin PIN there calls `updateLockTaskPinning(true)` to re-pin immediately — genuinely no app
+or session restart needed, which was the second half of the ask. Made `kioskUnpinned` itself a key
+on the `LaunchedEffect` (alongside the existing `isSetupComplete`/`kioskMode` keys) specifically so
+clearing it (via a correct PIN) restarts the effect and resumes polling for the *next* unpin — the
+first draft only polled once per session and would have silently stopped protecting the kiosk
+after the first recovery. iOS is untouched — same hard platform asymmetry as the rest of item 14
+(no programmatic Guided Access trigger or equivalent state-change signal exists on that platform
+at all, so there's nothing to build there). Build-verified
+(`./gradlew :app:compileDebugKotlin`). No relay changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

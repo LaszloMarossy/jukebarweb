@@ -892,6 +892,35 @@ requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.
         appears on these two cards regardless of whether Screen Pinning happens to already be
         enabled in Settings (there's no API to check, so don't expect or require it to hide itself —
         that's expected platform-limited behavior, not a bug)
+
+### Kiosk re-lock after unpin (new 2026-08-16, item 14 follow-up) — Android only
+
+**Setup**: Android host, `localOnly` or `localAndRemote` kiosk mode, kiosk launched and pinned.
+No iOS equivalent exists to test — see CLAUDE.md for why (no programmatic Guided Access trigger or
+comparable state-change signal on that platform at all).
+
+- [ ] While pinned, perform the standard unpin gesture (back+overview held, or swipe-up-and-hold on
+      gesture nav). Confirm within ~1 second the screen is replaced by "Kiosk Unpinned" with an
+      "Admin PIN" button — not the home screen, app switcher, or any other app, even briefly.
+- [ ] Confirm no interaction with the underlying kiosk (now-playing, Up Next, Request button) is
+      possible while this screen is up — it's a full block, same as the existing Spotify-outage
+      screen's pattern.
+- [ ] Tap "Admin PIN," enter the correct PIN — confirm the device re-pins (the standard unpin
+      gesture is required again to leave) **without the app restarting or the session/queue being
+      affected in any way** — Up Next, now-playing, and all settings should be exactly as they were
+      the moment before the unpin gesture.
+- [ ] "Forgot PIN?" from this screen still works (device-biometric-gated reset, same as the regular
+      admin-unlock and Spotify-outage-recovery PIN entry points) — confirm it also re-pins on success,
+      not just the normal-PIN path.
+- [ ] **Repeat the whole unpin → re-pin cycle a second time in the same session** — this is the
+      specific regression the first draft of this feature had: polling only ran once per session and
+      silently stopped protecting the kiosk after the first recovery. Confirm the second unpin is
+      caught just as reliably as the first.
+- [ ] `remoteOnly` mode, or kiosk not yet launched: confirm this mechanism never engages at all —
+      same scope as the base pinning feature above, nothing new to break here.
+- [ ] End Session while `KioskUnpinnedScreen` is showing (if reachable) or immediately after
+      recovering from it — confirm the wizard restart flow is unaffected, no leftover blocked state
+      carries into the next setup pass.
   - [ ] Remote Only's card has no such advisory on either platform
 
 ### Android: empty admin PIN bypass (new 2026-08-02, item 3) — was a real reachable bug, now fixed
