@@ -1105,6 +1105,46 @@ equivalent lockdown mechanism, already has its own built-in exit-passcode gate a
 of turning it on, so the same underlying concern is already covered there once an operator follows
 the existing Guided Access advisory — no parallel change needed. Build-verified.
 
+**Device Protection: force-lock on exit, in every kiosk mode (2026-08-16), Android only.** User
+clarified the actual threat model behind the device lock-screen advisory above: not "someone puts
+the screen to sleep," but "someone exits the pinned app — by any means, unpinning or otherwise —
+and then has unsupervised access to the device's home screen and Settings." The app-level PIN
+screen from earlier the same day doesn't solve this: it can only ever show while the app is in the
+foreground, so if someone leaves without ever returning to it, that screen never appears at all.
+Explicitly requested this apply **even in `remoteOnly` mode** — unauthorized physical access is a
+concern regardless of whether customers were ever meant to touch the screen.
+
+The real mechanism is `DevicePolicyManager.lockNow()`, called from `Activity.onStop()` — which
+fires the instant the Activity leaves the foreground for *any* reason (unpinning, Home, recent-
+apps switch), unlike the Screen Pinning watch loop above which only reacts to a specific gesture.
+`lockNow()` requires the app to be an active **Device Administrator** — the lightweight, standard
+Android permission grantable via a one-time system consent dialog
+(`Settings.ACTION_ADD_DEVICE_ADMIN`), explicitly not Device Owner/MDM provisioning, which stays
+out of scope everywhere else in this feature. New `KioskDeviceAdminReceiver` (a minimal
+`DeviceAdminReceiver`, only declares the `force-lock` policy — no password-quality control, no
+remote wipe, nothing else requested) registered in the manifest; `onStop()` calls `lockNow()`
+whenever the kiosk is live (`isSetupComplete`, no kiosk-mode filter at all — deliberately broader
+than Screen Pinning's scope) and the admin is confirmed active.
+
+New "🔒 Device Protection" card in `AdminScreen.kt` (placed right after Bartender Access, in the
+same security-cluster group moved up earlier this session) shows current status and an
+Enable/Turn Off button. Also checks `KeyguardManager.isDeviceSecure()` and shows a warning if the
+device has no lock-screen credential of its own — `lockNow()` does nothing meaningful without one,
+same dependency as the wizard advisory added earlier the same day. No direct callback exists for
+"the system consent screen just closed," so status re-checks on every `ON_RESUME` via a
+`LifecycleEventObserver` — standard pattern for a permission/settings screen with no result
+callback, first use of this specific idiom in the codebase.
+
+**Caught and fixed one real XML gotcha before it shipped**: both the manifest comment and the new
+`device_admin_policies.xml`'s comment originally used `--` as a plain-prose em-dash substitute
+(this session's own writing convention elsewhere) — but a literal `--` inside an XML comment is
+invalid and fails resource/manifest parsing outright. `./gradlew :app:compileDebugKotlin` alone
+didn't catch this (Kotlin compiles fine regardless of XML validity); `:app:assembleDebug` did,
+which is why that was run as the final check here rather than stopping at the Kotlin-only build
+this session otherwise defaults to. Fixed by using a real em dash character instead. No relay or
+iOS changes — iOS has no equivalent Device Administrator concept to build against, consistent with
+the rest of item 14's platform asymmetry.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

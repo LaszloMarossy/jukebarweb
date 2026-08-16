@@ -933,6 +933,36 @@ comparable state-change signal on that platform at all).
       the Screen Pinning recommendation now also includes a line recommending a device lock-screen
       PIN/pattern be set — this is a docs/copy check only, not a functional gate (the app has no way
       to detect or enforce the device's own lock-screen state).
+
+### Device Protection: force-lock on exit (new 2026-08-16, item 14 follow-up) — Android only
+
+**Setup**: Android host, device has its own lock-screen PIN/pattern already set (required for this
+to be observable at all — see the warning-banner test below for the no-credential case), any kiosk
+mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
+
+- [ ] On the admin screen (kiosk-native, reachable from the wizard's Summary step or live during a
+      session), find the new "🔒 Device Protection" card. Confirm it starts **Off**.
+- [ ] Tap "Enable Device Protection" — confirm the real Android system consent dialog appears
+      ("Activate this device admin app?"), not anything built by this app. Approve it.
+- [ ] Confirm the card flips to **On** shortly after returning to the app (no manual refresh/tab
+      switch should be needed — this is checking the resume-triggered re-check works).
+- [ ] With it On, launch the kiosk (if not already) and press the physical Home button (or switch
+      to another app via recents) — confirm the device's **screen locks immediately**, requiring the
+      device's own PIN/pattern to get back in, landing back in the still-live kiosk once unlocked.
+- [ ] **Confirm this works in `remoteOnly` mode specifically** — this is the scope this item was
+      explicitly built to cover, unlike Screen Pinning above which deliberately excludes that mode.
+- [ ] Confirm it also fires from the **unpin gesture** itself, not just Home/recents — unpinning
+      should immediately force-lock the screen too, on top of (not instead of) the existing
+      `KioskUnpinnedScreen` recovery flow from the section above.
+- [ ] Tap "Turn Off Device Protection" — confirm the card returns to Off, and confirm Home/recents/
+      unpin no longer force-locks the screen afterward (only the existing Screen-Pinning-specific
+      behaviors, if any, should remain).
+- [ ] **No device lock-screen credential set**: with Device Protection On but the device itself has
+      no PIN/pattern/password configured, confirm the card shows the "⚠ This device has no lock
+      screen PIN or pattern" warning — and confirm (expected, not a bug) that exiting the kiosk in
+      this state does *not* actually protect anything, since `lockNow()` has nothing to lock into.
+- [ ] Confirm granting/toggling this has no effect on Screen Pinning itself (the two are independent
+      mechanisms) — pinning still needs to be separately engaged per the section above.
   - [ ] Remote Only's card has no such advisory on either platform
 
 ### Android: empty admin PIN bypass (new 2026-08-02, item 3) — was a real reachable bug, now fixed
