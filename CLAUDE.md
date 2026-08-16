@@ -1077,6 +1077,34 @@ after the first recovery. iOS is untouched — same hard platform asymmetry as t
 at all, so there's nothing to build there). Build-verified
 (`./gradlew :app:compileDebugKotlin`). No relay changes.
 
+**Kiosk re-lock: false-positive fixed + device lock-screen advisory added (2026-08-16, same day**
+**as the feature above), Android only.** User caught a real regression live, minutes after the
+re-lock feature shipped: after finishing the wizard and tapping "Launch Kiosk," the device
+genuinely pinned (OS confirmed it), but the app flipped into `KioskUnpinnedScreen` about a second
+later anyway — a false positive, not a real unpin. Root cause: the polling loop's first check ran
+exactly at the 1s mark, and `startLockTask()` doesn't take effect instantly — the very first time
+a device ever pins, Android shows a one-time "Screen pinned" system tutorial that can push the
+actual `lockTaskModeState` transition out past a single 1-second check. Fixed by splitting the
+effect into two phases: a warm-up loop (up to 5s, checking every 500ms) that waits for pinning to
+be genuinely confirmed before ever starting to watch for an unpin, followed by the steady-state
+1s watch loop from before. If warm-up never confirms pinning at all (OEM restriction, etc.), the
+effect exits quietly rather than showing a false unpin prompt for something that was never pinned
+— `updateLockTaskPinning()` already logs that failure separately.
+
+Same message also raised a second, distinct point: even with pinning working perfectly, the kiosk
+keeps the screen on indefinitely (`FLAG_KEEP_SCREEN_ON`, unrelated to lock-task mode) — but a
+bystander can still manually sleep the screen with the physical power button, which
+`FLAG_KEEP_SCREEN_ON` does nothing to prevent. Without a device-level lock-screen credential,
+waking it back up lands directly back in the (still-pinned) kiosk with no gate in between; with
+one, waking requires passing the OS's own lock screen first — a real, independent security
+boundary neither `startLockTask()` nor this session's app-level PIN-recovery screen can provide on
+their own. Added a matching recommendation to the same wizard advisory that already recommends
+enabling Screen Pinning (`DisplayModeStep.kt`'s Local Only / Local + Remote cards) — same
+placement, same "why" framing. iOS not touched for this specific point: Guided Access, iOS's
+equivalent lockdown mechanism, already has its own built-in exit-passcode gate as an inherent part
+of turning it on, so the same underlying concern is already covered there once an operator follows
+the existing Guided Access advisory — no parallel change needed. Build-verified.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

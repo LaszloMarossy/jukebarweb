@@ -921,6 +921,18 @@ comparable state-change signal on that platform at all).
 - [ ] End Session while `KioskUnpinnedScreen` is showing (if reachable) or immediately after
       recovering from it — confirm the wizard restart flow is unaffected, no leftover blocked state
       carries into the next setup pass.
+- [ ] **Regression, fixed same day it shipped**: tap "Launch Kiosk" at the end of setup and watch
+      closely for the first ~5 seconds — confirm the kiosk view stays up normally and
+      `KioskUnpinnedScreen` does **not** appear on its own. This is the specific false-positive the
+      user caught live: the very first pin on a device (before Android's one-time "Screen pinned"
+      tutorial has ever shown) can take longer than 1 second to actually register, and the original
+      polling loop's first check fired too early, misreading "not yet pinned" as "was unpinned."
+      Most reliable repro: a device/emulator where Screen Pinning has never been used before, or
+      right after clearing the app's data.
+- [ ] **Device lock-screen advisory**: on the Local Only and Local + Remote wizard cards, confirm
+      the Screen Pinning recommendation now also includes a line recommending a device lock-screen
+      PIN/pattern be set — this is a docs/copy check only, not a functional gate (the app has no way
+      to detect or enforce the device's own lock-screen state).
   - [ ] Remote Only's card has no such advisory on either platform
 
 ### Android: empty admin PIN bypass (new 2026-08-02, item 3) — was a real reachable bug, now fixed
