@@ -887,12 +887,12 @@ diffs spot-checked directly — confirmed the pairing/approve/deny/list code pat
 the relay never had in the first place.
 
 **Novice/external beta-tester guide added (2026-08-16), `docs/beta_tester_guide.md`.** User needs
-12 outside, non-developer testers to run through the request-flow scenarios — `testing.md`'s
+12 outside, non-developer testers to run through the request-flow scenarios — `docs/full_system_test_plan.md`'s
 section A (9 end-to-end cross-surface scenarios) is written for developers and leans on internal
 names throughout (`AppState.swift`, `effective_stripe`, `desired_settings`, etc.), which isn't
 usable by someone with no codebase knowledge. Rather than multiple small per-case files (considered
 and explicitly rejected — user wants one file people can be handed a section of, not a folder to
-navigate), this is one document with 9 sections, each covering the same ground as testing.md's
+navigate), this is one document with 9 sections, each covering the same ground as `docs/full_system_test_plan.md`'s
 A1–A9 but **fully self-contained and deliberately repetitive** — a tester assigned one section
 should never need to read another section or scroll elsewhere for context, so setup steps are
 restated in full every time rather than cross-referenced. Every section follows the same shape:

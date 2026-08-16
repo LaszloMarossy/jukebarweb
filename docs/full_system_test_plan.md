@@ -67,7 +67,7 @@ otherwise, run it once per host platform, as two independent passes** — same c
 `[Both]` tag used throughout sections 1–15, just not repeated inline here for every scenario. A2 is
 platform-specific by construction (the bug it regression-tests lived in Android's `RelayService.kt`
 only — see its own note); A7 is Android-only because iOS has no Spotify-outage-equivalent code path
-at all (confirmed architectural, not unverified — see testing.md §8 and CLAUDE.md).
+at all (confirmed architectural, not unverified — see §8 and CLAUDE.md).
 
 ### A1. Settings toggle propagates to every surface, with correct lock/unlock timing
 
