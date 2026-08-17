@@ -390,3 +390,15 @@ Android was already correct (in-memory append-ordered list, no sort needed). Fou
 iOS while checking: its list came from a filesystem directory listing with no guaranteed order at
 all — added an explicit sort. Been silently unordered since the Sessions tab shipped 2026-08-02,
 never caught before.
+
+## 2026-08-17 — Bartender's own name now shown on their own screen; "Updated" moved off the header
+
+User's live-testing round on render (names propagate to admin, multiple bartenders login, Kill
+works) surfaced two gaps: "the bartender's name is NOT displayed on their own screen... right after
+[bar name] - [bartender name]; use diff color... the text Updated [datetime]... should go onto the
+scrollable area top... make sure you do these changes also to the lan-based bartender/admin pages."
+Fixed on all three: render's previously-hidden `.header-role` div now shows the bartender's own
+name in the existing peach accent color, and its "Updated" badge moved into the scrollable
+requests pane. LAN's "Updated" was already correctly placed (confirmed by reading the code, not
+assumed) — only the name-display gap needed fixing there, via a new `name` field on both LAN
+platforms' pair/status responses.

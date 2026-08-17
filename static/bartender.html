@@ -106,9 +106,12 @@
       font-family: 'Bubblegum Sans', cursive;
       font-size: clamp(18px, 4dvh, 32px); line-height: 1.1;
     }
-    .header-role { display: none; }
+    .header-role {
+      font-size: 14px; font-weight: 600; color: var(--accent); margin-top: 1px;
+    }
     .refresh-badge {
       font-size: 11px; color: var(--muted); white-space: nowrap;
+      display: block; margin-bottom: 10px;
     }
 
     /* ── now playing ── */
@@ -283,9 +286,8 @@
     </svg>
     <div class="header-info">
       <div class="bar-name" id="bar-name">JukeBar</div>
-      <div class="header-role">Bartender</div>
+      <div class="header-role" id="header-role"></div>
     </div>
-    <div class="refresh-badge" id="refresh-badge"></div>
   </div>
 
   <div class="tabs">
@@ -315,6 +317,7 @@
   </div>
 
   <div id="requests-pane">
+    <div class="refresh-badge" id="refresh-badge"></div>
     <div class="now-playing-card">
       <div class="np-label">Now Playing</div>
       <div class="np-row">
@@ -376,6 +379,8 @@ async function boot() {
   const cachedToken = sessionStorage.getItem(authKey);
   if (cachedToken) {
     S.token = cachedToken;
+    S.bartenderName = sessionStorage.getItem(`jb_name_${S.jukebarId}_${S.session}`) || 'Bartender';
+    $('header-role').textContent = `– ${S.bartenderName}`;
     await startMain();
   } else {
     showScreen('s-pin');
@@ -429,6 +434,9 @@ async function verifyPin() {
 
     const authData = await res.json();
     S.token = authData.token;
+    S.bartenderName = name;
+    sessionStorage.setItem(`jb_name_${S.jukebarId}_${S.session}`, name);
+    $('header-role').textContent = `– ${name}`;
     // Cache so they don't have to re-enter on refresh (cleared when tab closes)
     sessionStorage.setItem(`jb_auth_${S.jukebarId}_${S.session}`, S.token);
     await startMain();

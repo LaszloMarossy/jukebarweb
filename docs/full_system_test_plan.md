@@ -778,14 +778,33 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
       with the new PIN succeeded (so the PIN/pairing mechanics work end-to-end) — but this doesn't
       confirm the actual "QR/URL appears" wording in this checkbox, which is false on render/LAN as
       written. Other 4 surfaces (kiosk-native ×2, LAN admin.html ×2) not yet tested.
-- [ ] **New (2026-08-17): render `bartender.html` now asks for a name before the PIN**, matching
+- [X] **New (2026-08-17): render `bartender.html` now asks for a name before the PIN**, matching
       LAN's existing "Your name" field — previously it only sent `{pin_hash, role}`, so every
       internet-authenticated bartender showed up identically as the literal string "Bartender" on
       the Sessions tab, making Kill impossible to target correctly with 2+ bartenders logged in.
       Confirm: the name field is optional (leaving it blank still logs in, defaulting server-side to
       "Bartender" — same fallback the backend already had); a name typed here shows up correctly in
       the render admin.html Sessions tab's session list; a failed PIN attempt preserves the typed
-      name rather than clearing it (matches LAN's behavior for a failed attempt).
+      name rather than clearing it (matches LAN's behavior for a failed attempt). **Verified
+      2026-08-17** — user confirmed names pass through to the remote admin screen correctly on
+      render. LAN not separately re-confirmed this round (already covered by the original PIN-split
+      field addition, not new this pass).
+- [ ] **New (2026-08-17): the bartender's own name now shows on their own bartender.html screen**,
+      all 3 surfaces (render, LAN both platforms) — previously the typed name went to the server and
+      showed on the admin Sessions tab, but the bartender never saw their own name reflected back on
+      their own device at all. Log in/pair, confirm the header shows "[bar name] – [bartender name]"
+      (the bartender name in a visually distinct color from the bar name/title) right after signing
+      in, and that it persists correctly across a page reload (cached-session reconnect path, not
+      just the fresh-login path).
+  - [ ] Render specifically: confirm this also survives the sessionStorage-cached-token reload path
+        (close and reopen the tab without a fresh PIN entry) — the name is cached alongside the
+        token, not re-fetched from the server on reconnect.
+- [ ] **New (2026-08-17): the "Updated [time]" timestamp moved into the scrollable content area**,
+      off the fixed header, render `bartender.html` only (LAN's was already correctly placed there,
+      confirmed by reading the code, not moved — see CLAUDE.md for why LAN didn't need this fix).
+      Confirm on render: the timestamp no longer appears next to the bar/bartender name in the
+      sticky header, and instead appears at the top of the Requests pane, scrolling away with the
+      rest of the content as expected rather than staying pinned.
 - [ ] **Propagation round-trip, render specifically**: set the bartender PIN from render admin.html
       while the host is running — confirm it lands in the relay's `desired_settings` immediately
       (control shows "pending"/greyed), then clears once the host's next sync echoes it back, and the
@@ -856,18 +875,25 @@ wait, not a defense mechanism itself.
       on iOS specifically (unordered filesystem directory listing), fixed same day as this checkbox
       was added; Android was already correct by construction.
 
-- [ ] Pair 2+ bartenders (different names/devices if possible), open the Sessions tab on each of
+- [X] Pair 2+ bartenders (different names/devices if possible), open the Sessions tab on each of
       the 3 admin surfaces — each shows every currently-paired bartender for **that surface's own**
       transport (LAN sessions and render sessions are separate pools — a bartender paired via LAN
-      never appears in render's list or vice versa, confirmed by design, not a bug)
+      never appears in render's list or vice versa, confirmed by design, not a bug). **Partially
+      verified 2026-08-17** — user confirmed multiple bartenders can log into the same bar on
+      render. Cross-surface isolation (LAN sessions not appearing in render's list) not separately
+      re-confirmed this round.
 - [ ] Fail a bartender PIN 1-2 times (not enough to lock out) from one IP — that IP appears in
       Waiting to Retry with the correct attempt count and "not waiting yet" status, plus the name
       that was typed on the last failed attempt
 - [ ] Fail 3 times to trigger the wait — same row now shows "waiting" with a counting-down
       remaining time
-- [ ] **Kill a session**: confirm dialog fires, declining the "also change PIN" follow-up prompt
+- [X] **Kill a session**: confirm dialog fires, declining the "also change PIN" follow-up prompt
       still kills the session — that bartender's next poll gets logged out (session/pair screen
-      reappears with an explanatory message, not a frozen stale UI) within one poll interval
+      reappears with an explanatory message, not a frozen stale UI) within one poll interval.
+      **Partially verified 2026-08-17** — user confirmed on render that killing a specific
+      bartender's session correctly logs that bartender out. The specific "declining the PIN-change
+      prompt still kills" branch wasn't separately isolated this round (see the bundled-accept
+      variant below, which was).
 - [X] **Kill + bundled PIN change**: accept the "also change PIN" prompt, enter a new PIN — confirm
       BOTH happen: the killed bartender is logged out AND the old PIN no longer works for a fresh
       pairing attempt (new PIN required). **Verified 2026-08-17** — user confirmed both prompts

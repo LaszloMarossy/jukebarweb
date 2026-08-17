@@ -1559,6 +1559,42 @@ and the user's request was specific to sessions.
 All three platforms build/import-verified (`xcodebuild ... build`, `:app:compileDebugKotlin`,
 direct Python import with the new `qrcode` dependency installed).
 
+**Bartender's own name shown on their own bartender.html screen; "Updated" timestamp relocated out**
+**of the header (2026-08-17), all three surfaces.** User's round of live testing on render (names
+propagate to admin, multiple bartenders can log in, Kill works) surfaced two real gaps: "the
+bartender's name is NOT displayed on their own screen - it should - right after [bar name] -
+[bartender name]; use diff color for bartender name; the text Updated [datetime] next to bar and
+bartender name should go onto the scrollable area top... make sure you do these changes also to the
+lan-based bartender/admin pages."
+
+- **Render `bartender.html`**: `.header-role` (an existing but `display: none`'d div right below
+  the bar name) was repurposed to show the bartender's own name in the peach accent color
+  (`var(--accent)`) instead of staying hidden — set from `verifyPin()`'s already-known `name`
+  variable at login (no server round-trip needed, the client already sent it), and persisted
+  alongside the cached auth token in `sessionStorage` (`jb_name_{id}_{session}`) so it survives the
+  cached-token reconnect path on page reload, not just a fresh login. The `.refresh-badge`
+  ("Updated [time]") moved from the sticky `.header` into `#requests-pane` as its first child —
+  previously pinned next to the bar name permanently, now scrolls away with the rest of the content
+  like everywhere else in this app's design language.
+- **iOS/Android LAN `bartender.html`**: structurally different from render's (no persistent
+  sticky-header timestamp to move at all — `#last-refresh` was *already* inside the scrollable
+  `.refresh-row`/`#reqs-pane`, confirmed by reading the code before assuming a fix was needed, so
+  the "Updated" part of this request needed zero changes on either LAN page). The name-display part
+  did need fixing: `#header-sub` existed but was actively cleared to empty on iOS
+  (`subEl.textContent = ''`) and only ever showed the bar name (not the bartender's own name) on
+  Android. Both platforms' `/api/bartender/pair` and `/api/bartender/status` responses gained a new
+  `"name"` field (previously the server already stored the paired bartender's name but never
+  returned it to that same bartender's own client) — iOS's `updateHeaderTitle()` now sets
+  `#header-sub` to `– {name}` instead of clearing it; Android's appends `– {name}` after the
+  existing bar-name text it was already showing there. Both reuse `header p`'s pre-existing peach
+  color (`#fbbe84`) — already visually distinct from the white/rainbow title, so no new styling
+  needed to satisfy "use diff color."
+
+All three build/compile-verified (`xcodebuild ... build`, `:app:compileDebugKotlin`; render is
+static HTML/JS, reviewed directly). No relay Python changes — `main.py`'s `bar_authenticate()`
+already accepted and stored `name` from the earlier same-day fix, this pass only touched what the
+client displays with it.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
