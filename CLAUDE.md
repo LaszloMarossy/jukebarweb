@@ -1274,6 +1274,25 @@ can ever detect and react to Guided Access state, once the kiosk is actually run
 via `xcodebuild ... build` (clean). No relay or Android changes — Android has no Guided Access
 equivalent to mirror this into.
 
+**"Both off = free" explanation made always-visible on every Payments surface (2026-08-17), all**
+**three repos.** The "Both off — all requests auto-accepted for free" line already existed
+everywhere (kiosk-native `AdminScreen.kt`/`AdminView.swift`, `static/admin.html`,
+`static/bartender.html`) but was purely reactive — CSS/Compose-conditional on the toggles already
+both being off, so an operator only ever saw it *after* leaving both off, never as a heads-up
+beforehand. First reported as "I don't see this text anywhere" (kiosk screens), which traced to
+this exact conditional gating, not a missing feature or a stale build — confirmed by asking the
+user directly whether both toggles were off (they were), then the user toggled them off live and
+saw it appear, then immediately followed up: "this should be on all the time!" Fixed by adding a
+second, permanently-visible caption right below each surface's "Payments"/"Payment Mode" header,
+reusing the exact wording the setup wizard's `ApprovalModeStep`/`approvalModeStep` intro line
+already established ("Enable one or both payment methods. Leave both off and requests will be free
+and auto-approved.") rather than inventing new copy — the wizard already had this two-tier pattern
+right (a persistent rule statement plus a reactive confirmation once it's actually true), the live
+Admin/remote pages just never got the persistent half. The original reactive line is untouched and
+still fires exactly as before on all four surfaces — this is additive, not a replacement. Both
+platforms build-verified (`:app:compileDebugKotlin`, `xcodebuild ... build`); the two `static/*.html`
+changes are static markup, no server-side logic touched.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

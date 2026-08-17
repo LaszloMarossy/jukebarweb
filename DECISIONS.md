@@ -268,3 +268,13 @@ manual steps to enable it (Settings → Accessibility → Guided Access; set a p
 once the kiosk is running). Deliberately non-blocking — Apple gives no API to check the Settings-level
 toggle from inside setup, so there's nothing to gate "Next" on. Build-verified (`xcodebuild ... build`).
 No relay or Android changes — Android has nothing equivalent to mirror this into.
+
+## 2026-08-17 — "Both off = free" explanation made always-visible, all three repos
+
+User reported not seeing this explanation on either kiosk-native admin screen. Traced to the text
+being purely reactive (only shown once both toggles are already off) on every surface that has it —
+kiosk-native (both platforms), `static/admin.html`, and `static/bartender.html` alike. Confirmed via
+a quick check that both toggles were in fact off before concluding anything; user then toggled both
+off live, saw the text appear, and said: "this should be on all the time!" Added a second,
+permanently-visible caption using the wizard's own existing wording, on all four surfaces — the
+original reactive line is untouched, this is purely additive.
