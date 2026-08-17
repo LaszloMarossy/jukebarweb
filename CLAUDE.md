@@ -1377,6 +1377,43 @@ file carried the gap forward rather than introducing it. Fixed by adding the sam
 matching every sibling step exactly. Build-verified (`:app:compileDebugKotlin`). No relay or iOS
 changes.
 
+**Bartender Access PIN control simplified on both kiosk-native Admin screens (2026-08-17), iOS +**
+**Android.** User: "way too much content for this one setting" — the old design permanently showed
+a two-branch on/off status paragraph, an always-visible text field, an always-visible (but
+disabled-until-4-digits) Save button, and — only when a PIN was already set — a separate "Turn Off
+Bartender Access" button that opened its own inline confirm row. Redesigned to a single control:
+
+- **A set PIN displays as a masked, tap-to-edit placeholder** (`•` repeated
+  `bartenderPinDisplayLength` times, default 4) instead of a persistent status sentence — tapping
+  it clears into an editable field, exactly the "click on the field would get rid of the ****"
+  behavior asked for. No PIN set → the field is simply empty and already editable, no tap needed.
+- **Save is not a permanent fixture** — it only renders once there's an actual pending change:
+  `hasChange = isEditing && (entry.isEmpty ? currentlyOn : entry.length >= 4)`. Typing 1–3 digits
+  (not yet actionable) shows nothing; clearing an existing PIN back to empty *is* treated as a real
+  pending change ("no digits = no bartender access", the user's own framing) and surfaces Save
+  labeled "Save (turns off bartender access)" rather than the plain "Save" a new/changed PIN gets.
+  Tapping it in the empty case reuses the existing destructive confirm dialog (unchanged) rather
+  than disabling immediately — still a two-step action for something that immediately kicks any
+  paired bartenders.
+- **The separate always-visible "Turn Off Bartender Access" button is gone** — folded into the
+  same field+Save flow above, one control instead of two.
+- **Footer text collapsed to one line**, reusing wording close to the user's own suggested copy:
+  "Enable bartender access by setting a PIN, or leave it empty to disable."
+
+`bartenderPinDisplayLength` is session-local only — a stored value is a SHA-256 hash, which carries
+no length, so a fresh screen load with an existing PIN falls back to a generic 4-dot placeholder;
+only immediately after a same-session Save does the mask reflect the actual digit count typed.
+iOS: new `@State private var isEditingBartenderPin`/`bartenderPinDisplayLength`, wired through the
+existing `@FocusState bartenderPinFocused` from the keyboard-dismiss fix above. Android: same two
+new `remember { mutableStateOf(...) }` locals inside the `AdminCard`. Both platforms build-verified
+(`xcodebuild ... build`, `:app:compileDebugKotlin`). No relay changes — purely local UI state, no
+wire-contract involvement. LAN `admin.html` (both platforms) and render `static/admin.html` have
+the **same** overloaded pattern (status text + always-visible field/Save + separate always-visible
+Turn Off button, confirmed by reading `static/admin.html` directly) but were deliberately **not**
+touched — user scoped this explicitly to "both platforms," meaning iOS/Android native, not a
+request to sweep every surface. Worth revisiting there later for the same simplification, not done
+as part of this pass.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

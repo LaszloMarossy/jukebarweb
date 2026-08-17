@@ -318,3 +318,13 @@ User: buttons on that step sit lower than every other wizard step, into the nav 
 other step's nav row already had `.windowInsetsPadding(WindowInsets.navigationBars)`; this one file
 never did — a pre-existing gap carried forward, not introduced, by the earlier same-day pinned-nav
 fix. Added the missing inset to match every sibling step.
+
+## 2026-08-17 — Bartender Access PIN control simplified, both kiosk-native Admin screens
+
+User: "way too much content for this one setting" — proposed a single field that shows masked
+dots when a PIN is set (tap to clear and re-enter), with Save appearing only when there's an actual
+pending change, including clearing to empty meaning "disable." Implemented on both iOS and Android,
+folding the old separate always-visible status text + field + Save + Turn Off button into one
+control. Footer collapsed to the user's own suggested one-liner. `static/admin.html`/LAN admin.html
+have the identical overloaded pattern but were deliberately left alone — scoped to "both platforms"
+meaning native apps, not a sweep of every surface.
