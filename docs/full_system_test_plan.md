@@ -893,42 +893,20 @@ requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.
         enabled in Settings (there's no API to check, so don't expect or require it to hide itself —
         that's expected platform-limited behavior, not a bug)
 
-### Kiosk re-lock after unpin (new 2026-08-16, item 14 follow-up) — Android only
+### Kiosk re-lock after unpin — REMOVED 2026-08-17, see Device Protection below instead
 
-**Setup**: Android host, `localOnly` or `localAndRemote` kiosk mode, kiosk launched and pinned.
-No iOS equivalent exists to test — see CLAUDE.md for why (no programmatic Guided Access trigger or
-comparable state-change signal on that platform at all).
+A polling-based "detect the unpin gesture, show a PIN-recovery screen (`KioskUnpinnedScreen`),
+re-pin on success" mechanism shipped 2026-08-16, misfired live in testing (a false "unpinned" trip
+right after every kiosk launch), got a real fix attempt the same day, and **still misfired live
+after that fix** — caught by the user on a rebuild the next day. Rather than chase a third timing
+bug in a polling approach, it was removed entirely in favor of Device Protection (below), which
+doesn't have this class of bug at all — it's a plain Activity lifecycle callback (`onStop()`), not
+a poll racing against `ActivityManager.lockTaskModeState`. Screen Pinning itself
+(`startLockTask()`/`stopLockTask()`) is untouched by this removal — still active for `localOnly`/
+`localAndRemote`, still a real deterrent; only the "detect+recover from an unpin" layer on top of
+it is gone. If this test section's checkboxes above still exist in an older copy of this doc,
+they no longer apply to any shipped code.
 
-- [ ] While pinned, perform the standard unpin gesture (back+overview held, or swipe-up-and-hold on
-      gesture nav). Confirm within ~1 second the screen is replaced by "Kiosk Unpinned" with an
-      "Admin PIN" button — not the home screen, app switcher, or any other app, even briefly.
-- [ ] Confirm no interaction with the underlying kiosk (now-playing, Up Next, Request button) is
-      possible while this screen is up — it's a full block, same as the existing Spotify-outage
-      screen's pattern.
-- [ ] Tap "Admin PIN," enter the correct PIN — confirm the device re-pins (the standard unpin
-      gesture is required again to leave) **without the app restarting or the session/queue being
-      affected in any way** — Up Next, now-playing, and all settings should be exactly as they were
-      the moment before the unpin gesture.
-- [ ] "Forgot PIN?" from this screen still works (device-biometric-gated reset, same as the regular
-      admin-unlock and Spotify-outage-recovery PIN entry points) — confirm it also re-pins on success,
-      not just the normal-PIN path.
-- [ ] **Repeat the whole unpin → re-pin cycle a second time in the same session** — this is the
-      specific regression the first draft of this feature had: polling only ran once per session and
-      silently stopped protecting the kiosk after the first recovery. Confirm the second unpin is
-      caught just as reliably as the first.
-- [ ] `remoteOnly` mode, or kiosk not yet launched: confirm this mechanism never engages at all —
-      same scope as the base pinning feature above, nothing new to break here.
-- [ ] End Session while `KioskUnpinnedScreen` is showing (if reachable) or immediately after
-      recovering from it — confirm the wizard restart flow is unaffected, no leftover blocked state
-      carries into the next setup pass.
-- [ ] **Regression, fixed same day it shipped**: tap "Launch Kiosk" at the end of setup and watch
-      closely for the first ~5 seconds — confirm the kiosk view stays up normally and
-      `KioskUnpinnedScreen` does **not** appear on its own. This is the specific false-positive the
-      user caught live: the very first pin on a device (before Android's one-time "Screen pinned"
-      tutorial has ever shown) can take longer than 1 second to actually register, and the original
-      polling loop's first check fired too early, misreading "not yet pinned" as "was unpinned."
-      Most reliable repro: a device/emulator where Screen Pinning has never been used before, or
-      right after clearing the app's data.
 - [ ] **Device lock-screen advisory**: on the Local Only and Local + Remote wizard cards, confirm
       the Screen Pinning recommendation now also includes a line recommending a device lock-screen
       PIN/pattern be set — this is a docs/copy check only, not a functional gate (the app has no way
@@ -940,8 +918,13 @@ comparable state-change signal on that platform at all).
 to be observable at all — see the warning-banner test below for the no-credential case), any kiosk
 mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
 
-- [ ] On the admin screen (kiosk-native, reachable from the wizard's Summary step or live during a
-      session), find the new "🔒 Device Protection" card. Confirm it starts **Off**.
+- [ ] **Reaching the card at all requires unlocking Admin first** — from the live kiosk's
+      now-playing screen (not just the wizard's Summary step), tap into Admin and enter the admin
+      PIN. This is worth calling out explicitly: the false-unpin bug above being live at the same
+      time this feature first shipped meant the admin screen was hard to reach at all, which is
+      why Device Admin consent was never actually seen in that round of testing — confirm this
+      path is now straightforwardly reachable.
+- [ ] On the admin screen, find the new "🔒 Device Protection" card. Confirm it starts **Off**.
 - [ ] Tap "Enable Device Protection" — confirm the real Android system consent dialog appears
       ("Activate this device admin app?"), not anything built by this app. Approve it.
 - [ ] Confirm the card flips to **On** shortly after returning to the app (no manual refresh/tab
@@ -951,9 +934,10 @@ mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
       device's own PIN/pattern to get back in, landing back in the still-live kiosk once unlocked.
 - [ ] **Confirm this works in `remoteOnly` mode specifically** — this is the scope this item was
       explicitly built to cover, unlike Screen Pinning above which deliberately excludes that mode.
-- [ ] Confirm it also fires from the **unpin gesture** itself, not just Home/recents — unpinning
-      should immediately force-lock the screen too, on top of (not instead of) the existing
-      `KioskUnpinnedScreen` recovery flow from the section above.
+- [ ] Confirm it also fires from the standard **unpin gesture** itself, not just Home/recents —
+      unpinning a `localOnly`/`localAndRemote` kiosk should force-lock the screen immediately, with
+      no app-level recovery screen involved at all anymore (that layer was removed — see the note
+      above).
 - [ ] Tap "Turn Off Device Protection" — confirm the card returns to Off, and confirm Home/recents/
       unpin no longer force-locks the screen afterward (only the existing Screen-Pinning-specific
       behaviors, if any, should remain).

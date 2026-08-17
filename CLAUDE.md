@@ -1043,7 +1043,10 @@ message, unlike the routine "stored" status) and `.textSelection(.enabled)` so t
 can still be long-pressed to copy/compare. Both platforms build-verified. No relay changes.
 
 **Kiosk lock-to-app, item 14 follow-up (2026-08-16), Android only: re-lock after an unpin,**
-**without restarting the app or session.** User noticed the standard Android unpin gesture (hold
+**without restarting the app or session. — SUPERSEDED 2026-08-17, this entire approach was**
+**removed; see the "polling-based unpin-detection layer... was removed entirely" entry further**
+**below for why and what replaced it.** Kept here for the historical record of how the design got
+there, not as a description of current code. User noticed the standard Android unpin gesture (hold
 Back+Overview, or swipe-up-hold on gesture nav) works for anyone, not just staff — the original
 item 14 design already documented this as the ceiling of what `startLockTask()`-only pinning can
 do without Device Owner provisioning, but hadn't built a mitigation. Two real Android platform
@@ -1078,7 +1081,10 @@ at all, so there's nothing to build there). Build-verified
 (`./gradlew :app:compileDebugKotlin`). No relay changes.
 
 **Kiosk re-lock: false-positive fixed + device lock-screen advisory added (2026-08-16, same day**
-**as the feature above), Android only.** User caught a real regression live, minutes after the
+**as the feature above), Android only.** **The false-positive fix described here turned out not to**
+**be the actual fix — the same bug recurred the next day and this whole mechanism was removed; see
+below.** The device lock-screen advisory text added in the same pass is unaffected and still
+current. User caught a real regression live, minutes after the
 re-lock feature shipped: after finishing the wizard and tapping "Launch Kiosk," the device
 genuinely pinned (OS confirmed it), but the app flipped into `KioskUnpinnedScreen` about a second
 later anyway — a false positive, not a real unpin. Root cause: the polling loop's first check ran
@@ -1144,6 +1150,44 @@ which is why that was run as the final check here rather than stopping at the Ko
 this session otherwise defaults to. Fixed by using a real em dash character instead. No relay or
 iOS changes — iOS has no equivalent Device Administrator concept to build against, consistent with
 the rest of item 14's platform asymmetry.
+
+**The polling-based unpin-detection layer (`KioskUnpinnedScreen`) was removed entirely (2026-08-17),**
+**one day after shipping, in favor of Device Protection alone.** It misfired live in testing right
+after it shipped (a false "unpinned" trip on every kiosk launch), got a real fix attempt the same
+day (a warm-up phase before the watch loop starts), and **still misfired after that fix** — caught
+by the user on a fresh rebuild the next day. Rather than chase a third timing bug in a
+poll-against-`lockTaskModeState` design, removed it outright: `MainActivity.kt`'s `LaunchedEffect`
+is back to the original one-line `updateLockTaskPinning(shouldPin)` from before any of this, no
+`kioskUnpinned` state, no watch loop; `KioskView.kt`'s `KioskUnpinnedScreen` and its
+`kioskUnpinned`/`onRePin` parameters are gone. **Screen Pinning itself
+(`startLockTask()`/`stopLockTask()`) is untouched** — still active for `localOnly`/
+`localAndRemote`, still a real deterrent; only the "detect an unpin and show a PIN-recovery
+screen" layer built on top of it the day before is gone.
+
+This wasn't just abandoning a broken feature — the user's own observation made it clearly the
+right call, not just the path of least resistance: Device Protection's `onStop()` → `lockNow()` is
+strictly better for this exact job. It's a plain Activity lifecycle callback (`onStop()` fires
+reliably and promptly whenever the Activity leaves the foreground, for any reason, guaranteed by
+the platform) rather than a poll racing against `ActivityManager.lockTaskModeState` on a timer —
+no warm-up window to get wrong, no steady-state interval to misfire. It also reacts to leaving the
+app *at all* (Home, recent-apps switch, the unpin gesture, anything), not just one specific
+gesture, and forces the device's actual OS lock screen rather than an app-level PIN entry that
+could only ever help if someone came back to this app afterward — a limitation already known and
+accepted about the polling approach even before its two live failures.
+
+**Root-caused why the user never saw the Device Admin consent dialog during the wizard, since**
+**it looked like a separate bug at first but wasn't one**: "Enable Device Protection" only exists
+on the live admin screen (reachable by unlocking Admin from the kiosk's now-playing view with the
+admin PIN) — never something the wizard prompts for automatically, by design, same as every other
+admin-screen-only setting in this app. `KioskUnpinnedScreen` misfiring on every launch meant the
+user could never get far enough into a normal session to reach that screen at all, so the consent
+dialog was never reached to be shown — not evidence Device Protection itself was broken, just
+evidence it was unreachable. Confirmed this reasoning explicitly rather than asserting it, since a
+plausible-sounding root cause is still a guess until it's traced end to end. Build-verified via the
+full `:app:assembleDebug` (not just `:app:compileDebugKotlin`) after the removal, matching the
+lesson from the Device Protection feature's own XML comment mistake the day before — a
+Kotlin-only build doesn't validate manifest/resource changes, and this removal touched enough
+surface area to be worth the fuller check again.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
