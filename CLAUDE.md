@@ -1321,6 +1321,34 @@ every step but `.uploading` (which has no nav buttons at all) now uses the one s
 Android changes — Android's equivalent wizard screens were never reported as having this
 inconsistency and weren't audited as part of this fix.
 
+**Android setup wizard had the identical Back/Next scroll bug — worse, universally not just on**
+**some steps (2026-08-17), Android only.** Follow-up audit after the iOS fix above, at the user's
+request ("check Android's wizard for the same issue"). Every reachable Android wizard step
+(`NameEntryStep`, `AdminPinStep`, `DeviceProtectionStep`, `ApprovalModeStep`, `PricingStep`,
+`NetworkModeStep`, `LocalFolderStep`, `SpotifyDeviceStep`, `SpotifyPlaylistStep` — 9 of 11 files
+under `ui/setup/`) wrapped its entire content *and* its Back/Next Row in one single
+`Modifier.verticalScroll(...)` Column, so the nav buttons scrolled away with the rest of the form
+on every single step — a strictly worse version of the iOS bug, which only affected 3 of iOS's 8
+steps. `LocalFolderStep` and `SpotifyPlaylistStep` were the worst offenders in practice, since both
+can show a long scrollable list (folder browser / Spotify playlists) pushing Next far off-screen.
+`SpotifyPlaylistStep` had a doc comment that said the quiet part out loud: "Buttons scroll with the
+list, appearing just below the last item."
+
+Fixed with the same shape as iOS: split each step's single scrolling `Column` into an outer
+`Column(Modifier.fillMaxSize())` containing an inner `Column(Modifier.weight(1f).verticalScroll(...))`
+for content and a nav `Row` as a sibling after it, outside the scroll. `SpotifyPlaylistStep`
+needed a different fix shape since its Loaded state used a `LazyColumn` with Back/Next appended as
+the list's own last `item` (duplicated a second time for the Loading/Error states, which already
+rendered nav correctly outside content) — consolidated to one shared nav `Row` after the `when`
+block for all three states, computing `enabled` from the current state instead of hardcoding it per
+branch. Two files with a `verticalScroll` reference were found to be **dead code** during this audit
+(`SetupSummaryStep.kt`, `FolderPickerDialog.kt` — confirmed via grep, zero call sites for either
+composable anywhere in the app) and deliberately left untouched — not reachable, not worth fixing.
+`DisplayModeStep.kt` (the wizard's first step) has no persistent nav row at all by design (each
+option card advances immediately on tap) and needed no change. Build-verified via both
+`:app:compileDebugKotlin` and the fuller `:app:assembleDebug`. No relay or iOS changes — this pass
+was Android-only, mirroring a fix iOS already had.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

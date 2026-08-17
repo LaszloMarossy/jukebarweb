@@ -293,3 +293,13 @@ down to push them all the time." Traced to three steps (name, PIN, pricing) embe
 nav bar inside their own scrollable Form instead of using the already-pinned shared one every other
 step used. Removed the three duplicates; all steps but the upload spinner now share one
 always-pinned bar. iOS only, not audited on Android.
+
+## 2026-08-17 — Same fix ported to Android's wizard — turned out worse there
+
+User: "check Android's wizard for the same issue." Found it was universal, not partial like iOS —
+every one of 9 reachable wizard steps wrapped its entire content and the Back/Next row in one
+scrollable Column, so nav always scrolled away, worst on the two steps with potentially long lists
+(local folder browser, Spotify playlist picker — one file's own comment admitted "buttons scroll
+with the list"). Fixed the same way as iOS: split scrollable content from a pinned nav row on all 9
+files. Found and left alone two genuinely dead files with the same pattern (`SetupSummaryStep.kt`,
+`FolderPickerDialog.kt` — zero call sites, confirmed via grep) rather than fixing unreachable code.
