@@ -755,14 +755,28 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
 - [ ] **Fresh bar / fresh install, all three surfaces**: bartender PIN starts unset. No bartender QR
       code is shown anywhere (render admin.html's Actions tab, iOS `AdminView.swift`, Android
       `AdminScreen.kt`). Confirm the setup wizard (either platform) never prompts for a bartender PIN
-      — it's deliberately not part of onboarding.
+      — it's deliberately not part of onboarding. **Partially verified 2026-08-17**: confirmed on
+      render admin.html (iOS host) — no PIN set, no QR shown. Kiosk-native (iOS/Android
+      `AdminView.swift`/`AdminScreen.kt` — these also show their own bartender QR, not just render)
+      and LAN admin.html not yet tested; wizard-never-prompts not yet tested either.
 - [ ] With bartender PIN unset: `GET /bartender/{id}` (render) returns a real 404, not the bartender
       page shell. LAN `/bartender` (both platforms) also 404s. `POST /api/bartender/pair` (LAN, both
       platforms) and the relay's `/api/bar/{id}/authenticate` with `role: "bartender"` both reject
       (503/404) without attempting a PIN compare at all — confirm via direct call, not just UI.
 - [ ] Admin sets a bartender PIN from each of the 5 admin surfaces in turn (kiosk-native ×2, LAN
       admin.html ×2, render admin.html): status flips to "on," the bartender QR/URL appears, and
-      `/bartender/{id}` (or LAN `/bartender`) becomes reachable and accepts that PIN.
+      `/bartender/{id}` (or LAN `/bartender`) becomes reachable and accepts that PIN. **Partially
+      verified 2026-08-17**: confirmed for render admin.html (iOS host) — QR appeared, and logging
+      in via the render bartender.html URL with that PIN succeeded. Other 4 surfaces (kiosk-native
+      ×2, LAN admin.html ×2) not yet tested.
+- [ ] **New (2026-08-17): render `bartender.html` now asks for a name before the PIN**, matching
+      LAN's existing "Your name" field — previously it only sent `{pin_hash, role}`, so every
+      internet-authenticated bartender showed up identically as the literal string "Bartender" on
+      the Sessions tab, making Kill impossible to target correctly with 2+ bartenders logged in.
+      Confirm: the name field is optional (leaving it blank still logs in, defaulting server-side to
+      "Bartender" — same fallback the backend already had); a name typed here shows up correctly in
+      the render admin.html Sessions tab's session list; a failed PIN attempt preserves the typed
+      name rather than clearing it (matches LAN's behavior for a failed attempt).
 - [ ] **Propagation round-trip, render specifically**: set the bartender PIN from render admin.html
       while the host is running — confirm it lands in the relay's `desired_settings` immediately
       (control shows "pending"/greyed), then clears once the host's next sync echoes it back, and the
@@ -824,9 +838,11 @@ wait, not a defense mechanism itself.
 - [ ] **Kill a session**: confirm dialog fires, declining the "also change PIN" follow-up prompt
       still kills the session — that bartender's next poll gets logged out (session/pair screen
       reappears with an explanatory message, not a frozen stale UI) within one poll interval
-- [ ] **Kill + bundled PIN change**: accept the "also change PIN" prompt, enter a new PIN — confirm
+- [X] **Kill + bundled PIN change**: accept the "also change PIN" prompt, enter a new PIN — confirm
       BOTH happen: the killed bartender is logged out AND the old PIN no longer works for a fresh
-      pairing attempt (new PIN required)
+      pairing attempt (new PIN required). **Verified 2026-08-17** — user confirmed both prompts
+      appeared (Kill confirm, then "also change PIN?"), accepted, and the old PIN correctly failed
+      while the new one succeeded. Render surface only; LAN not yet tested.
 - [ ] **Let Retry Now**: confirm the target IP can immediately retry the PIN (not waiting out the
       remaining time), and that this does NOT change the PIN itself — the same PIN that was
       failing before still works once entered correctly

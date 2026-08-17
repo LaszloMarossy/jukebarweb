@@ -354,3 +354,14 @@ left as-is since that's what was asked. (2) Kiosk's Guided Access warning captio
 full sentence to "Enable Guided Access!" — user: "the rest is not on the screen." The fuller
 explanation still lives in the wizard's dedicated Guided Access step; this caption was always meant
 as a brief nudge, not the primary explanation.
+
+## 2026-08-17 — Render bartender.html now asks for a name (closes a real multi-bartender gap)
+
+User confirmed a round of live testing (render admin/bartender, iOS host): PIN set/unset showing/
+hiding the QR, logging in as bartender, Kill + bundled PIN-change all worked. While answering their
+question about whether name-taking still happens on LAN, found render's `bartender.html` never
+collected one at all despite the relay backend already supporting it — every internet bartender
+showed up as the literal "Bartender" on the Sessions tab. User: "without taking names we will have
+a clusterfuck.. How would I know which session to kill if there is a hacker bartender?" Added the
+same "Your name" field LAN already has; no backend change needed, the field was already accepted
+and stored, just never sent from render's own page.

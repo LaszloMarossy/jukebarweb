@@ -1475,6 +1475,23 @@ Both build-verified (`xcodebuild ... build`). No relay or Android changes — bo
 to iOS specifically by the user, and Android has no equivalent runtime warning caption (Screen
 Pinning's advisory lives only in the setup wizard, not on the live kiosk screen).
 
+**Render `bartender.html` now collects a name before the PIN, closing a real multi-bartender gap**
+**(2026-08-17), relay only.** Found while confirming what the user had tested: LAN `bartender.html`
+(both platforms) has always asked "Your name" before pairing, feeding `BartenderRecord`/
+`LocalBartender`'s `name` field — but render's `bartender.html` only ever sent `{pin_hash, role}`
+to `bar_authenticate()`, even though the relay backend already reads and stores `body.get("name")`
+(`main.py`'s `bar_authenticate()`, falling back to the literal string `"Bartender"`) and the
+Bartender Sessions tab is built to display that name per-session. Since the frontend never
+collected one, every internet-authenticated bartender showed up identically as "Bartender" —
+user, on realizing this: "without taking names we will have a clusterfuck.. How would I know which
+session to kill if there is a hacker bartender?" Fixed by adding the same "Your name" field to
+`static/bartender.html`'s PIN screen (styled as a lighter-weight `.name-field`, distinct from the
+heavily-styled numeric `.pin-field`), sent as `name` in the `/authenticate` POST body — **no
+backend change needed at all**, since `bar_authenticate()` already accepted and stored this field;
+the gap was purely that render's own frontend never asked. Optional, same "Bartender" fallback the
+backend already had if left blank, matching LAN's permissiveness exactly. Not build-verified via a
+compiler (`static/*.html` is plain markup/JS, no build step) — reviewed directly instead.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
