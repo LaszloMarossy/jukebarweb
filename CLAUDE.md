@@ -1492,6 +1492,24 @@ the gap was purely that render's own frontend never asked. Optional, same "Barte
 backend already had if left blank, matching LAN's permissiveness exactly. Not build-verified via a
 compiler (`static/*.html` is plain markup/JS, no build step) — reviewed directly instead.
 
+**Correction: only kiosk-native admin screens actually render a bartender QR image — render and**
+**LAN `admin.html` never have, confirmed 2026-08-17 by direct grep, not assumption.** I'd told the
+user QR codes appear on 3 places (kiosk-native, LAN admin.html, render admin.html); they pushed
+back that it's kiosk-native only. Checked directly rather than re-asserting from memory:
+`AdminView.swift` has `QRImageView` (×4), `AdminScreen.kt` has `generateQrBitmap`/zxing's
+`QRCodeWriter` (×5) — both genuinely render a QR bitmap for the Bartender/Admin URL. `static/
+admin.html` has zero matches for any QR-generation pattern; `WebApps/admin.html`'s 3 "canvas"
+matches turned out to be an unrelated iOS-Safari video-keepalive hack, not QR. Both render and LAN
+`admin.html` only ever show status text ("bartender QR code and bartender page are active") — no
+image, and **no visible link either** — there is currently no way to get the actual bartender URL
+from render or LAN admin.html at all, only by physically going to the kiosk's own screen. Not fixed
+— flagged to the user as a real gap worth deciding on, not silently patched. Also corrected a
+test-plan annotation from the immediately-preceding session turn that had repeated this same wrong
+"QR appeared on render" claim (`docs/full_system_test_plan.md`, the "Admin sets a bartender PIN
+from each of the 5 admin surfaces" checkbox) — the underlying PIN/pairing mechanics the user
+actually tested (status flipped to "on," login via the bartender.html URL succeeded) are still
+correctly recorded as confirmed; only the "QR appeared" wording was wrong and has been struck.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

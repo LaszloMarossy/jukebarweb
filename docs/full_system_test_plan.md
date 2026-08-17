@@ -755,20 +755,29 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
 - [ ] **Fresh bar / fresh install, all three surfaces**: bartender PIN starts unset. No bartender QR
       code is shown anywhere (render admin.html's Actions tab, iOS `AdminView.swift`, Android
       `AdminScreen.kt`). Confirm the setup wizard (either platform) never prompts for a bartender PIN
-      — it's deliberately not part of onboarding. **Partially verified 2026-08-17**: confirmed on
-      render admin.html (iOS host) — no PIN set, no QR shown. Kiosk-native (iOS/Android
-      `AdminView.swift`/`AdminScreen.kt` — these also show their own bartender QR, not just render)
-      and LAN admin.html not yet tested; wizard-never-prompts not yet tested either.
+      — it's deliberately not part of onboarding. **Note**: render/LAN admin.html never show an
+      actual QR *image* even when the PIN is set (see the correction on the next checkbox below) —
+      only kiosk-native does. **Partially verified 2026-08-17**: confirmed on render admin.html
+      (iOS host) — with no PIN set, the status text correctly read "off." Kiosk-native (iOS/Android
+      — these are the only two surfaces with a real bartender QR image) and LAN admin.html not yet
+      tested; wizard-never-prompts not yet tested either.
 - [ ] With bartender PIN unset: `GET /bartender/{id}` (render) returns a real 404, not the bartender
       page shell. LAN `/bartender` (both platforms) also 404s. `POST /api/bartender/pair` (LAN, both
       platforms) and the relay's `/api/bar/{id}/authenticate` with `role: "bartender"` both reject
       (503/404) without attempting a PIN compare at all — confirm via direct call, not just UI.
 - [ ] Admin sets a bartender PIN from each of the 5 admin surfaces in turn (kiosk-native ×2, LAN
       admin.html ×2, render admin.html): status flips to "on," the bartender QR/URL appears, and
-      `/bartender/{id}` (or LAN `/bartender`) becomes reachable and accepts that PIN. **Partially
-      verified 2026-08-17**: confirmed for render admin.html (iOS host) — QR appeared, and logging
-      in via the render bartender.html URL with that PIN succeeded. Other 4 surfaces (kiosk-native
-      ×2, LAN admin.html ×2) not yet tested.
+      `/bartender/{id}` (or LAN `/bartender`) becomes reachable and accepts that PIN. **Correction
+      2026-08-17**: only kiosk-native (iOS `AdminView.swift`/Android `AdminScreen.kt`) actually
+      render a QR *image* — confirmed by direct grep (`QRImageView`/`generateQrBitmap`, zero
+      matches in either `admin.html`). Render and LAN `admin.html` only ever show status text
+      ("bartender QR code and bartender page are active") — no image, no visible link either;
+      there's currently no way to get the actual bartender URL from render/LAN admin.html at all,
+      only from the kiosk itself. **Partially verified 2026-08-17**: user confirmed the status text
+      flipped to "on" on render admin.html and that logging in via the render bartender.html URL
+      with the new PIN succeeded (so the PIN/pairing mechanics work end-to-end) — but this doesn't
+      confirm the actual "QR/URL appears" wording in this checkbox, which is false on render/LAN as
+      written. Other 4 surfaces (kiosk-native ×2, LAN admin.html ×2) not yet tested.
 - [ ] **New (2026-08-17): render `bartender.html` now asks for a name before the PIN**, matching
       LAN's existing "Your name" field — previously it only sent `{pin_hash, role}`, so every
       internet-authenticated bartender showed up identically as the literal string "Bartender" on

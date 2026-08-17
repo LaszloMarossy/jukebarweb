@@ -365,3 +365,12 @@ showed up as the literal "Bartender" on the Sessions tab. User: "without taking 
 a clusterfuck.. How would I know which session to kill if there is a hacker bartender?" Added the
 same "Your name" field LAN already has; no backend change needed, the field was already accepted
 and stored, just never sent from render's own page.
+
+## 2026-08-17 — Correction: bartender QR is kiosk-native only, not on render/LAN admin.html
+
+I'd claimed QR codes show on 3 places (kiosk-native + LAN admin.html + render admin.html). User
+pushed back, correctly: "QR codes for bartender logins ONLY are displayed on either iOS kiosk admin
+page or android kiosk admin page." Checked directly (grep for QR-generation code) rather than
+re-asserting — user was right. Render and LAN admin.html only show status text, no image, no
+visible link at all; only kiosk-native (`QRImageView`/`generateQrBitmap`) actually renders one.
+Fixed a wrong "QR appeared on render" annotation I'd just added to the test plan in the process.
