@@ -1307,6 +1307,20 @@ free" (`static/bartender.html`'s equivalent: "Both off: requests are free and au
 visible by default in markup instead. Both platforms build-verified
 (`:app:compileDebugKotlin`, `xcodebuild ... build`).
 
+**Setup wizard Back/Next now pinned to the bottom on every step, iOS only (2026-08-17).** User:
+"some screens feature a Back Next button that is fixed on the bottom of the screen, and content
+above is scrollable — yet, some screens feature buttons on the very bottom of the page, that I have
+to scroll to." Root cause: `SetupView.swift` already had a single shared `bottomNavBar`, pinned
+outside the scrollable per-step content — but three steps (`nameStep`, `pinStep`, `pricingStep`)
+instead embedded that same `bottomNavBar` as the *last Section inside their own Form*, so on those
+three specifically it scrolled away with the rest of the content instead of staying pinned, exactly
+the inconsistency the user hit repeatedly on restart. Fixed by removing those three embedded
+Sections and dropping their steps from the exclusion list that suppressed the shared pinned bar —
+every step but `.uploading` (which has no nav buttons at all) now uses the one shared, always-pinned
+`bottomNavBar`, no per-step duplication. Build-verified (`xcodebuild ... build`). No relay or
+Android changes — Android's equivalent wizard screens were never reported as having this
+inconsistency and weren't audited as part of this fix.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

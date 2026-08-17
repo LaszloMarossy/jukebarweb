@@ -284,3 +284,12 @@ the warning that appears BELOW the buttons when I click both buttons to OFF... I
 warning to be there all the time" — plus a wording correction, dash to colon: "Both off: all
 requests...". Redone correctly: removed the new caption, made the *original* line unconditional in
 its original spot/styling, wording updated on all four surfaces to match.
+
+## 2026-08-17 — iOS setup wizard: Back/Next pinned to the bottom on every step
+
+User: some wizard screens had Back/Next fixed at the bottom with scrollable content above, others
+required scrolling all the way down to reach them, "so that if I restart, I do not have to scroll
+down to push them all the time." Traced to three steps (name, PIN, pricing) embedding the shared
+nav bar inside their own scrollable Form instead of using the already-pinned shared one every other
+step used. Removed the three duplicates; all steps but the upload spinner now share one
+always-pinned bar. iOS only, not audited on Android.
