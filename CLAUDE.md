@@ -1228,6 +1228,29 @@ lock screen, which is a real Activity pause/resume cycle. Both routes share one 
 already-pinned no-op check, so calling it redundantly from both paths is harmless). Build-verified
 via `:app:assembleDebug`. No relay or iOS changes.
 
+**Device Protection's ~1s unpin-to-lock window is accepted as the practical ceiling (confirmed**
+**2026-08-17, Android), and iOS has no equivalent capability to build at all — checked, not**
+**assumed, same day.** User tested live: after unpinning, other apps/Settings are briefly reachable
+(roughly a second) before the screen goes dark and asks for the device PIN. Root cause isn't a gap
+in the app's logic — it's Android's own unpin-gesture animation plus `lockNow()`'s render time,
+both outside the app's control. The only way to close it further would be firing from `onPause()`
+instead of `onStop()`, which triggers earlier but also fires for transient interruptions (a
+permission dialog, the notification shade, even Device Protection's own consent dialog) — would
+falsely lock the device during ordinary use, including possibly while the operator is *trying* to
+grant Device Protection in the first place. Confirmed correct to leave on `onStop()`.
+
+**iOS**: re-checked whether an equivalent "lock the device when focus leaves the app" is possible
+at all — it is not, and for a structurally different reason than Android's timing gap. Android's
+`lockNow()` exists because Google exposes "force lock" as one of a small set of permitted Device
+Administrator actions to any app. Apple has no public API of any kind for a third-party app to lock
+the device screen — the only path is the MDM `DeviceLock` remote command, which requires Supervised
+enrollment, the same ceiling item 14 already documents for Guided Access. Guided Access (existing,
+manually-enabled-only, already detected and warned-about in `KioskView.swift`) remains the closest
+iOS analog — arguably a stronger mitigation in one sense, since once active it blocks leaving the
+app at all rather than locking a moment after. No code change; confirmed via direct source read
+(`KioskView.swift:26-33`, the existing "no public API" comment) rather than re-litigating from
+memory.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

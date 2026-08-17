@@ -940,10 +940,13 @@ mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
       device's own PIN/pattern to get back in, landing back in the still-live kiosk once unlocked.
 - [ ] **Confirm this works in `remoteOnly` mode specifically** — this is the scope this item was
       explicitly built to cover, unlike Screen Pinning above which deliberately excludes that mode.
-- [ ] Confirm it also fires from the standard **unpin gesture** itself, not just Home/recents —
+- [X] Confirm it also fires from the standard **unpin gesture** itself, not just Home/recents —
       unpinning a `localOnly`/`localAndRemote` kiosk should force-lock the screen immediately, with
       no app-level recovery screen involved at all anymore (that layer was removed — see the note
-      above).
+      above). **Verified 2026-08-17**: user confirmed live — after unpinning, other apps/Settings
+      are reachable for roughly a second (Android's own unpin-gesture animation + `lockNow()`'s
+      render time, not a gap in the app's logic), then the screen goes dark and asks for the
+      device PIN. Discussed and accepted as the practical ceiling for this approach — see CLAUDE.md.
 - [ ] Tap "Turn Off Device Protection" — confirm the card returns to Off, and confirm Home/recents/
       unpin no longer force-locks the screen afterward (only the existing Screen-Pinning-specific
       behaviors, if any, should remain).
