@@ -345,3 +345,12 @@ with lineLimit(1), actually truncated with an ellipsis). Split into two rows on 
 logo + JukeBar + bar name (wraps), row 2 is "Admin" + Done. iOS needed a bigger change since a
 toolbar principal item can't grow taller — pulled the header out of the toolbar into a plain
 VStack above the Form, hiding the nav bar entirely; Done became a plain button in that header.
+
+## 2026-08-17 — Two small iOS polish fixes: Admin header logo size, Guided Access caption wording
+
+User asked for both together. (1) Admin header logo (22pt, added in the two-row header fix above)
+enlarged to match the customer/kiosk page's capped logo size (80/104pt) — logo only, text sizes
+left as-is since that's what was asked. (2) Kiosk's Guided Access warning caption shortened from a
+full sentence to "Enable Guided Access!" — user: "the rest is not on the screen." The fuller
+explanation still lives in the wizard's dedicated Guided Access step; this caption was always meant
+as a brief nudge, not the primary explanation.

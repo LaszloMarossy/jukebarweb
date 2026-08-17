@@ -1449,6 +1449,32 @@ touch it. Android's change was smaller — same `Column`-based header as before,
 rows instead of one `Row`. Both platforms build-verified (`xcodebuild ... build`,
 `:app:compileDebugKotlin`). No relay changes.
 
+**Two small iOS-only polish fixes (2026-08-17), both requested together.**
+
+1. **Admin header logo enlarged to match the customer/kiosk page.** `AdminView.swift`'s header
+   logo (added earlier this session as part of the two-row header fix) was `size: 22` — small next
+   to `KioskView.swift`'s customer-facing `topBar()`, whose `logoSize` is dynamic but caps at
+   `isIPad ? 104 : 80`. Added the same `@Environment(\.horizontalSizeClass)`/`isIPad` pattern
+   `KioskView.swift` already uses, and matched those capped values exactly rather than replicating
+   `topBar()`'s full dynamic-height formula (Admin's header is a fixed compact bar, not a
+   variable-height container, so there's no equivalent height to derive a dynamic size from).
+   Deliberately logo-only per the request — the adjacent "JukeBar"/bar name text sizes were left
+   untouched, not scaled up to match, since only the logo size was asked for.
+2. **Guided Access warning caption shortened.** `KioskView.swift`'s `topBar()` warning (shown when
+   `kioskDisplayMode != .remoteOnly` and Guided Access isn't active) read "⚠︎ For kiosk security,
+   enable Guided Access (Settings → Accessibility), then triple-click the side button" — user:
+   "the warning should simply be 'Enable Guided Access!' - the rest is not on the screen [i.e. not
+   visible/needed]." Shortened to "⚠︎ Enable Guided Access!", `lineLimit` dropped from 2 to 1 since
+   it now always fits on one line. `topBar()` is a single shared function called from all 4 kiosk
+   layout variants (portrait/landscape × two contexts), so this was one edit, not four. The fuller
+   explanation (Settings path, triple-click gesture) still lives in the setup wizard's dedicated
+   Guided Access step from earlier this session — this caption was always meant as an in-the-
+   moment nudge, not the primary place to learn the mechanic.
+
+Both build-verified (`xcodebuild ... build`). No relay or Android changes — both fixes were scoped
+to iOS specifically by the user, and Android has no equivalent runtime warning caption (Screen
+Pinning's advisory lives only in the setup wizard, not on the live kiosk screen).
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
