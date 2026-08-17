@@ -1275,23 +1275,37 @@ via `xcodebuild ... build` (clean). No relay or Android changes — Android has 
 equivalent to mirror this into.
 
 **"Both off = free" explanation made always-visible on every Payments surface (2026-08-17), all**
-**three repos.** The "Both off — all requests auto-accepted for free" line already existed
-everywhere (kiosk-native `AdminScreen.kt`/`AdminView.swift`, `static/admin.html`,
-`static/bartender.html`) but was purely reactive — CSS/Compose-conditional on the toggles already
-both being off, so an operator only ever saw it *after* leaving both off, never as a heads-up
-beforehand. First reported as "I don't see this text anywhere" (kiosk screens), which traced to
-this exact conditional gating, not a missing feature or a stale build — confirmed by asking the
-user directly whether both toggles were off (they were), then the user toggled them off live and
-saw it appear, then immediately followed up: "this should be on all the time!" Fixed by adding a
-second, permanently-visible caption right below each surface's "Payments"/"Payment Mode" header,
-reusing the exact wording the setup wizard's `ApprovalModeStep`/`approvalModeStep` intro line
-already established ("Enable one or both payment methods. Leave both off and requests will be free
-and auto-approved.") rather than inventing new copy — the wizard already had this two-tier pattern
-right (a persistent rule statement plus a reactive confirmation once it's actually true), the live
-Admin/remote pages just never got the persistent half. The original reactive line is untouched and
-still fires exactly as before on all four surfaces — this is additive, not a replacement. Both
-platforms build-verified (`:app:compileDebugKotlin`, `xcodebuild ... build`); the two `static/*.html`
-changes are static markup, no server-side logic touched.
+**three repos — two-step design, first attempt was the wrong shape.** The "Both off — all requests
+auto-accepted for free" line already existed everywhere (kiosk-native `AdminScreen.kt`/
+`AdminView.swift`, `static/admin.html`, `static/bartender.html`) but was purely reactive —
+conditional on the toggles already both being off, so an operator only ever saw it *after* leaving
+both off, never as a heads-up beforehand. First reported as "I don't see this text anywhere" (kiosk
+screens), traced to this exact conditional gating (confirmed by asking whether both toggles were
+off — they were), then the user toggled them off live, saw it appear, and said: "this should be on
+all the time!"
+
+First fix attempt added a *second*, separate persistent caption above the toggles (reusing the
+wizard's `ApprovalModeStep` intro wording) while leaving the original reactive line as-is below the
+toggles — modeled on the wizard's own two-tier pattern (persistent rule statement + reactive
+confirmation). This shipped, built clean on both platforms, but the user reported it missing on
+"the wizard final screens on both kiosks... which is also the admin kiosk UI" — several rounds of
+diagnosis (confirming rebuild status, confirming toggle state) before the user clarified what they
+actually meant: the new caption *was* there, correctly, above the currency rows — but they wanted
+the **existing orange warning below the toggles** to be the one made permanent, not a second new
+line added elsewhere. Lesson: "add an explanation" was underspecified on which of two visually
+distinct spots was meant, and the first-attempt design (mirroring the wizard's two-line pattern)
+was a reasonable guess but not what was asked for — should have clarified placement before
+building, given the ask referenced an existing specific element ("there is an explanation below").
+
+Second, corrected fix: removed the newly-added top-of-card caption entirely on all four surfaces,
+and instead removed the conditional gating from the *original* line, making it unconditionally
+visible in its original position and styling (orange/yellow, below the toggles) — reworded per the
+user's explicit correction from an em-dash to a colon: "Both off: all requests auto-accepted for
+free" (`static/bartender.html`'s equivalent: "Both off: requests are free and auto-accepted."). On
+`static/admin.html`/`static/bartender.html` this meant removing the JS that was toggling the
+`show`/`display:none` state (`updatePaymentUI()`/`updatePaymentToggleUI()`) and marking the element
+visible by default in markup instead. Both platforms build-verified
+(`:app:compileDebugKotlin`, `xcodebuild ... build`).
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

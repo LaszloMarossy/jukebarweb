@@ -286,7 +286,6 @@
 
   <div id="actions-pane">
     <div class="cfg-title">Payment Mode</div>
-    <div class="lan-pay-warn" style="color:var(--muted, #9ca3af)">Enable one or both payment methods. Leave both off and requests will be free and auto-approved.</div>
     <div class="cfg-row" id="lan-row-stripe">
       <span class="cfg-label">Stripe 💳</span>
       <div class="lan-toggle" id="lan-tog-stripe" onclick="toggleBtPayment('stripe')"><div class="lan-thumb"></div></div>
@@ -296,7 +295,7 @@
       <span class="cfg-label">Pay to bartender</span>
       <div class="lan-toggle" id="lan-tog-bartender" onclick="toggleBtPayment('bartender')"><div class="lan-thumb"></div></div>
     </div>
-    <div class="lan-pay-warn" id="lan-pay-warn" style="display:none">Both off — requests are free and auto-accepted.</div>
+    <div class="lan-pay-warn" id="lan-pay-warn">Both off: requests are free and auto-accepted.</div>
 
     <div class="cfg-title" style="margin-top:16px">Requests</div>
     <div class="cfg-row" id="lan-row-accepting">
@@ -619,10 +618,8 @@ function updatePaymentToggleUI() {
   $('lan-tog-accepting')?.classList.toggle('on', btAcceptingRequests);
   $('lan-tog-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
   $('lan-row-accepting')?.classList.toggle('pending', btSettingsPending.includes('accepting_requests'));
-  const warn = $('lan-pay-warn');
-  // Stripe is inert (not just its toggle disabled) in Local Only mode regardless of its stored
-  // value, so it counts as "off" here too.
-  if (warn) warn.style.display = ((!btStripeEnabled || stripeLocked) && !btBartenderEnabled) ? '' : 'none';
+  // lan-pay-warn ("Both off: requests are free and auto-accepted.") is always visible now
+  // (2026-08-17) -- was previously conditional on stripe/bartender both being off.
   const acceptWarn = $('lan-accepting-warn');
   if (acceptWarn) acceptWarn.style.display = btAcceptingRequests ? 'none' : '';
 }

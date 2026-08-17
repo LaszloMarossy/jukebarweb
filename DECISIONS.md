@@ -269,12 +269,18 @@ once the kiosk is running). Deliberately non-blocking — Apple gives no API to 
 toggle from inside setup, so there's nothing to gate "Next" on. Build-verified (`xcodebuild ... build`).
 No relay or Android changes — Android has nothing equivalent to mirror this into.
 
-## 2026-08-17 — "Both off = free" explanation made always-visible, all three repos
+## 2026-08-17 — "Both off = free" explanation made always-visible, all three repos (two attempts)
 
 User reported not seeing this explanation on either kiosk-native admin screen. Traced to the text
 being purely reactive (only shown once both toggles are already off) on every surface that has it —
 kiosk-native (both platforms), `static/admin.html`, and `static/bartender.html` alike. Confirmed via
 a quick check that both toggles were in fact off before concluding anything; user then toggled both
-off live, saw the text appear, and said: "this should be on all the time!" Added a second,
-permanently-visible caption using the wizard's own existing wording, on all four surfaces — the
-original reactive line is untouched, this is purely additive.
+off live, saw the text appear, and said: "this should be on all the time!"
+
+First attempt added a *second*, new persistent caption above the toggles, leaving the original
+reactive line untouched below. User then reported it missing on the wizard's final/summary screen
+— several rounds of diagnosis later, it turned out to be there, just not what was wanted: "I want
+the warning that appears BELOW the buttons when I click both buttons to OFF... I want the orange
+warning to be there all the time" — plus a wording correction, dash to colon: "Both off: all
+requests...". Redone correctly: removed the new caption, made the *original* line unconditional in
+its original spot/styling, wording updated on all four surfaces to match.

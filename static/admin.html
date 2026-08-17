@@ -438,7 +438,6 @@
   <div id="pane-actions" class="tab-pane">
     <div class="payment-card" style="margin-top:4px">
       <div class="payment-title">Payments</div>
-      <div class="bt-sess-sub" style="margin-bottom:8px">Enable one or both payment methods. Leave both off and requests will be free and auto-approved.</div>
       <div class="pay-row" id="row-stripe">
         <span class="pay-label">Stripe 💳</span>
         <div class="toggle-track" id="tog-stripe" onclick="togglePayment('stripe')"><div class="toggle-thumb"></div></div>
@@ -448,7 +447,7 @@
         <span class="pay-label">Pay to bartender</span>
         <div class="toggle-track" id="tog-bartender" onclick="togglePayment('bartender')"><div class="toggle-thumb"></div></div>
       </div>
-      <div class="pay-warning" id="pay-warning">Both off — all requests auto-accepted for free</div>
+      <div class="pay-warning show" id="pay-warning">Both off: all requests auto-accepted for free</div>
     </div>
     <div class="payment-card" style="margin-top:14px">
       <div class="payment-title">Requests</div>
@@ -669,11 +668,9 @@ function updatePaymentUI() {
   $('tog-accepting')?.classList.toggle('on', S.acceptingRequests);
   $('tog-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
   $('row-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
-  const warn = $('pay-warning');
-  // Stripe is inert (not just its toggle disabled) in Local Only mode regardless of its stored
-  // value, so it counts as "off" here too - otherwise turning off bartender-pay alone wouldn't
-  // show the free/auto-accept warning even though Stripe can't actually cover it in this mode.
-  if (warn) warn.classList.toggle('show', (!S.stripeEnabled || stripeLocked) && !S.bartenderEnabled);
+  // pay-warning ("Both off: all requests auto-accepted for free") is always visible now
+  // (2026-08-17) -- was previously conditional on stripe/bartender both being off, which meant
+  // an operator only ever saw it after leaving both off, not as a heads-up beforehand.
   const acceptWarn = $('accepting-warning');
   if (acceptWarn) acceptWarn.style.display = S.acceptingRequests ? 'none' : 'block';
   updateBartenderPinUI();
