@@ -1414,6 +1414,21 @@ touched — user scoped this explicitly to "both platforms," meaning iOS/Android
 request to sweep every surface. Worth revisiting there later for the same simplification, not done
 as part of this pass.
 
+**"List on JukeBar map" switch style unified with the Payments switches (2026-08-17), Android**
+**only.** User noticed `NameEntryStep.kt`'s Discovery toggle looked different from Stripe/Bartender
+Pay on the same platform — checked CLAUDE.md and git history first, found no documented reason for
+the divergence, just an unreconciled one-off: black thumb + solid Coral track, vs. every Payments
+switch (`AdminScreen.kt`'s Stripe/Bartender/Accepting-requests, `ApprovalModeStep.kt`'s wizard
+toggle) using Coral thumb + translucent (40%) Coral track. Unified to the latter. Build-verified
+(`:app:compileDebugKotlin`). Android only — not extended to iOS: while checking whether iOS had the
+same problem, found `AdminView.swift`'s Payments toggles explicitly set `.tint(.orange)` while
+`SetupView.swift`'s "List on JukeBar map" `Toggle` has no explicit tint at all, inheriting the
+app-wide accent (`ContentView.swift`'s root `.tint(...)`, a peach/Coral color) instead — a similar
+*shape* of inconsistency to the one just fixed on Android, but not identical and not yet confirmed
+visually distinguishable on-device. Flagged to the user, not fixed — this task was scoped to
+Android only ("on Android" in the original question), and fixing an unrequested iOS issue wasn't
+part of what was asked.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

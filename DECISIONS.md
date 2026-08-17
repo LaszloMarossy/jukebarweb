@@ -328,3 +328,11 @@ folding the old separate always-visible status text + field + Save + Turn Off bu
 control. Footer collapsed to the user's own suggested one-liner. `static/admin.html`/LAN admin.html
 have the identical overloaded pattern but were deliberately left alone — scoped to "both platforms"
 meaning native apps, not a sweep of every surface.
+
+## 2026-08-17 — Android "List on JukeBar map" switch style unified with Payments switches
+
+User noticed the styling mismatch and asked why; no documented reason found, just an unreconciled
+one-off (black thumb + solid track vs. every Payments switch's Coral thumb + translucent track).
+User: "Yes, go ahead and fix it." Unified. While checking for the same issue on iOS, found a
+similar-shaped but not identical mismatch (Payments toggles have an explicit `.tint(.orange)`,
+"List on JukeBar map" has none) — flagged to the user, left unfixed since the ask was Android-only.
