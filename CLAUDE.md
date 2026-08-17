@@ -1349,6 +1349,23 @@ option card advances immediately on tap) and needed no change. Build-verified vi
 `:app:compileDebugKotlin` and the fuller `:app:assembleDebug`. No relay or iOS changes — this pass
 was Android-only, mirroring a fix iOS already had.
 
+**Bartender PIN field's keyboard couldn't be dismissed on the iOS live Admin screen (2026-08-17),**
+**iOS only.** `AdminView.swift`'s "New bartender PIN" `SecureField` uses `.keyboardType(.numberPad)`
+— iOS's numeric keypad has no Return/Done key of its own by design, so with no other dismiss
+mechanism wired up, the keyboard stayed on screen indefinitely once focused, with no way to get rid
+of it. Fixed by adding a `@FocusState private var bartenderPinFocused: Bool`, binding it to the
+field via `.focused($bartenderPinFocused)`, and adding a `ToolbarItemGroup(placement: .keyboard)`
+with a "Done" button to the Form's existing `.toolbar` block that clears it — the same idiom
+`SetupView.swift`'s currency field already established elsewhere in this app for exactly this
+class of no-Return-key field. Also clears focus automatically from `saveBartenderPin()` itself, so
+tapping Save (not just the keyboard's Done) drops the keyboard too. Audited the rest of
+`adminPanel`'s `Form` for the same pattern (grepped for `SecureField`/`TextField`/`keyboardType`
+within it) — this was the only field affected, so no broader sweep was needed. The "should show
+dots as I type" part of the original bug report needed no fix — `SecureField` already masks input
+with dots natively; only the missing dismiss mechanism was a real bug. Build-verified
+(`xcodebuild ... build`). No relay or Android changes — Android's equivalent bartender PIN field
+uses a different (non-SwiftUI) IME that isn't subject to this iOS-specific numberPad quirk.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

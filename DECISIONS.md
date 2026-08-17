@@ -303,3 +303,11 @@ scrollable Column, so nav always scrolled away, worst on the two steps with pote
 with the list"). Fixed the same way as iOS: split scrollable content from a pinned nav row on all 9
 files. Found and left alone two genuinely dead files with the same pattern (`SetupSummaryStep.kt`,
 `FolderPickerDialog.kt` — zero call sites, confirmed via grep) rather than fixing unreachable code.
+
+## 2026-08-17 — iOS bartender PIN field's keyboard couldn't be dismissed
+
+User: entering a new bartender PIN on the live Admin screen left the number-pad keyboard stuck on
+screen with no way to close it. Root cause: `.numberPad` has no Return/Done key on iOS, and nothing
+else in this field was wired to drop focus. Added `@FocusState` + a keyboard-toolbar Done button
+(same pattern already used for the setup wizard's currency field), and made Save also clear focus.
+Audited the rest of the Form for the same gap — this was the only affected field.
