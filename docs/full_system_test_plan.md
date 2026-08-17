@@ -835,6 +835,27 @@ fumbled their own PIN, not a hacker watchlist. The underlying per-IP throttle st
 of whether anyone ever looks at this tab; the tab is purely a convenience to shortcut someone's
 wait, not a defense mechanism itself.
 
+- [ ] **New (2026-08-17): Bartender Login QR card at the top of the Sessions tab, all 3 surfaces**
+      (render admin.html, LAN admin.html both platforms) — previously only kiosk-native drew an
+      actual QR image; these three only ever showed status text with no image or link at all. With
+      bartender access off, the card is hidden entirely. Turn it on — confirm the card appears with
+      a real, scannable QR (scan it with a phone camera and confirm it opens the correct
+      bartender.html URL for that surface — LAN's is `http://<lan-ip>:8080/bartender`, render's is
+      `https://jukebars.com/bartender/{id}?s={session}`), then turn access off — confirm the card
+      disappears again.
+  - [ ] Rotate the PIN while access stays on — confirm the QR still displays (its encoded URL
+        doesn't change on rotation, only the PIN does) and still scans/logs in successfully with
+        the new PIN.
+  - [ ] Confirm the QR endpoint itself is admin-token-gated on all 3 surfaces — a request with no
+        token or a bartender (non-admin) token gets rejected, not just hidden client-side.
+- [ ] **New (2026-08-17): session list order is chronological, earliest sign-in first, latest**
+      **last** — sign in 2+ bartenders in sequence, confirm the Sessions list shows them in the
+      order they signed in, not reverse. Sign in a *duplicate* (same name again, or a different
+      device) — confirm it appears at the bottom, below the original, not jumping to the top. Test
+      on all 3 surfaces (render, LAN both platforms) — this was a real, previously-undiscovered bug
+      on iOS specifically (unordered filesystem directory listing), fixed same day as this checkbox
+      was added; Android was already correct by construction.
+
 - [ ] Pair 2+ bartenders (different names/devices if possible), open the Sessions tab on each of
       the 3 admin surfaces — each shows every currently-paired bartender for **that surface's own**
       transport (LAN sessions and render sessions are separate pools — a bartender paired via LAN

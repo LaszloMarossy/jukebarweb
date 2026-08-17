@@ -374,3 +374,19 @@ page or android kiosk admin page." Checked directly (grep for QR-generation code
 re-asserting — user was right. Render and LAN admin.html only show status text, no image, no
 visible link at all; only kiosk-native (`QRImageView`/`generateQrBitmap`) actually renders one.
 Fixed a wrong "QR appeared on render" annotation I'd just added to the test plan in the process.
+
+## 2026-08-17 — Bartender QR added to render/LAN admin.html Sessions tab; sort order fixed
+
+User: "let remote admin surfaces carry the bartender QR code... Do it!" Implemented on all three
+(relay via new Python `qrcode` dependency, iOS/Android LAN via each platform's already-proven QR
+generator, reused not reimplemented) — round-trip-verified the relay's output before shipping
+(encoded, decoded with OpenCV, confirmed match). User redirected placement mid-build: "the QR codes
+should go under the Sessions tab above the already connected sessions" — moved from the
+Bartender-Access-PIN card to a new card atop the Sessions pane on all three.
+
+Separately, same message: "sessions should be listed in chronological order of sign in, earliest
+first, latest last (possible duplicates, hackers...)" — relay was sorting latest-first, flipped.
+Android was already correct (in-memory append-ordered list, no sort needed). Found a real bug on
+iOS while checking: its list came from a filesystem directory listing with no guaranteed order at
+all — added an explicit sort. Been silently unordered since the Sessions tab shipped 2026-08-02,
+never caught before.

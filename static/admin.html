@@ -474,6 +474,10 @@
     <div class="report-actions">
       <button class="btn-report" onclick="loadBartenderSessions()">↻ Refresh</button>
     </div>
+    <div class="payment-card" id="bt-qr-card" style="margin-top:4px; display:none; text-align:center">
+      <div class="payment-title" style="text-align:left">Bartender Login QR</div>
+      <img id="bt-qr" style="width:200px;height:200px;padding:10px;background:#fff;border-radius:12px">
+    </div>
     <div class="payment-card" style="margin-top:4px">
       <div class="payment-title">Active Bartender Sessions</div>
       <div id="bt-sessions-list"><div class="empty-state">Loading…</div></div>
@@ -702,6 +706,22 @@ function updateBartenderPinUI() {
   }
   const clearBtn = $('bt-pin-clear');
   if (clearBtn) clearBtn.style.display = (S.bartenderAccessEnabled && !pending) ? 'block' : 'none';
+  // Lives on the Sessions tab, not this card (2026-08-17) -- above the already-connected
+  // sessions list, so an admin can show a bartender the QR and see them appear in that same list.
+  const qrCard = $('bt-qr-card');
+  const qr = $('bt-qr');
+  if (qrCard && qr) {
+    if (S.bartenderAccessEnabled && !pending) {
+      // Cache-bust -- browsers cache <img> by URL, and the QR's encoded URL doesn't change on
+      // PIN rotation (same /bartender path), so without this a stale cached image could keep
+      // showing even though it'd still scan fine.
+      qr.src = `/api/bar/${S.jukebarId}/bartender_qr.png?s=${enc(S.session)}&token=${enc(S.token)}&t=${Date.now()}`;
+      qrCard.style.display = 'block';
+    } else {
+      qrCard.style.display = 'none';
+      qr.removeAttribute('src');
+    }
+  }
 }
 
 async function saveBartenderPin() {

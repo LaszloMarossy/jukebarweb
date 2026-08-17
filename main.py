@@ -25,6 +25,7 @@ KEY METHODS:
     tick) and clears a desired_settings entry once the echo matches it.
 """
 import asyncio
+import io
 import json
 import os
 import time
@@ -34,6 +35,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import qrcode
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -1467,7 +1469,11 @@ async def bartender_sessions(jukebar_id: str, s: str = Query(..., alias="s"), to
             for rec in bar.bartender_tokens.values()
             if rec.get("role") == "bartender"
         ),
-        key=lambda r: r["paired_at"], reverse=True,
+        # Earliest sign-in first, latest last (2026-08-17, was reverse=True/latest-first) — the
+        # earliest session for a given name is the presumed-legitimate one; later duplicates
+        # (same name signing in again, or an impostor) show up at the bottom where they stand out
+        # against the established order rather than jumping to the top.
+        key=lambda r: r["paired_at"],
     )
     lockouts = sorted(
         (
@@ -1484,6 +1490,27 @@ async def bartender_sessions(jukebar_id: str, s: str = Query(..., alias="s"), to
         key=lambda r: r["locked_until"], reverse=True,
     )
     return {"sessions": sessions, "lockouts": lockouts}
+
+
+@app.get("/api/bar/{jukebar_id}/bartender_qr.png")
+async def bar_bartender_qr(jukebar_id: str, s: str = Query(..., alias="s"), token: str = Query(..., alias="token")):
+    """
+    Bartender QR image for render admin.html's Sessions tab (2026-08-17). Before this, only
+    kiosk-native (iOS QRImageView / Android generateQrBitmap) actually drew a QR image — render
+    and LAN admin.html showed status text only, with no image and no visible link at all, so an
+    admin using either of those had no way to get the bartender URL except walking to the kiosk's
+    own screen. Admin-token-gated, same reasoning as the report endpoints (this reveals a live,
+    working login URL, not just informational text).
+    """
+    bar = _customer_bar(jukebar_id, s)
+    _require_admin_token(bar, token)
+    if not bar.bartender_pin_hash:
+        raise HTTPException(404, "Bartender access not enabled")
+    url = f"https://jukebars.com/bartender/{jukebar_id}?s={bar.session}"
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png", headers=_NO_CACHE)
 
 
 @app.post("/api/bar/{jukebar_id}/bartender_sessions/kill")

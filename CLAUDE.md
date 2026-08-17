@@ -1510,6 +1510,55 @@ from each of the 5 admin surfaces" checkbox) — the underlying PIN/pairing mech
 actually tested (status flipped to "on," login via the bartender.html URL succeeded) are still
 correctly recorded as confirmed; only the "QR appeared" wording was wrong and has been struck.
 
+**Bartender QR image added to render and LAN admin.html's Sessions tab, closing the gap from the**
+**correction above (2026-08-17), all three repos.** User: "let remote admin surfaces carry the
+bartender QR code so they can show it to bartenders without having to mess with the kiosk... Do
+it!" Deliberately reused each platform's already-proven QR generator rather than writing a new
+JS QR encoder from scratch (correctness risk for a hand-rolled implementation — Reed-Solomon/mask
+selection is easy to get subtly wrong) or loading a third-party JS QR library from a CDN (LAN pages
+must work with zero internet dependency by design):
+- **Relay** (`main.py`): new `GET /api/bar/{id}/bartender_qr.png`, admin-token-gated like the
+  report endpoints. Uses the `qrcode` Python library (new dependency, `qrcode[pil]` added to
+  `requirements.txt`) server-side — round-trip verified before shipping (encoded a URL, decoded
+  the resulting PNG back with OpenCV's `QRCodeDetector` in a throwaway venv, confirmed it matched
+  exactly) rather than trusting an unfamiliar library blind.
+- **iOS LAN** (`LocalServer.swift`): new `GET /api/admin/bartender_qr.png`, same admin-token gate.
+  Reuses `QRCodeView.swift`'s existing CoreImage `CIFilter.qrCodeGenerator()` logic — extracted
+  the generation code into a shared top-level `makeQRImage()` function so the SwiftUI view and the
+  new PNG-serving endpoint call the exact same, already-working code path, not a second
+  implementation.
+- **Android LAN** (`LocalServer.kt`): new `GET /api/admin/bartender_qr.png`, same gate. Reuses
+  `AdminScreen.kt`'s existing `generateQrBitmap()` (zxing) directly via import — same reasoning,
+  zero new QR logic.
+- **Placement, all three**: initially added under the Bartender Access card (where the PIN is
+  set), then the user redirected mid-implementation — "the QR codes should go under the Sessions
+  tab above the already connected sessions" — moved to a new card at the top of the Sessions
+  tab/pane, shown/hidden by the same `bartenderAccessEnabled` state already driving the existing
+  status text, with the `<img src>` cache-busted (`&t=Date.now()`) on every show so toggling
+  access off-then-on always fetches fresh rather than risking a stale browser-cached image.
+
+**Bartender Sessions list re-sorted to chronological (earliest-first), same pass — closes a**
+**latent iOS-only ordering bug found while implementing.** User: "sessions should be listed in
+chronological order of sign in, earliest first, latest last (possible duplicates, hackers[...])" —
+the earliest sign-in under a given name is presumed legitimate; a later duplicate (re-sign-in or
+an impostor) should sort to the bottom where it stands out, not jump to the top. Relay's
+`bartender_sessions()` was doing the opposite (`sorted(..., reverse=True)`, latest-first) — flipped
+to ascending. **Android was already correct without any change**: `LocalRequestManager.
+listBartenderSessions()` returns a `CopyOnWriteArrayList` in append order with no sort applied at
+all, so pairing order (= chronological) was already what shipped. **iOS had a real, previously
+undiscovered bug**: `LocalServer.swift`'s `/api/bartender/sessions` read `storage.loadBartenders()`,
+which lists a directory (`FileManager.contentsOfDirectory`) — filesystem directory listings have
+no guaranteed chronological order at all, unlike Android's in-memory list. Added an explicit
+`.sorted { $0.pairedAt < $1.pairedAt }` — this had been silently unordered (whatever order the
+filesystem happened to return) since the Sessions tab shipped 2026-08-02, never caught before now
+because nobody had paired enough bartenders in one session to notice. `_bartender_lockouts`'
+"Waiting to Retry" sort (`locked_until`, still descending) was deliberately left untouched — that's
+a different list sorted for a different reason (soonest-to-retry visibility), not "sign-in order,"
+and the user's request was specific to sessions.
+
+All three platforms build/import-verified (`xcodebuild ... build`, `:app:compileDebugKotlin`,
+direct Python import with the new `qrcode` dependency installed).
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
