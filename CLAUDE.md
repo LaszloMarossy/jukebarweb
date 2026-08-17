@@ -1251,6 +1251,29 @@ app at all rather than locking a moment after. No code change; confirmed via dir
 (`KioskView.swift:26-33`, the existing "no public API" comment) rather than re-litigating from
 memory.
 
+**Guided Access given its own wizard step (2026-08-17), iOS only — the mirror-image of Android's**
+**Device Protection step, for the platform that has no programmatic equivalent at all.** Once the
+prior research confirmed Apple exposes zero API for a third-party app to lock the device or
+start/stop Guided Access (see the entry above this one), the user's own reaction was that Guided
+Access is "EXACTLY what we need" and asked for it to get the same wizard-step treatment Android's
+Device Protection just got, right after the payment-choices screen. New `SetupStep.guidedAccess`
+case, inserted between `.approvalMode` (the "enable one or both payment methods" screen — the
+actual "payment choices" screen the user meant, confirmed by the step's own on-screen copy) and
+`.pricing`; `SetupView.swift`'s `previousStep`/`bottomNavBar` switches rewired accordingly, and the
+old `Step 6/7` `// MARK:` comments renumbered to `7/8` to keep the sequence honest. New
+`guidedAccessStep` view explains the gap in plain language (admin PIN protects the app's settings,
+not the device itself), then gives the exact three manual steps (Settings → Accessibility →
+Guided Access → on; set a passcode or Face/Touch ID; triple-click the side/Home button once the
+kiosk is running, every session) — deliberately advisory-only and skippable via the same
+"Next"-always-enabled pattern the rest of this wizard already uses for non-blocking steps, since
+there's nothing to gate on: `UIAccessibility.isGuidedAccessEnabled` only reflects an active
+session, not the Settings-level toggle, so it would read false at this point in setup regardless of
+whether the operator actually did anything. No live status shown here for that reason — the
+existing `KioskView.swift` warning caption (unaffected, unchanged) remains the only place this app
+can ever detect and react to Guided Access state, once the kiosk is actually running. Build-verified
+via `xcodebuild ... build` (clean). No relay or Android changes — Android has no Guided Access
+equivalent to mirror this into.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

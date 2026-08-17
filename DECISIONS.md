@@ -256,3 +256,15 @@ re-established it. User's own proposed fix ("re-press Done from the kiosk admin 
 re-activate Pinned App") is now wired in, alongside a more general `onResume()`-based re-pin covering
 paths that don't go through Admin (e.g. returning through Device Protection's own lock screen). Android
 only, no relay or iOS involvement anywhere in this arc.
+
+## 2026-08-17 — Guided Access given its own wizard step, iOS
+
+Follow-up to confirming iOS has no `lockNow()` equivalent at all (checked directly against
+`KioskView.swift`, not assumed). User: "ios guided access is EXACTLY what we need... too bad Android
+does not have this" — asked for the same wizard-step treatment Android's Device Protection just got.
+New `SetupStep.guidedAccess` step in `SetupView.swift`, inserted right after the payment-choices
+screen (Stripe/bartender-pay toggles) and before Pricing, explaining the gap and giving the three
+manual steps to enable it (Settings → Accessibility → Guided Access; set a passcode/Face ID; triple-click
+once the kiosk is running). Deliberately non-blocking — Apple gives no API to check the Settings-level
+toggle from inside setup, so there's nothing to gate "Next" on. Build-verified (`xcodebuild ... build`).
+No relay or Android changes — Android has nothing equivalent to mirror this into.

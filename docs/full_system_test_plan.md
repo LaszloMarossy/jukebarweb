@@ -881,6 +881,21 @@ requires MDM/device-provisioning, explicitly out of scope this pass (see CLAUDE.
         the warning caption reappears
   - [ ] **Cannot be tested in iOS Simulator** — Guided Access is real-hardware-only; this entire
         section needs a physical device
+- [ ] **New (2026-08-17): dedicated Guided Access wizard step**, iOS only — mirrors Android's Device
+      Protection step. Walk through setup: right after the payment-choices screen (Stripe / Pay to
+      bartender toggles), confirm a "Protect this device" step appears, before Pricing, explaining
+      the gap in plain language (the admin PIN protects the app's own settings, not the device
+      itself) before giving the three manual steps (Settings → Accessibility → Guided Access → On;
+      set a passcode or Face/Touch ID; triple-click once the kiosk is running).
+  - [ ] Confirm the step is purely informational and never blocks — "Next" is always enabled here
+        regardless of whether Guided Access is actually on, since there's no way to detect the
+        Settings-level toggle from inside setup (only an active session, which can't exist yet at
+        this point in the wizard).
+  - [ ] Confirm Back/Next navigation is correct: Back returns to the payment-choices screen with its
+        prior toggle state intact; Next proceeds to Pricing.
+  - [ ] Confirm this step is purely additive — the existing live `KioskView.swift` warning caption
+        (tested above) is unchanged and still the only place Guided Access status is actually
+        detected once a session is running.
 - [ ] **Setup wizard advisory, both platforms, Local Only / Local + Remote steps only** (not Remote
       Only): a recommendation to enable the platform's lockdown mechanism is visible on both cards
   - [ ] iOS: this is a **live conditional check** — with Guided Access already enabled before
