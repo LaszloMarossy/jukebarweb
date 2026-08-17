@@ -955,6 +955,30 @@ mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
       mechanisms) — pinning still needs to be separately engaged per the section above.
   - [ ] Remote Only's card has no such advisory on either platform
 
+### Screen Pinning re-establishes itself after being exited (new 2026-08-17) — Android only
+
+**Setup**: Android host, `localOnly` or `localAndRemote` kiosk mode (pinning is a no-op in
+`remoteOnly` — nothing to re-establish there), Screen Pinning already engaged from setup.
+
+Previously, once pinning was lost — by any path — nothing brought it back; the app just stayed
+unpinned indefinitely until the whole session/setup was redone. Two independent triggers now
+reassert it:
+
+- [ ] **Admin Done button**: from the kiosk's now-playing screen, unpin the device (the standard
+      two-button gesture), confirm Device Protection's lock screen appears (if enabled) and unlock
+      it, then unlock Admin from within the kiosk and press "Done" to return to the customer view —
+      confirm the device re-pins itself immediately, with no separate action needed.
+- [ ] **General resume path**: with pinning lost the same way, instead of going through Admin, just
+      return to the app via recents (or by unlocking Device Protection's lock screen straight back
+      into the kiosk) — confirm pinning re-establishes on this path too, without visiting Admin at
+      all.
+- [ ] Confirm re-pinning is silent — no dialog, no visible flicker/prompt, just the app pinned again
+      by the time the customer view is back on screen.
+- [ ] With Device Protection also On, confirm the two mechanisms compose correctly end-to-end: exit
+      the kiosk any way → device force-locks (Device Protection) → unlock with device PIN → app
+      re-pins itself (this fix) — a full loop back to a fully secured state with no manual pinning
+      step required from the operator.
+
 ### Android: empty admin PIN bypass (new 2026-08-02, item 3) — was a real reachable bug, now fixed
 
 - [ ] **Regression, the core bug**: on an existing bar (has a saved PIN), re-run the setup wizard

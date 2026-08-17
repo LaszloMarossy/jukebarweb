@@ -1211,6 +1211,23 @@ isn't — visible, honest friction instead of a silent bypass. Build-verified vi
 `:app:assembleDebug`. No relay or iOS changes — iOS has no Device Administrator equivalent to
 build a matching step around.
 
+**Screen Pinning never re-established itself after being exited (2026-08-17), Android only.**
+User confirmed Device Protection works exactly as intended (screen locks immediately on exit,
+requiring the device's own PIN), then asked the natural follow-up: once pinning is exited, is there
+any way back into a pinned state short of tearing down the whole session? There wasn't — the
+pinning `LaunchedEffect` only reacts to `isSetupComplete`/`kioskMode` *changing*, and neither
+changes just from returning to the app (via the unpin gesture and back through Device Protection's
+lock screen, or any other path), so pinning silently stayed off indefinitely once lost. User's own
+proposed fix — re-pin when closing the kiosk's Admin panel via "Done" — was exactly right and is
+now wired in (`KioskView.kt`'s `onAdminClosed` callback, invoked alongside the existing
+`showAdminScreen = false`). Added a second, more general fix alongside it: `MainActivity.kt`'s
+`onResume()` now also reasserts pinning on every return to the foreground, covering paths the
+Admin-Done trigger can't reach — most importantly, coming back through Device Protection's own
+lock screen, which is a real Activity pause/resume cycle. Both routes share one new
+`reassertLockTaskPinning()` helper (guarded by the existing `updateLockTaskPinning()`'s
+already-pinned no-op check, so calling it redundantly from both paths is harmless). Build-verified
+via `:app:assembleDebug`. No relay or iOS changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

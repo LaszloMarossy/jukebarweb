@@ -233,3 +233,26 @@ deferred-but-doable fix — it's a fact about what's achievable in app code (tru
 lockdown on either platform requires enterprise MDM device provisioning, a hardware/procurement
 decision, not a code change). No code touched; only cleaned up a cross-reference that read as if it
 were still an open item. All four items from the 2026-08-08 scope-boundary review are now resolved.
+
+## 2026-08-17 — Android kiosk physical security: Device Protection replaces failed unpin-detection, gets its own wizard step, and now self-heals
+
+User's real concern turned out to be broader than the original ask ("require PIN to unpin"): "someone
+unlocking the pinned device and looking around on the device, including the settings... The app pin is
+not a solution here." Built Device Protection instead — `DevicePolicyManager.lockNow()` via a
+lightweight Device Administrator grant, triggered from `onStop()` — which force-locks the real OS lock
+screen the instant the kiosk app is exited by any means, in any kiosk mode including `remoteOnly`. This
+replaced an earlier app-level polling+PIN-recovery mechanism (`KioskUnpinnedScreen`) that misfired live
+in testing twice in a row (a false "unpinned" trip right after launch, unresolved even after a warm-up-phase
+fix attempt) — rather than chase a third timing bug, removed that layer entirely in favor of the plain
+lifecycle-callback approach, which doesn't have that class of bug at all.
+
+User then noticed the new feature was undiscoverable ("I do not recall being asked about agreeing to
+this device admin role") — it only ever lived on the live admin screen. Gave it its own non-blocking
+wizard step (`WizardStep.DEVICE_PROTECTION`, right after Admin PIN) explaining the gap before asking for
+anything.
+
+Final follow-up: once confirmed working, user asked what happens after pinning is exited — nothing
+re-established it. User's own proposed fix ("re-press Done from the kiosk admin screen should
+re-activate Pinned App") is now wired in, alongside a more general `onResume()`-based re-pin covering
+paths that don't go through Admin (e.g. returning through Device Protection's own lock screen). Android
+only, no relay or iOS involvement anywhere in this arc.
