@@ -311,3 +311,10 @@ screen with no way to close it. Root cause: `.numberPad` has no Return/Done key 
 else in this field was wired to drop focus. Added `@FocusState` + a keyboard-toolbar Done button
 (same pattern already used for the setup wizard's currency field), and made Save also clear focus.
 Audited the rest of the Form for the same gap — this was the only affected field.
+
+## 2026-08-17 — Android Spotify Playlist step's nav buttons leaned into the system nav bar
+
+User: buttons on that step sit lower than every other wizard step, into the nav bar area. Every
+other step's nav row already had `.windowInsetsPadding(WindowInsets.navigationBars)`; this one file
+never did — a pre-existing gap carried forward, not introduced, by the earlier same-day pinned-nav
+fix. Added the missing inset to match every sibling step.

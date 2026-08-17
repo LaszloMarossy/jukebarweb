@@ -1366,6 +1366,17 @@ with dots natively; only the missing dismiss mechanism was a real bug. Build-ver
 (`xcodebuild ... build`). No relay or Android changes — Android's equivalent bartender PIN field
 uses a different (non-SwiftUI) IME that isn't subject to this iOS-specific numberPad quirk.
 
+**Android Spotify Playlist step's nav row was missing the system nav-bar inset, follow-up to the**
+**pinned-nav-bar fix above (2026-08-17).** User: buttons on that step "lean into the nav bar below
+it," unlike every other wizard step. Root cause: `SpotifyPlaylistStep.kt`'s nav `Row` never had
+`.windowInsetsPadding(WindowInsets.navigationBars)` — every other step's nav row already had it
+(`NameEntryStep`, `AdminPinStep`, `DeviceProtectionStep`, `ApprovalModeStep`, `PricingStep`,
+`NetworkModeStep`, `LocalFolderStep`, `SpotifyDeviceStep`), this one file was the one omission, and
+it predated the same-day pinning fix — consolidating the three previous nav render sites in that
+file carried the gap forward rather than introducing it. Fixed by adding the same inset modifier,
+matching every sibling step exactly. Build-verified (`:app:compileDebugKotlin`). No relay or iOS
+changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
