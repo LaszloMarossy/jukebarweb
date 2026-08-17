@@ -1429,6 +1429,26 @@ visually distinguishable on-device. Flagged to the user, not fixed — this task
 Android only ("on Android" in the original question), and fixing an unrequested iOS issue wasn't
 part of what was asked.
 
+**Admin screen header split into two non-scrolling rows so a long bar name can't force truncation**
+**(2026-08-17), both platforms — this is the wizard's SUMMARY step too, same composable.** User:
+"do not truncate to force onto a single row." Both platforms previously crammed logo + "JukeBar" +
+bar name + "Admin" label + Done button into one single-line row — Android via a plain `Row` with no
+wrap capability (long names would overflow past the Done button), iOS via a toolbar `.principal`
+item with `.lineLimit(1)` (long names literally truncated with an ellipsis, since a nav-bar toolbar
+item can't grow taller). Fixed identically on both: row 1 is logo + "JukeBar" + bar name (Android:
+`Modifier.weight(1f, fill = false)` on the name `Text` so it wraps within available width instead
+of overflowing; iOS: no `lineLimit` at all, so `Text` wraps naturally), row 2 is "Admin" + Done,
+`SpaceBetween`. **iOS needed a bigger structural change than Android**: a toolbar `.principal` item
+is fixed-height and can't reasonably hold two rows, so the header was pulled out of the toolbar
+entirely into a plain `VStack` above the `Form`, with `.toolbar(.hidden, for: .navigationBar)` on
+the whole `adminPanel` and the Done button now a plain `Button` in the custom header instead of a
+`ToolbarItem(placement: .confirmationAction)`. The keyboard-dismiss `ToolbarItemGroup(placement:
+.keyboard)` from the bartender-PIN fix earlier this session is unaffected — keyboard accessory
+toolbars attach to the responder chain, not the navigation bar, so hiding the nav bar doesn't
+touch it. Android's change was smaller — same `Column`-based header as before, just split into two
+rows instead of one `Row`. Both platforms build-verified (`xcodebuild ... build`,
+`:app:compileDebugKotlin`). No relay changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

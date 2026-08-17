@@ -336,3 +336,12 @@ one-off (black thumb + solid track vs. every Payments switch's Coral thumb + tra
 User: "Yes, go ahead and fix it." Unified. While checking for the same issue on iOS, found a
 similar-shaped but not identical mismatch (Payments toggles have an explicit `.tint(.orange)`,
 "List on JukeBar map" has none) — flagged to the user, left unfixed since the ask was Android-only.
+
+## 2026-08-17 — Admin screen header split into two rows so long bar names can't be truncated
+
+User: "do not truncate to force onto a single row" — both platforms crammed logo/JukeBar/bar
+name/Admin/Done into one line (Android: plain Row, could overflow; iOS: toolbar .principal item
+with lineLimit(1), actually truncated with an ellipsis). Split into two rows on both: row 1 is
+logo + JukeBar + bar name (wraps), row 2 is "Admin" + Done. iOS needed a bigger change since a
+toolbar principal item can't grow taller — pulled the header out of the toolbar into a plain
+VStack above the Form, hiding the nav bar entirely; Done became a plain button in that header.
