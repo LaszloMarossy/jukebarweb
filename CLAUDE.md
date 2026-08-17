@@ -1189,6 +1189,28 @@ lesson from the Device Protection feature's own XML comment mistake the day befo
 Kotlin-only build doesn't validate manifest/resource changes, and this removal touched enough
 surface area to be worth the fuller check again.
 
+**Device Protection given its own wizard step (2026-08-17), Android only.** The Enable/Turn Off
+control had only ever existed on the live admin screen, reachable by unlocking Admin from the
+kiosk — nothing in setup ever prompted for it, so in practice it went unused (this is also root of
+why the user never saw the Device Admin consent dialog during the wizard: nothing pointed there).
+New `WizardStep.DEVICE_PROTECTION`, inserted right after Admin PIN — "you just secured admin
+access with a PIN, now secure the device itself" reads as one continuous idea, and it's the
+natural place given the step is otherwise about device-level security. New
+`DeviceProtectionStep.kt` explains the actual gap in plain language before asking for anything
+(the admin PIN alone doesn't stop someone from just leaving the app and reaching Settings
+directly), shows live status, and reuses the same `KioskDeviceAdminReceiver`/`isAdminActive()`/
+resume-triggered-recheck pattern as the existing `AdminScreen.kt` card — that card is unchanged
+and still there for enabling/disabling later, the wizard step doesn't replace it.
+
+**Deliberately still skippable, not a blocking gate** — granting Device Admin is a real system
+permission with its own consent dialog; forcing it would be worse than clearly recommending it and
+moving on if declined, same philosophy already established for the non-blocking Screen Pinning /
+device-lock-screen advisories on the Display Mode step. The Next button's label reflects this
+plainly rather than pretending it's neutral: "Next →" once enabled, "Skip for now →" while it
+isn't — visible, honest friction instead of a silent bypass. Build-verified via
+`:app:assembleDebug`. No relay or iOS changes — iOS has no Device Administrator equivalent to
+build a matching step around.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

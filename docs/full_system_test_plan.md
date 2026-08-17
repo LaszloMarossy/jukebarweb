@@ -918,13 +918,19 @@ they no longer apply to any shipped code.
 to be observable at all — see the warning-banner test below for the no-credential case), any kiosk
 mode including `remoteOnly`. No iOS equivalent — see CLAUDE.md.
 
-- [ ] **Reaching the card at all requires unlocking Admin first** — from the live kiosk's
-      now-playing screen (not just the wizard's Summary step), tap into Admin and enter the admin
-      PIN. This is worth calling out explicitly: the false-unpin bug above being live at the same
-      time this feature first shipped meant the admin screen was hard to reach at all, which is
-      why Device Admin consent was never actually seen in that round of testing — confirm this
-      path is now straightforwardly reachable.
-- [ ] On the admin screen, find the new "🔒 Device Protection" card. Confirm it starts **Off**.
+- [ ] **New (2026-08-17): dedicated wizard step.** Walk through setup — right after Admin PIN,
+      confirm a "Device Protection" step appears (before Request Handling), explaining the gap in
+      plain language before asking for anything. Confirm the Next button reads "Skip for now →"
+      while not yet enabled, and "Next →" once it is — this is deliberate, visible friction, not a
+      silent bypass.
+- [ ] From this wizard step, tap "Enable Device Protection" — confirm the real Android system
+      consent dialog appears ("Activate this device admin app?"). Approve it, confirm the step's
+      status flips to **On** without needing to background/foreground manually.
+- [ ] Tap "Skip for now" without enabling — confirm setup proceeds normally, nothing blocks it.
+- [ ] **The live admin-screen card still exists too, unchanged** — from the kiosk's now-playing
+      screen, unlock Admin, find the "🔒 Device Protection" card, confirm its state matches
+      whatever was set (or skipped) during the wizard, and confirm toggling it there still works
+      normally after setup is complete.
 - [ ] Tap "Enable Device Protection" — confirm the real Android system consent dialog appears
       ("Activate this device admin app?"), not anything built by this app. Approve it.
 - [ ] Confirm the card flips to **On** shortly after returning to the app (no manual refresh/tab
