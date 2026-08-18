@@ -415,3 +415,16 @@ every bartender token. Android already did this correctly (confirmed by reading
 persisted "setup complete" flag (not just inferring from file presence, since End Session
 deliberately leaves those files on disk) and a migration for already-live installs upgrading to
 this fix.
+
+## 2026-08-18 — Reverted the above same day: user's explicit design call, plus a corrected diagnosis
+
+Two things overturned it: the original report's host was actually Android, not iOS ("the host must
+have been on Android"), so the iOS fix was never the real explanation; and an explicit reversal of
+the whole premise: "if the session restarts... the session RIGHTFULLY should end... so kiosk
+session restart should wipe the sessions and force a new session." Reverted `AppState.swift` in
+full back to "no auto-restore." Actual likely cause of the original report: Render auto-deploys on
+every push to jukebarweb's `main`, and this session pushed to `main.py` repeatedly while the user
+was live-testing — each deploy restarts the relay process and wipes `_bars` (in-memory only),
+killing every bartender token with zero host involvement. Accepted as expected/by-design, not
+fixed — matches the user's own stated position. Lesson: avoid pushing to jukebarweb's `main` while
+the user is actively live-testing a session.

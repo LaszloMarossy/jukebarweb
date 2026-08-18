@@ -844,42 +844,43 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
 - [ ] Relay restart clears all render-side lockouts (in-memory only, same accepted tradeoff as
       `bar.requests`) — not a bug, matches existing relay-restart behavior elsewhere
 
-### iOS session survives an app process kill (fixed 2026-08-18) — iOS only, Android was already correct
+### iOS session-survives-app-kill — REVERTED 2026-08-18, see below for why
 
-**Context**: found while investigating a user report of a bartender session going invalid on
-render without anyone choosing End Session. Root cause: iOS never restored `isSetupComplete` on a
-cold app launch, so *any* process kill — not just an intentional force-quit, also iOS killing the
-app under memory pressure, a crash, or a device reboot — landed back on the setup wizard, and
-completing it (even via pre-filled fields) minted a brand-new session, silently invalidating every
-paired bartender's token and the customer QR link. Android already restored correctly.
+Built same-day in response to a user report of a bartender session going invalid on render without
+anyone choosing End Session — made iOS auto-restore `isSetupComplete`/session across any cold app
+launch (mirroring what was believed to be Android's equivalent behavior). **User's explicit
+follow-up after discussion reversed this design entirely**: "if the session restarts (either by me
+or reloading the app, or anything), the session RIGHTFULLY should end... there is just no way we
+should try to managing keeping an ongoing session during this time in our complex system... so
+kiosk session restart should wipe the sessions and force a new session." Reverted in full —
+`AppState.swift` is back to its original "no auto-restore" behavior, both platforms. The original
+report turned out to describe an Android-hosted bar with no host-side restart at all, so this fix
+was never the actual explanation anyway — see the "Relay restarts wipe all live bar state" entry
+below for the actual, accepted-as-by-design cause. If this test section's checkboxes still exist in
+an older copy of this doc, they no longer apply to any shipped code.
 
-- [ ] **Core fix, iOS**: with a live session running (bartender paired, customer QR in use), force-
-      quit the app (swipe away in the app switcher, or `xcrun simctl terminate` on a simulator) and
-      relaunch. Confirm: the app goes straight back to the kiosk/now-playing view, **not** the setup
-      wizard — no fields need re-entering, no Finish button needs tapping.
-  - [ ] Confirm a bartender who was paired/logged in *before* the kill can still act normally after
-        the relaunch (poll succeeds, approve/deny works) — their token must still be valid, proving
-        the session id itself didn't change.
-  - [ ] Confirm the customer-facing QR/link from before the kill still works after the relaunch (no
-        "session no longer valid" on `customer.html`/`bartender.html`/`admin.html`).
-  - [ ] Confirm the relay's copy of `bar.session` is unchanged across the kill — the next
-        `host_register()` call should update the *existing* `BarSession` in place, not replace it
-        (no gap in Now Playing/Up Next, no fresh registration side effects).
-- [ ] **End Session still starts fresh correctly** — explicitly End Session, force-quit before
-      re-running the wizard, relaunch. Confirm the app shows the wizard (pre-filled), **not** an
-      auto-resume into the just-ended session — this is the specific case the fix has to get right
-      to not regress: presence of old config/session files alone must not be enough to trigger
-      resume once End Session has been chosen.
-- [ ] **Fresh install / first-time setup unaffected** — on a device that has never completed setup,
-      confirm the app still starts at the wizard as normal (no crash, no attempt to restore
-      nonexistent state).
-- [ ] **Upgrade migration**: simulate an install that completed setup *before* this fix shipped (no
-      `setup_complete_v1` flag in UserDefaults yet, but valid config/session files already on disk)
-      — confirm the first launch after upgrading still resumes correctly (doesn't spuriously bounce
-      to the wizard), and that the flag is then present for all subsequent launches.
-- [ ] **Android regression check** — confirm Android's already-correct equivalent behavior
-      (`MainActivity.restoreSetupState()`) is unaffected by this iOS-only change (it should be,
-      since nothing here touches Android, but worth a quick confirm given how central this path is).
+### Relay restarts wipe all live bar state, including bartender sessions — confirmed by design, not a bug (2026-08-18)
+
+**Context**: user saw "invalid session" on an iPhone remote view of a bartender session, with the
+host on Android and no recollection of restarting the host app at all. Root cause almost certainly
+isn't the host: `main.py`'s `_bars` dict is in-memory only (documented elsewhere in this file and
+in CLAUDE.md's architecture notes) — a relay process restart wipes it entirely, including every
+`bartender_tokens` entry, regardless of what the host is doing. Render (this project's host) is
+configured to auto-deploy on every push to jukebarweb's `main` branch, and this session pushed to
+`main.py` repeatedly while the user was live-testing — each push almost certainly triggered exactly
+this. **Accepted as expected behavior, not something to build resilience against** — matches the
+user's own stated position (see the reverted entry above) that a restart, for any reason, should
+just start a clean new session rather than the system trying to preserve continuity across it.
+
+- [ ] Confirm: pushing a new commit to jukebarweb's `main` branch while a bar has an active session
+      (bartender paired, customer QR in use) causes exactly this symptom — remote clients get
+      "invalid session"/"session expired" on their next request after the relay restarts.
+- [ ] Confirm this self-heals for the *host* automatically within one register/sync cycle (a few
+      seconds) — Now Playing/Up Next reappear once the host's next call repopulates `_bars` — but
+      does **not** self-heal for already-connected bartender/customer browser tabs, which need a
+      fresh QR scan or re-pair, matching the "no resilience" design decision above.
+- [ ] If doing live user-facing testing against jukebarweb again in the future, avoid pushing to
+      `main` mid-session, or expect this — not a regression to chase if it happens.
 
 ### Bartender Sessions admin tab (new 2026-08-02) — LAN admin.html (both platforms) + render admin.html only, NOT kiosk-native
 

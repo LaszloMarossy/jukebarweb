@@ -1638,6 +1638,40 @@ doesn't spuriously bounce an already-live bar to the wizard once on its first po
 Build-verified (`xcodebuild ... build`). No relay or Android changes — Android was already correct,
 confirmed by reading the code rather than assumed innocent by default.
 
+**Reverted the iOS session-survives-app-kill fix above, same day — user's explicit design call,**
+**not a bug in the fix itself.** After shipping it, the user gave two pieces of new information
+that together fully overturned the premise: (1) "I have seen these errors on iOS, meaning, the
+host must have been on Android" — the original report's host was Android, not iOS, so the iOS fix
+was never actually the explanation for what they saw; and (2) an explicit, unambiguous design
+call: "if the session restarts (either by me or reloading the app, or anything), the session
+RIGHTFULLY should end... there is just no way we should try to managing keeping an ongoing session
+during this time in our complex system... so kiosk session restart should wipe the sessions and
+force a new session." This directly overturns the fix's whole premise (that a restart should be
+survivable) — reverted in full: `AppState.swift`'s `init()` is back to the original "no
+auto-restore" comment/behavior, `setupCompleteKey` and its three call sites (`init()`, `finishSetup()`,
+`resetSetup()`) all removed. Android's already-correct `MainActivity.restoreSetupState()` was never
+touched by any of this and remains as-is — **not because it's now considered wrong**, but because
+reverting it would be a separate, unrequested behavior change on a platform the user didn't ask
+about; this note exists so a future pass doesn't assume Android needs to match iOS's now-reverted
+"no restore" behavior for consistency's sake — the two platforms are deliberately left asymmetric
+here, matching the user's Android-specific "session restart should force a new session" framing
+without touching working Android code.
+
+**The actual likely cause of the original report: Render auto-deploys on every push to jukebarweb's**
+**`main` branch, and this session pushed to `main.py` repeatedly while the user was live-testing** —
+each deploy restarts the `uvicorn main:app` process, wiping `_bars` (in-memory only, documented
+throughout this file and `docs/architecture.html`) entirely, including every `bartender_tokens`
+entry, with zero involvement from either host platform. This fully explains "I do not recall any
+changes to the host" — there weren't any; the relay was what restarted. Confirmed via `render.yaml`
+(a standard Render web service, no explicit auto-deploy override) plus the sheer volume of `main.py`
+pushes this same session (bartender QR endpoint, sort-order fix, name field, etc.) landed while
+testing was ongoing. **Accepted as expected, by-design behavior, not fixed** — this matches the
+user's own just-stated position that session continuity across any kind of restart isn't something
+worth engineering resilience for. Practical lesson for future sessions: avoid pushing to jukebarweb's
+`main` while the user is actively live-testing a session, since every push is a relay restart.
+
+Both iOS build-verified after the revert (`xcodebuild ... build`). No relay or Android changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
