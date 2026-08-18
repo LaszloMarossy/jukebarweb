@@ -402,3 +402,16 @@ name in the existing peach accent color, and its "Updated" badge moved into the 
 requests pane. LAN's "Updated" was already correctly placed (confirmed by reading the code, not
 assumed) — only the name-display gap needed fixing there, via a new `name` field on both LAN
 platforms' pair/status responses.
+
+## 2026-08-18 — iOS: fixed a real "no auto-restore" bug that silently rotated sessions
+
+User: bartender session on render said "no longer valid" despite not closing the kiosk app — asked
+me to confirm sessions only expire via explicit new-session or Kill. Traced to a genuine gap:
+`AppState.swift` never restored `isSetupComplete` on a cold launch (its own comment said "no
+auto-restore"), so any process kill — not just an intentional End Session — landed back on the
+wizard, and completing it (even via pre-filled fields) minted a new session, silently invalidating
+every bartender token. Android already did this correctly (confirmed by reading
+`MainActivity.restoreSetupState()`). Fixed with the same shape of restore, plus a dedicated
+persisted "setup complete" flag (not just inferring from file presence, since End Session
+deliberately leaves those files on disk) and a migration for already-live installs upgrading to
+this fix.

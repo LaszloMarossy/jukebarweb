@@ -844,6 +844,43 @@ empty, the bartender role doesn't exist for that bar at all (no QR, no page, no 
 - [ ] Relay restart clears all render-side lockouts (in-memory only, same accepted tradeoff as
       `bar.requests`) — not a bug, matches existing relay-restart behavior elsewhere
 
+### iOS session survives an app process kill (fixed 2026-08-18) — iOS only, Android was already correct
+
+**Context**: found while investigating a user report of a bartender session going invalid on
+render without anyone choosing End Session. Root cause: iOS never restored `isSetupComplete` on a
+cold app launch, so *any* process kill — not just an intentional force-quit, also iOS killing the
+app under memory pressure, a crash, or a device reboot — landed back on the setup wizard, and
+completing it (even via pre-filled fields) minted a brand-new session, silently invalidating every
+paired bartender's token and the customer QR link. Android already restored correctly.
+
+- [ ] **Core fix, iOS**: with a live session running (bartender paired, customer QR in use), force-
+      quit the app (swipe away in the app switcher, or `xcrun simctl terminate` on a simulator) and
+      relaunch. Confirm: the app goes straight back to the kiosk/now-playing view, **not** the setup
+      wizard — no fields need re-entering, no Finish button needs tapping.
+  - [ ] Confirm a bartender who was paired/logged in *before* the kill can still act normally after
+        the relaunch (poll succeeds, approve/deny works) — their token must still be valid, proving
+        the session id itself didn't change.
+  - [ ] Confirm the customer-facing QR/link from before the kill still works after the relaunch (no
+        "session no longer valid" on `customer.html`/`bartender.html`/`admin.html`).
+  - [ ] Confirm the relay's copy of `bar.session` is unchanged across the kill — the next
+        `host_register()` call should update the *existing* `BarSession` in place, not replace it
+        (no gap in Now Playing/Up Next, no fresh registration side effects).
+- [ ] **End Session still starts fresh correctly** — explicitly End Session, force-quit before
+      re-running the wizard, relaunch. Confirm the app shows the wizard (pre-filled), **not** an
+      auto-resume into the just-ended session — this is the specific case the fix has to get right
+      to not regress: presence of old config/session files alone must not be enough to trigger
+      resume once End Session has been chosen.
+- [ ] **Fresh install / first-time setup unaffected** — on a device that has never completed setup,
+      confirm the app still starts at the wizard as normal (no crash, no attempt to restore
+      nonexistent state).
+- [ ] **Upgrade migration**: simulate an install that completed setup *before* this fix shipped (no
+      `setup_complete_v1` flag in UserDefaults yet, but valid config/session files already on disk)
+      — confirm the first launch after upgrading still resumes correctly (doesn't spuriously bounce
+      to the wizard), and that the flag is then present for all subsequent launches.
+- [ ] **Android regression check** — confirm Android's already-correct equivalent behavior
+      (`MainActivity.restoreSetupState()`) is unaffected by this iOS-only change (it should be,
+      since nothing here touches Android, but worth a quick confirm given how central this path is).
+
 ### Bartender Sessions admin tab (new 2026-08-02) — LAN admin.html (both platforms) + render admin.html only, NOT kiosk-native
 
 Surfaces existing paired-bartender and PIN-lockout bookkeeping behind a new "Sessions" tab, with

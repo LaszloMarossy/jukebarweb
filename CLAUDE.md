@@ -1595,6 +1595,49 @@ static HTML/JS, reviewed directly). No relay Python changes — `main.py`'s `bar
 already accepted and stored `name` from the earlier same-day fix, this pass only touched what the
 client displays with it.
 
+**iOS: a real "no auto-restore" gap silently rotated the session on every cold app launch,**
+**invalidating every bartender token and the customer QR without anyone choosing End Session**
+**(fixed 2026-08-18), iOS only.** User: "the bartender session may expire early... I do not
+remember closing the kiosk app, yet... it said the session is no longer valid" — asked me to
+confirm bartender sessions only expire via an explicit new session or an explicit Kill, as
+designed. Traced end to end, not assumed: `AppState.swift`'s `init()` had a comment stating outright
+"no auto-restore" — `isSetupComplete` defaulted `false` and nothing anywhere else ever set it back
+to `true` except `finishSetup()` itself. This means **every cold process launch** — iOS killing the
+app in the background under memory pressure, a crash, a device reboot, not just an intentional
+force-quit — landed back on the setup wizard from scratch, pre-filled from `savedConfig`. Tapping
+through a pre-filled wizard looks harmless, but its Finish button calls
+`LocalStorage.startNewSession()`, which mints a brand-new session id and archives/wipes the old
+one — silently invalidating every paired bartender's token (`bar.bartender_tokens` gets replaced
+wholesale on the relay once it sees a different `session` value) and the customer-facing QR link,
+with no "End Session" ever having been chosen. `_validate_session()`'s exact error
+("Invalid session") is the literal message the user saw.
+
+**Android never had this bug** — confirmed by reading `MainActivity.kt`'s `restoreSetupState()`,
+which already reads `isSetupComplete = setupPrefs.getBoolean("complete", false)` plus the
+persisted `session_id` itself from SharedPreferences on every launch. iOS had no equivalent at all.
+Fixed by adding the same shape of restore to `AppState.init()`: if a saved `BarConfig` + session
+exist on disk, restore `hostConfig` and set `isSetupComplete = true`, letting `KioskView`'s own
+`.task` → `startServerIfNeeded()` handle actually starting the server exactly as it already does on
+any other launch — deliberately did **not** duplicate that server-starting logic inline, and
+deliberately did **not** set `showAdminAfterSetup` (that's a first-time-setup nicety, not wanted on
+an ordinary resume).
+
+**A second, less obvious problem surfaced while building this and was caught before shipping, not**
+**after**: `resetSetup()` (End Session) intentionally leaves the underlying `BarConfig`/session
+files on disk untouched — it only clears in-memory `hostConfig`/`isSetupComplete`, because the
+wizard pre-fills from those same files. That means "does a config+session file exist" alone can't
+distinguish "genuinely live, resume me" from "End Session was just chosen, wizard hasn't been
+re-finished yet" — using presence-of-files as the sole signal would have resumed an *ended* session
+if the app were killed in that specific window. Added an explicit persisted flag,
+`setup_complete_v1`, set `true` at the end of `finishSetup()` and `false` in `resetSetup()`, checked
+*in addition to* the files existing. **Also handled the upgrade case**: an install already live
+before this fix won't have the new flag set yet — added a one-time migration (flag absent →
+infer completion from the old file-existence heuristic, then backfill the flag) so upgrading
+doesn't spuriously bounce an already-live bar to the wizard once on its first post-update launch.
+
+Build-verified (`xcodebuild ... build`). No relay or Android changes — Android was already correct,
+confirmed by reading the code rather than assumed innocent by default.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
