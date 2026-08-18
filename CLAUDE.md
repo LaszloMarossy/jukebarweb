@@ -1759,6 +1759,33 @@ Pure static HTML/JS on both platforms — no Kotlin/Swift touched, no build step
 reviewing the diff directly (both files' structure double-checked for balanced markup after the
 edit). No relay changes.
 
+**LAN bartender.html showed "Your access was ended by the admin" before ever pairing, both**
+**platforms (2026-08-18) — a real bug, not a messaging tweak.** User: "on lan bartender login page
+I entered correct pin but short name - system responded by: Your access was ended by the admin -
+enter the pin again to continue; which is misleading message; it was because of short name
+entered." Traced precisely rather than assumed: the short-name rejection itself was working
+correctly (client-side `doPair()` already has `if (name.length < 2) return;`, confirmed by direct
+re-read) — the misleading message came from somewhere else entirely, running in the background
+regardless of what the user was doing. Both platforms' `bartender.html` have `setInterval
+(loadRequests, 15000)` registered **unconditionally at page-load time**, not gated to only start
+once actually paired (unlike its sibling `loadPaymentState`'s interval, which correctly only starts
+inside `showMain()`). `loadRequests()` itself sends `token=${bartenderId || ''}` with no guard — on
+a freshly-loaded, never-paired page `bartenderId` is empty, the server correctly 401s an empty
+token, and `bartenderKicked()`/`sessionKicked()` fires its "ended by the admin" message — a message
+that only makes sense for a *previously valid* session that got revoked, firing here for a session
+that never existed at all. The user's short-name PIN entry was real but incidental — this interval
+was going to fire this exact wrong message on *any* freshly-loaded, not-yet-paired LAN bartender
+page within 15 seconds, regardless of what was being typed.
+
+Fixed by adding `if (!bartenderId) return;` as the first line of `loadRequests()` on both
+`assets/bartender.html` (Android) and `WebApps/bartender.html` (iOS) — the two legitimate call
+sites (`doPair()`'s success branch, `checkStatus()`'s approved branch via `showMain()`) both already
+set `bartenderId` before calling it, so this only suppresses the spurious unconditional
+interval-driven calls before pairing, no regression to the real flow. Render's equivalent
+(`S.pollTimer`) was already correctly scoped inside `startMain()`, itself only reachable after a
+successful login — confirmed via direct re-read, no fix needed there. Pure static HTML/JS on both
+platforms, no build step applicable.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

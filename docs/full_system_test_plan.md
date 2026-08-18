@@ -912,6 +912,14 @@ wait, not a defense mechanism itself.
       Sessions, no standalone System), and opening Sessions shows, top to bottom: QR card →
       Active Bartender Sessions → Waiting to Retry → the former System content (Server/Session
       stats/Configuration/Stripe) at the bottom, all loading correctly on tab open.
+- [ ] **New (2026-08-18): LAN bartender.html no longer shows a misleading "ended by admin"**
+      **message before ever pairing, both platforms** — load LAN bartender.html fresh (no prior
+      pairing) and wait 15+ seconds without entering anything: confirm no error message appears at
+      all. Root cause was an unconditional background poll (`loadRequests`'s `setInterval`) firing
+      before pairing and misreading its own empty-token 401 as a revoked session. Then confirm the
+      real flows are unaffected: pair successfully and confirm requests still load/refresh on the
+      15s interval as before; get an actual admin Kill while paired and confirm the "ended by the
+      admin" message still correctly appears in that genuine case.
 - [ ] **New (2026-08-17): session list order is chronological, earliest sign-in first, latest**
       **last** — sign in 2+ bartenders in sequence, confirm the Sessions list shows them in the
       order they signed in, not reverse. Sign in a *duplicate* (same name again, or a different

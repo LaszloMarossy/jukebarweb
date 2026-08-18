@@ -460,3 +460,17 @@ landed on System first and concluded nothing was there. Followed the user's exac
 removed System as a separate tab on both platforms, moved its content (`#system-info`) to the
 bottom of the Sessions panel, below the QR/session-list/lockout stack that was already correctly
 ordered. Both LAN pages now have 4 tabs, matching render.
+
+## 2026-08-18 — LAN bartender.html: misleading "ended by admin" message before ever pairing
+
+User: entered correct PIN but a short name on LAN bartender login, got "Your access was ended by
+the admin — enter the PIN again to continue" — a misleading message. Traced past the obvious
+suspect first: the short-name client-side guard was already correctly blocking submission, so the
+message couldn't have come from a rejected pairing attempt at all. Real cause: both platforms'
+`setInterval(loadRequests, 15000)` runs unconditionally from page load, unlike its sibling
+`loadPaymentState`'s interval which only starts after pairing succeeds — an unpaired page has an
+empty `bartenderId`, so the interval's own background call sent an empty token, got a genuine 401,
+and fired the "kicked" message on a session that never existed. Fixed with a one-line guard
+(`if (!bartenderId) return;`) at the top of `loadRequests()` on both `assets/bartender.html`
+(Android) and `WebApps/bartender.html` (iOS). Render's equivalent interval was already correctly
+scoped inside `startMain()` — confirmed, no fix needed there.
