@@ -1729,6 +1729,36 @@ import). Ordering note for future reference: PIN check → name-length check →
 consistently across all three backends — a wrong PIN never leaks whether a name would also have
 been rejected, and a too-short name never leaks whether it's also already taken.
 
+**LAN admin.html's standalone "System" tab merged into "Sessions," both platforms (2026-08-18) —**
+**closes a real discoverability gap, not just a naming mismatch.** User: LAN admin had "no Session
+tab but have System tab instead (that render does not)" and separately flagged the bartender QR
+"is not present on the LAN admin page despite your earlier claims" — checked directly and the QR
+*was* already there (added earlier this session, confirmed via `git log` timestamps predating the
+report), inside a "Sessions" tab that genuinely did already exist too. The actual bug: LAN
+admin.html has always had **5** tabs (Requests/Reports/Actions/**System**/Sessions) while render
+has only **4** (no System at all) — the unfamiliar extra "System" tab, sitting directly before
+Sessions in the tab order, was different enough from render's layout that the user's own live
+testing landed there first and concluded the QR/session content wasn't there at all, since System's
+panel (server/session stats, bar config, Stripe status) has nothing to do with bartenders.
+
+User's fix direction, followed exactly: rename/merge System into Sessions rather than keep both —
+"push below session content after renaming System tab Session... QR code... on top of Session tab,
+then the list of bartender sessions, then the current System tab content underneath." Implemented
+on both `assets/admin.html` (Android) and `WebApps/admin.html` (iOS) identically:
+- Removed the standalone `System` `<div class="tab">` button and its `#tab-system` panel entirely.
+- The System panel's sole content div (`#system-info`) moved to the bottom of `#tab-sessions`,
+  below the existing QR card → Active Bartender Sessions → Waiting to Retry stack (which was
+  already in the right order — the QR-not-present complaint traced to the wrong tab, not wrong
+  content).
+- `switchTab()`'s tab array dropped `'system'`; `loadSystem()` (unchanged function, still targets
+  `#system-info` by id) now fires alongside `loadBartenderSessions()` whenever the Sessions tab
+  opens, instead of only on its own now-removed tab.
+
+Tab count on both LAN pages is now 4 (Requests/Reports/Actions/Sessions), matching render exactly.
+Pure static HTML/JS on both platforms — no Kotlin/Swift touched, no build step applicable beyond
+reviewing the diff directly (both files' structure double-checked for balanced markup after the
+edit). No relay changes.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -449,3 +449,14 @@ not 4" (name minimum is separate from the PIN's 4-digit one) and "all surfaces a
 Fixed in all three backends (relay, Android LAN, iOS LAN) with the same PIN → name-length →
 name-uniqueness ordering, plus client-side gating added to all three `bartender.html` pages — the
 two LAN pages' Pair buttons previously had no gating at all (always clickable).
+
+## 2026-08-18 — LAN admin.html's standalone "System" tab merged into "Sessions"
+
+User: LAN admin has "no Session tab but have System tab instead (that render does not)" and the
+bartender QR "is not present... despite your earlier claims." Checked directly — the QR and
+Sessions tab were both genuinely already there (added earlier this session); the real bug was LAN
+having 5 tabs (with an unfamiliar System tab right before Sessions) vs. render's 4, so live testing
+landed on System first and concluded nothing was there. Followed the user's exact fix direction:
+removed System as a separate tab on both platforms, moved its content (`#system-info`) to the
+bottom of the Sessions panel, below the QR/session-list/lockout stack that was already correctly
+ordered. Both LAN pages now have 4 tabs, matching render.

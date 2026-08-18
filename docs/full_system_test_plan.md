@@ -905,6 +905,13 @@ wait, not a defense mechanism itself.
         the new PIN.
   - [ ] Confirm the QR endpoint itself is admin-token-gated on all 3 surfaces — a request with no
         token or a bartender (non-admin) token gets rejected, not just hidden client-side.
+- [ ] **New (2026-08-18): LAN admin.html's "System" tab merged into "Sessions," both platforms** —
+      user found the extra 5th tab confusing (render only has 4) and initially concluded the QR/
+      session content was missing entirely because it landed on the unfamiliar System tab first.
+      Confirm on both LAN admin.html (iOS + Android): only 4 tabs now (Requests/Reports/Actions/
+      Sessions, no standalone System), and opening Sessions shows, top to bottom: QR card →
+      Active Bartender Sessions → Waiting to Retry → the former System content (Server/Session
+      stats/Configuration/Stripe) at the bottom, all loading correctly on tab open.
 - [ ] **New (2026-08-17): session list order is chronological, earliest sign-in first, latest**
       **last** — sign in 2+ bartenders in sequence, confirm the Sessions list shows them in the
       order they signed in, not reverse. Sign in a *duplicate* (same name again, or a different
