@@ -920,6 +920,17 @@ wait, not a defense mechanism itself.
       verified 2026-08-17** — user confirmed multiple bartenders can log into the same bar on
       render. Cross-surface isolation (LAN sessions not appearing in render's list) not separately
       re-confirmed this round.
+- [ ] **New (2026-08-18): bartender names must be unique among currently-active sessions.** Pair as
+      "Ted", then try to pair a second, different device/browser as "Ted" again while the first is
+      still active — confirm the second attempt is rejected (409, "already in use") rather than
+      silently creating a duplicate. Found broken on Android LAN specifically (user's own test);
+      fixed on all three pairing backends (render, LAN both platforms) — test all three.
+  - [ ] Case-insensitivity: "ted" / "TED" / "Ted" are all treated as the same name for this check.
+  - [ ] **Freed name becomes available again**: Kill the first "Ted" (or have it fail its own PIN
+        lockout/deny on iOS's pending-approval path), then confirm a *new* pairing attempt with the
+        same name "Ted" now succeeds — the check is against active sessions only, not permanent.
+  - [ ] Confirm this doesn't affect admin logins (`role: "admin"` on render, or the LAN admin-auth
+        path) — the uniqueness check is bartender-specific.
 - [ ] Fail a bartender PIN 1-2 times (not enough to lock out) from one IP — that IP appears in
       Waiting to Retry with the correct attempt count and "not waiting yet" status, plus the name
       that was typed on the last failed attempt

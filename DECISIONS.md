@@ -428,3 +428,14 @@ was live-testing — each deploy restarts the relay process and wipes `_bars` (i
 killing every bartender token with zero host involvement. Accepted as expected/by-design, not
 fixed — matches the user's own stated position. Lesson: avoid pushing to jukebarweb's `main` while
 the user is actively live-testing a session.
+
+## 2026-08-18 — Bartender names must be unique among active sessions, all three pairing backends
+
+User tested pairing two bartenders as "Ted" on Android LAN — allowed, shouldn't have been ("we
+talked about bartender names under a bar's sessions should be unique"). Asked me to check all
+platforms including LAN and "kiosk back end." Fixed in all three independent implementations
+(relay `main.py`, Android `LocalRequestManager`, iOS `LocalServer.swift`) — case-insensitive
+uniqueness check against currently-active sessions only (confirmed Kill genuinely removes records
+on each platform, not just marks them, so a freed name is immediately reusable), 409 on conflict.
+Android/iOS bartender.html pages needed no JS changes (already had a generic error fallback);
+render's did need one explicit branch added.

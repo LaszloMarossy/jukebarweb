@@ -991,9 +991,21 @@ async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(...
         raise HTTPException(403, "Incorrect PIN")
 
     _bartender_lockouts.pop(key, None)
+    final_name = (body.get("name") or "Bartender").strip()[:60] or "Bartender"
+    # Bartender names must be unique among currently-active bartender sessions for this bar
+    # (2026-08-18) — otherwise the Sessions tab's Kill action can't reliably target the right
+    # person once two people share a name, defeating the whole point of collecting one. Only
+    # checked against *active* sessions (bartender_tokens entries are deleted outright on Kill —
+    # see bartender_sessions_kill()), so a freed-up name becomes available again immediately.
+    # Scoped to role == "bartender" only — admin doesn't have this ambiguity concern.
+    if role == "bartender" and any(
+        rec.get("role") == "bartender" and rec.get("name", "").strip().lower() == final_name.lower()
+        for rec in bar.bartender_tokens.values()
+    ):
+        raise HTTPException(409, f'The name "{final_name}" is already in use by an active bartender — pick a different name.')
     token = uuid.uuid4().hex
     bar.bartender_tokens[token] = {
-        "name":       (body.get("name") or "Bartender").strip()[:60] or "Bartender",
+        "name":       final_name,
         "paired_at":  now,
         "ip":         client_ip,
         "role":       role,

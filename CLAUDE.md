@@ -1672,6 +1672,33 @@ worth engineering resilience for. Practical lesson for future sessions: avoid pu
 
 Both iOS build-verified after the revert (`xcodebuild ... build`). No relay or Android changes.
 
+**Bartender names must be unique among currently-active sessions for a bar (2026-08-18), all three**
+**pairing backends.** User tested creating two bartender sessions under the same name ("Ted") on
+Android LAN — the system let it through; asked me to check and fix on every platform, "also on lan
+bartender pages and kiosk back end." This directly serves the reason names were added in the first
+place (so Kill can reliably target the right person) — two active "Ted"s makes that impossible.
+Fixed identically in all three independent pairing implementations:
+- **Relay** (`main.py`'s `bar_authenticate()`, role == "bartender" only — admin has no such
+  ambiguity concern): case-insensitive check against `bar.bartender_tokens.values()` before minting
+  a token, `HTTPException(409, ...)`.
+- **Android LAN** (`LocalRequestManager.pairBartender()`): case-insensitive check against the
+  in-memory `bartenders` list before adding, new `PairResult.Failure.nameTaken` flag surfaced by
+  `LocalServer.kt`'s handler as NanoHTTPD's `Response.Status.CONFLICT` (409).
+- **iOS LAN** (`LocalServer.swift`'s `/api/bartender/pair`): case-insensitive check against
+  `storage.loadBartenders(sessionId:)` before creating a `BartenderRecord`, `.raw(409, "Conflict",
+  ...)`.
+
+All three check only *currently-active* sessions, not history — confirmed for each platform that
+Kill genuinely removes the record rather than just marking it (relay: `del bar.bartender_tokens[...]`;
+Android: `bartenders.removeIf { ... }`; iOS: `storage.deleteBartender()` removes the file), so a
+freed-up name becomes available again immediately, not permanently reserved. None of the three
+client pages (`static/bartender.html`, both LAN `bartender.html` files) needed JS changes for the
+error path on Android/iOS — both already had a generic `if (!r.ok) throw new Error(d.error || ...)`
+fallback that picks up the new `{"error": "..."}` body automatically; only render's `verifyPin()`
+needed an explicit `409` branch added (its error handling was more branch-per-status than
+Android/iOS's generic fallback). All three backends build/import-verified
+(`xcodebuild ... build`, `:app:compileDebugKotlin`, direct Python import).
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -429,6 +429,13 @@ async function verifyPin() {
       $('pin-btn').disabled = true;
       return;
     }
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({}));
+      $('pin-err').textContent = body.detail || 'That name is already in use by an active bartender — pick a different name.';
+      $('pin-btn').disabled = false;
+      $('name-input').focus();
+      return;
+    }
     if (res.status === 404) return showError('Session ended or bar offline', 'This session is no longer active, bartender access was turned off, or the JukeBar is temporarily unreachable. Ask the host to start a new session and/or scan the fresh QR code.');
     if (!res.ok) throw new Error(res.status);
 
