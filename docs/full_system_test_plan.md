@@ -931,6 +931,18 @@ wait, not a defense mechanism itself.
         same name "Ted" now succeeds — the check is against active sessions only, not permanent.
   - [ ] Confirm this doesn't affect admin logins (`role: "admin"` on render, or the LAN admin-auth
         path) — the uniqueness check is bartender-specific.
+- [ ] **New (2026-08-18): bartender name is required, minimum 2 characters, all 3 backends + all 3**
+      **bartender.html pages.** Found the same round: render "allowed me to log in without giving a
+      name," silently defaulting to the literal "Bartender." Try to log in/pair with the name field
+      left blank, or with just 1 character — confirm the submit button stays disabled client-side
+      (can't even attempt it), and confirm a direct API call bypassing the UI still gets rejected
+      with a 400 server-side (defense in depth). 2+ characters succeeds normally.
+  - [ ] Confirm the two LAN pages' Pair button, which previously had **no gating of any kind** (was
+        always clickable even with both fields empty), now correctly starts disabled and only
+        enables once the name is long enough.
+  - [ ] Confirm PIN validity is still checked before name-length/uniqueness — a wrong PIN with also
+        a too-short/duplicate name should show the PIN error, not the name error (checked in that
+        order server-side on all three backends).
 - [ ] Fail a bartender PIN 1-2 times (not enough to lock out) from one IP — that IP appears in
       Waiting to Retry with the correct attempt count and "not waiting yet" status, plus the name
       that was typed on the last failed attempt

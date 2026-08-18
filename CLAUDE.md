@@ -1699,6 +1699,36 @@ needed an explicit `409` branch added (its error handling was more branch-per-st
 Android/iOS's generic fallback). All three backends build/import-verified
 (`xcodebuild ... build`, `:app:compileDebugKotlin`, direct Python import).
 
+**Bartender name is now required, minimum 2 characters, all three pairing backends + all three**
+**bartender.html pages (2026-08-18).** Found in the same testing round as the uniqueness fix
+above: render's bartender login "allowed me to log in without giving a name" — every backend still
+silently defaulted a blank name to the literal `"Bartender"`, which defeats the point of collecting
+one in the first place (the very first person to leave it blank becomes an unidentifiable generic
+"Bartender" on the Sessions tab, exactly the ambiguity this whole feature exists to prevent). User's
+follow-up refinement: "length should be 2 or greater; not 4" (some client-side PIN-length gating
+code was `< 4`, for the *PIN* field — this clarified the *name* minimum is a separate, smaller
+threshold, not a copy-paste of the PIN one) — and "all surfaces and platforms."
+
+- **Relay** (`main.py`): `bar_authenticate()`, role == "bartender" only, rejects `len(raw_name) < 2`
+  with `HTTPException(400, "Name must be at least 2 characters")` — the old `or "Bartender"`
+  fallback is gone entirely, replaced by this hard requirement.
+- **Android LAN** (`LocalRequestManager.pairBartender()`): new `PairResult.Failure.nameRequired`
+  flag, checked before the uniqueness check (same order as the relay: PIN validity → name length →
+  name uniqueness), surfaced by `LocalServer.kt` as `Response.Status.BAD_REQUEST`.
+- **iOS LAN** (`LocalServer.swift`'s `/api/bartender/pair`): `guard rawName.count >= 2 else { ... }`
+  returning `.raw(400, ...)`, same ordering.
+- **All three `bartender.html` pages** gained matching client-side gating — previously render's Pin
+  button was already gated on PIN length but not name length at all, and both LAN pages' Pair
+  buttons had **no gating whatsoever** (always clickable, even with both fields empty). All three
+  now disable their submit button until the name field has ≥2 trimmed characters (render also still
+  requires PIN length ≥4, unchanged), and all three surface the new 400 response's `error` message
+  on submission as defense-in-depth against a direct API call bypassing the disabled button.
+
+All three build/import-verified (`xcodebuild ... build`, `:app:compileDebugKotlin`, direct Python
+import). Ordering note for future reference: PIN check → name-length check → name-uniqueness check,
+consistently across all three backends — a wrong PIN never leaks whether a name would also have
+been rejected, and a too-short name never leaks whether it's also already taken.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

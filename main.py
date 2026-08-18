@@ -991,7 +991,14 @@ async def bar_authenticate(jukebar_id: str, request: Request, s: str = Query(...
         raise HTTPException(403, "Incorrect PIN")
 
     _bartender_lockouts.pop(key, None)
-    final_name = (body.get("name") or "Bartender").strip()[:60] or "Bartender"
+    raw_name = (body.get("name") or "").strip()
+    # Name is required for bartender logins, minimum 2 characters (2026-08-18) — previously a
+    # blank name silently defaulted to the literal "Bartender", defeating the entire point of
+    # collecting one (telling multiple bartenders apart on the Sessions tab / Kill action). Admin
+    # has no name field/concept at all, so this is scoped to role == "bartender" only.
+    if role == "bartender" and len(raw_name) < 2:
+        raise HTTPException(400, "Name must be at least 2 characters")
+    final_name = raw_name[:60]
     # Bartender names must be unique among currently-active bartender sessions for this bar
     # (2026-08-18) — otherwise the Sessions tab's Kill action can't reliably target the right
     # person once two people share a name, defeating the whole point of collecting one. Only

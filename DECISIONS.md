@@ -439,3 +439,13 @@ uniqueness check against currently-active sessions only (confirmed Kill genuinel
 on each platform, not just marks them, so a freed name is immediately reusable), 409 on conflict.
 Android/iOS bartender.html pages needed no JS changes (already had a generic error fallback);
 render's did need one explicit branch added.
+
+## 2026-08-18 — Bartender name now required (min 2 chars), all three backends + pages
+
+Same testing round as the uniqueness fix above: render's bartender login "allowed me to log in
+without giving a name" — every backend still silently defaulted blank to "Bartender," which is
+exactly the ambiguity the whole feature exists to prevent. User: "length should be 2 or greater;
+not 4" (name minimum is separate from the PIN's 4-digit one) and "all surfaces and platforms."
+Fixed in all three backends (relay, Android LAN, iOS LAN) with the same PIN → name-length →
+name-uniqueness ordering, plus client-side gating added to all three `bartender.html` pages — the
+two LAN pages' Pair buttons previously had no gating at all (always clickable).
