@@ -945,6 +945,12 @@ wait, not a defense mechanism itself.
       lists that session at all (not just greyed out — actually gone); (3) reloading/reopening the
       bartender URL now shows a small styled "Bartender access unavailable" page, not a raw JSON
       or blank 404. Test on render, then repeat on LAN (both platforms).
+- [ ] **New (2026-08-18): a genuine app-swipe-off restart actually kills the LAN admin session,**
+      **Android only — the real regression test for this whole saga** — log into LAN admin, leave
+      the tab open (don't reload). Swipe the Android app fully off from Recents, reopen it, walk
+      through the wizard to Launch Kiosk. Without reloading the still-open tab, try toggling a
+      setting. Confirm it now correctly kicks to the PIN screen — this was working *before* this
+      fix (the stale tab kept succeeding), so this is the one that actually validates the fix.
 - [ ] **New (2026-08-18): admin PIN reset (Forgot-PIN flow) invalidates existing LAN admin**
       **sessions, both platforms** — log into LAN admin on one device/tab (leave it open,
       authenticated). On the kiosk, use the Forgot-PIN recovery flow to set a new admin PIN.

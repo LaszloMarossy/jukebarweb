@@ -577,3 +577,18 @@ needs to be a *reliable* way to kill a genuinely bad admin session, independent 
 mechanics. Found that neither platform's admin PIN reset ("Forgot PIN" flow) ever invalidated
 already-issued tokens — defeating its whole purpose as a security-recovery flow. Added
 `purgeAdminTokens()` on both platforms, called right after the PIN is saved.
+
+## 2026-08-18 — Likely real root cause: missing onTaskRemoved(), Android only
+
+User correctly rejected the PIN-reset mitigation as not actually explaining or fixing the restart
+behavior, then independently described the standard correct architecture (session restart should
+mint a fresh id, everything reconnects, closing the session should break all connections) —
+prompting a proper re-investigation. Found `LanForegroundService` (exists purely to stop OEM
+battery managers from freezing the LAN server, holds no reference to the real server) never
+overrode `onTaskRemoved()` — the Android hook specifically for "task was swiped away," since a
+foreground service can otherwise outlive that. Combined with `START_STICKY` (no reason to
+self-resurrect), this could let the *previous* NanoHTTPD listener — with its own never-reset
+admin tokens — keep answering requests independently of whatever a later launch starts. Fixed:
+`onTaskRemoved()` now tears down the real server via a registered callback and stops the service
+immediately; switched to `START_NOT_STICKY`; wrapped the previously-uncaught server bind call in
+try/catch as a second safety net. Not yet independently confirmed against a live repro.

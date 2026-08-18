@@ -2040,6 +2040,48 @@ mechanism for the user's actual concern, independent of whatever restart/process
 uncertainty remains unresolved. Both platforms build-verified
 (`:app:compileDebugKotlin`, `xcodebuild ... build`).
 
+**Likely actual root cause found for the stale-LAN-admin-session-survives-restart saga: missing**
+**`onTaskRemoved()`, Android only (2026-08-18).** User's response to the PIN-reset mitigation
+above was exactly right: "Did you force a pin change over restart? ... If the stale tab will
+likely keep working, then what exactly did you change??" — correctly rejecting a workaround for
+a problem that deserved an actual fix, and then independently arrived at the right underlying
+principle: a session restart should mint a fresh session id and everything connected should have
+to reconnect, "that should be the right behavior... but when we do intend to close the session,
+that should break all connections, no?" — exactly the standard in-memory-session-invalidates-on-
+restart pattern this codebase's own `LocalRequestManager.reset()` is already supposed to implement.
+
+That prompted going back to find why `reset()`'s `adminTokens.clear()` wasn't taking effect for
+the actual, currently-serving object. Found a real, standard Android pitfall in
+`LanForegroundService.kt` (started by `MainActivity.startLocalServer()` purely to keep the LAN
+server's process from being frozen by OEM battery managers — it holds no reference to the actual
+`LocalServer`/`LocalRequestManager` at all, by design): it never overrode `onTaskRemoved()` — the
+specific Android hook that exists precisely because **a foreground service can outlive its task
+being swiped away from Recents**, and it used `START_STICKY`, telling the OS to resurrect it on
+its own after being killed, for no reason this service actually needs. Without `onTaskRemoved()`,
+swiping the app away doesn't guarantee `MainActivity.onDestroy()` (and thus `stopLocalServer()`)
+fires promptly, or at all, before the process is genuinely reclaimed — leaving a real possibility
+that the *previous* `LocalServer`'s NanoHTTPD listener (bound to port 8080, holding its own,
+never-reset `adminTokens`) keeps answering requests independently of whatever a subsequent app
+launch starts. This fully explains every observed symptom: a stale, never-reloaded LAN admin tab
+kept working because it may genuinely have still been talking to the *old* listener the whole
+time, not a fresh one that somehow inherited old credentials.
+
+Fixed: `LanForegroundService.onTaskRemoved()` now invokes a listener (`onTaskRemovedListener`, a
+static callback `MainActivity.onCreate()` points at its own `stopLocalServer()`, re-registered on
+every fresh instance) and calls `stopSelf()` — the moment the task is swiped, the real server gets
+torn down immediately, not whenever/if `onDestroy()` eventually runs. Switched
+`START_STICKY` → `START_NOT_STICKY` since nothing should ever restart this service except
+`MainActivity` explicitly asking it to. As a second, independent safety net,
+`LocalServer.startLanServer()`'s previously-uncaught `start()` call (NanoHTTPD's own bind, which
+throws `IOException`) is now wrapped in try/catch with a clear log line — if a port conflict still
+somehow occurs despite the fix above, it now fails loudly and safely instead of propagating an
+uncaught exception or silently leaving `localServer` pointing at a server that never actually
+bound. Build-verified (`:app:compileDebugKotlin`). Not yet independently confirmed against a real
+device repro (would need the user to retest the exact swipe-off scenario) — this is the most
+concrete, standard-pitfall explanation found via code reading, not a live-verified fix. iOS not
+touched — its process lifecycle has no equivalent foreground-service/task-removal ambiguity; a
+force-quit there reliably kills everything.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
