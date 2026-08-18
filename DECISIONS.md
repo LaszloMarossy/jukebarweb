@@ -565,3 +565,15 @@ actually broken). Added a shared `adminKicked()` wired into the highest-traffic 
 calls (main poll, Sessions list, the three payment toggles, bartender PIN save/clear) on both LAN
 admin.html files. Render already handles this correctly via its existing "Session expired" path —
 not touched.
+
+## 2026-08-18 — LAN admin token survived a real app restart; closed via PIN-reset purge
+
+User's controlled test (full swipe-off restart, walked through wizard, then toggled a setting on
+an already-open, never-reloaded LAN admin tab) confirmed the pre-restart admin token still worked
+— contradicting the expectation that a fresh `LocalRequestManager` starts empty. Root cause not
+conclusively pinned down (would need live Logcat/PID inspection); user reframed the actual
+requirement correctly: a stale session surviving on the same trusted device is minor, but there
+needs to be a *reliable* way to kill a genuinely bad admin session, independent of restart
+mechanics. Found that neither platform's admin PIN reset ("Forgot PIN" flow) ever invalidated
+already-issued tokens — defeating its whole purpose as a security-recovery flow. Added
+`purgeAdminTokens()` on both platforms, called right after the PIN is saved.

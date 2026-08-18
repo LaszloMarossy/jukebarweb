@@ -1998,6 +1998,48 @@ toggle that looks like it should have flipped) — scoped to the paths that run 
 tapped often, not a full sweep of every endpoint. Render's `static/admin.html` was not touched —
 it already handles the analogous case correctly via its 403 "Session expired" `showError()` path.
 
+**A LAN admin session, once authenticated, could survive a genuine app restart — investigated at**
+**length, not fully root-caused, but closed via a reliable mitigation (2026-08-18), both platforms.**
+User did a careful, controlled test: swiped the Android app fully off (not just IntelliJ's Run
+button, ruling that theory out), reopened it, walked through the wizard start to finish (confirmed
+`startQueue()` — which mints a fresh `sessionId` and eventually calls
+`LocalRequestManager.reset()`, clearing `adminTokens` — always fires here, it's the only path that
+reaches the Summary step) — then, **without reloading** an already-open LAN admin browser tab from
+before the restart, toggled a setting. It worked, and the change genuinely reached the kiosk. This
+means the pre-restart admin token was still being accepted by whatever was actually answering
+requests, despite every code path saying a freshly-constructed `LocalRequestManager` (a plain
+instance field, no cross-instance sharing) should have started with an empty `adminTokens` list.
+
+Traced as far as static reading of the code allows: `MainActivity.startLocalServer()`'s first line
+(`localServer?.stopLanServer()`) is a safe-call against *that instance's own* `localServer`
+property — if the previous `LocalServer`/NanoHTTPD/`LanForegroundService` somehow outlived the
+Activity restart (no `android:process` override on the service, so it should die with the app
+process; default `stopWithTask` behavior should also stop it on task removal — checked the
+manifest directly, found nothing that should prevent teardown), the new instance has no reference
+to it and can't stop it. Whether that's actually what's happening, or something else about Android
+process/task reuse that isn't fully within app-code control, wasn't conclusively pinned down —
+would need live Logcat/PID inspection across a real restart to settle, which wasn't available in
+this session.
+
+**User's own reframing, correctly separating the two concerns**: "I am starting to think this is
+acceptable in most cases... However if there is a bad admin session, then restarting will not cure
+and get rid of it." A convenience-preserving stale session on the *same* trusted device is a minor
+UX question; a way to reliably kill a *compromised* admin credential is a real security
+requirement, and it shouldn't depend on an OS process-lifecycle detail nobody can fully guarantee.
+Rather than continue chasing the exact restart mechanism, closed the actual gap this exposed:
+**changing the admin PIN never invalidated already-issued admin tokens, on either platform** — the
+existing kiosk-native "Forgot PIN" recovery flow (Android `MainActivity`'s `onPinReset`, iOS
+`AdminView.swift`'s `showForgotPin` "Set PIN" button) only ever updated the stored hash going
+forward; a token minted before the reset kept working indefinitely regardless. That defeats the
+entire point of a PIN-reset-as-security-recovery flow — if you suspect someone unwanted has your
+PIN, changing it should also cut off any session they may have already opened with it. Added
+`purgeAdminTokens()` to both platforms' admin-token stores (Android
+`LocalRequestManager.adminTokens.clear()`, iOS `LocalServer.adminTokens.removeAll()`), called from
+both Forgot-PIN flows immediately after saving the new hash. This gives a reliable, in-app-code
+mechanism for the user's actual concern, independent of whatever restart/process-lifecycle
+uncertainty remains unresolved. Both platforms build-verified
+(`:app:compileDebugKotlin`, `xcodebuild ... build`).
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

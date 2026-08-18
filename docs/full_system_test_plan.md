@@ -945,6 +945,12 @@ wait, not a defense mechanism itself.
       lists that session at all (not just greyed out — actually gone); (3) reloading/reopening the
       bartender URL now shows a small styled "Bartender access unavailable" page, not a raw JSON
       or blank 404. Test on render, then repeat on LAN (both platforms).
+- [ ] **New (2026-08-18): admin PIN reset (Forgot-PIN flow) invalidates existing LAN admin**
+      **sessions, both platforms** — log into LAN admin on one device/tab (leave it open,
+      authenticated). On the kiosk, use the Forgot-PIN recovery flow to set a new admin PIN.
+      Without reloading the open LAN admin tab, try toggling a setting there. Confirm it now
+      correctly kicks to the PIN screen ("Your session ended...") instead of the old PIN's session
+      continuing to work.
 - [ ] **New (2026-08-18): LAN admin.html clearly logs out on a dead session, both platforms** —
       open LAN admin, log in, leave the tab open. Restart the host app (forces a new session,
       clearing admin tokens server-side). Without reloading the tab, wait ~5s or try toggling a
