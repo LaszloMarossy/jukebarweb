@@ -2079,8 +2079,22 @@ uncaught exception or silently leaving `localServer` pointing at a server that n
 bound. Build-verified (`:app:compileDebugKotlin`). Not yet independently confirmed against a real
 device repro (would need the user to retest the exact swipe-off scenario) — this is the most
 concrete, standard-pitfall explanation found via code reading, not a live-verified fix. iOS not
-touched — its process lifecycle has no equivalent foreground-service/task-removal ambiguity; a
-force-quit there reliably kills everything.
+touched (for this specific race) — its process lifecycle has no equivalent foreground-service/
+task-removal ambiguity; a force-quit there reliably kills everything.
+
+**Follow-up, same day: iOS had its own, more unconditional version of the admin-token gap.** User
+asked directly whether "similar techniques" existed on iOS. Checked rather than assumed parity —
+found a real, worse-than-Android gap: `LocalServer.shared` is a true app-process-lifetime
+singleton (unlike Android's per-`MainActivity`-instance `LocalRequestManager`), and its
+`adminTokens` Set was **never cleared anywhere**, not even by `AppState.resetSetup()` (End
+Session) — `LocalServer.shared.stop()` only stops the Swifter listener, never touches
+`adminTokens`. Unlike bartender records (disk-persisted, keyed per `sessionId`, so a new session
+naturally can't see an old session's bartender list), admin tokens had no session-scoping or
+clearing mechanism at all — an admin token minted in one session stayed valid across *any number*
+of End Session → new setup cycles, for as long as the app process itself stayed alive. This isn't
+a race like Android's, it's unconditional. Fixed by calling the same `purgeAdminTokens()` added
+earlier the same day (for the Forgot-PIN fix) from `resetSetup()` too. Build-verified
+(`xcodebuild ... build`).
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

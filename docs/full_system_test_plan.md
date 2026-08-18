@@ -951,6 +951,12 @@ wait, not a defense mechanism itself.
       through the wizard to Launch Kiosk. Without reloading the still-open tab, try toggling a
       setting. Confirm it now correctly kicks to the PIN screen — this was working *before* this
       fix (the stale tab kept succeeding), so this is the one that actually validates the fix.
+- [ ] **New (2026-08-18): End Session invalidates existing LAN admin sessions, iOS** — log into
+      LAN admin on iOS host, leave the tab open. On the kiosk, End Session and complete setup
+      again (no need to force-quit the app). Without reloading the still-open tab, try toggling a
+      setting. Confirm it now correctly kicks to the PIN screen — previously the old token stayed
+      valid indefinitely since `LocalServer.shared`'s admin tokens were never cleared on End
+      Session at all (unconditional gap, not a timing race).
 - [ ] **New (2026-08-18): admin PIN reset (Forgot-PIN flow) invalidates existing LAN admin**
       **sessions, both platforms** — log into LAN admin on one device/tab (leave it open,
       authenticated). On the kiosk, use the Forgot-PIN recovery flow to set a new admin PIN.

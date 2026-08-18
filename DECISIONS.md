@@ -592,3 +592,10 @@ admin tokens — keep answering requests independently of whatever a later launc
 `onTaskRemoved()` now tears down the real server via a registered callback and stops the service
 immediately; switched to `START_NOT_STICKY`; wrapped the previously-uncaught server bind call in
 try/catch as a second safety net. Not yet independently confirmed against a live repro.
+
+**Update, same day**: user confirmed the fix — stale tab kept showing now-playing but got kicked
+to the PIN screen the moment a real action was tried. Asked if iOS has similar protections; found
+a worse, unconditional gap: iOS's `LocalServer.shared` is a true process-lifetime singleton whose
+`adminTokens` was never cleared anywhere, including `resetSetup()` (End Session) — an admin token
+stayed valid across any number of new sessions for as long as the app process lived. Fixed by
+calling `purgeAdminTokens()` from `resetSetup()`.
