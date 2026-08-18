@@ -912,6 +912,13 @@ wait, not a defense mechanism itself.
       Sessions, no standalone System), and opening Sessions shows, top to bottom: QR card →
       Active Bartender Sessions → Waiting to Retry → the former System content (Server/Session
       stats/Configuration/Stripe) at the bottom, all loading correctly on tab open.
+- [ ] **New (2026-08-18): LAN admin.html's Actions/Sessions tabs stay live without re-navigating,**
+      **both platforms** — on LAN transport, open the LAN admin page and land on (or stay on) the
+      Actions or Sessions tab. From the kiosk-native Admin screen on the same device, toggle
+      bartender access on (or off). Without switching tabs or reloading, confirm within ~5s: the
+      Actions tab's bartender toggle/status text updates on its own, and the Sessions tab's QR
+      card appears/disappears on its own. Repeat toggling Stripe/Accepting-requests too (same
+      `loadActions()` refresh covers all of them).
 - [ ] **New (2026-08-18): turning off bartender access kills existing sessions + shows a friendly**
       **404, all 3 surfaces** — pair a bartender, then turn bartender access off from admin (any
       surface). Confirm: (1) within one poll cycle, the bartender's own open tab shows the

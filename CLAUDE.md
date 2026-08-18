@@ -1835,6 +1835,37 @@ a paired bartender's session is meant to stay valid until an explicit Kill or th
 End Session, not lapse from inactivity or a closed tab. The one thing that *is* now reliably
 detectable end-to-end, per this fix, is the admin explicitly turning bartender access off.
 
+**LAN admin.html's Actions/Sessions tabs never live-refreshed — a polling gap, not a propagation**
+**bug (2026-08-18), Android + iOS LAN only, render unaffected.** User: enabled bartender access
+from the kiosk-native Admin screen (not the LAN admin page) while on WiFi/hotspot transport — the
+already-open LAN admin.html kept showing bartender access as off on the Actions tab, and no QR
+appeared on the Sessions tab either. Guessed it might be a violation of the "host state broadcasts
+itself out" architecture principle — it wasn't; traced the actual data path first rather than
+assuming: kiosk-native's `onSetBartenderPin`/`clearBartenderPin` correctly call
+`propagateBarDetails()`/`pushPaymentSettings()`, which synchronously update the LAN `LocalServer`'s
+own `barDetails` in-process (Android: `localServer.barDetails = details`; iOS: same shape via
+`reloadConfig()`). `/api/catalog` (`catalogJson()`) reads that live property fresh on every call —
+so the *data* was never stale, confirmed by reading the code, not assumed correct.
+
+The actual bug: both LAN `admin.html`'s `loadActions()` (the only thing that calls
+`updateLanBartenderPinUI()`/`updateBartenderPinUI()`, which drives both the Actions tab's toggle
+display *and* the Sessions tab's QR-card visibility) was only ever invoked on page load or on an
+explicit `switchTab('actions')` click — never on `switchTab('sessions')`, and never on any
+recurring timer. Requests and NowPlaying already have their own 5s/3s poll loops; Actions/Sessions
+never got one, so any host-side change made while the admin was sitting on either tab (or had
+already passed through it once) simply never surfaced until they manually left and came back.
+Fixed identically on both platforms: the existing gated `pollTimer` interval (already conditional
+on `activeTab === 'requests'` for `loadRequests()`) gained a second condition,
+`if (activeTab === 'actions' || activeTab === 'sessions') loadActions();` — reuses the existing 5s
+timer rather than adding a new one, and only fetches when one of the two relevant tabs is actually
+visible, matching the existing gating idiom instead of polling unconditionally in the background.
+
+**Render's `static/admin.html` already had no equivalent gap, confirmed by reading the code, not**
+**assumed safe by default**: its `poll()` runs unconditionally every 5s regardless of `activeTab`
+(no gating at all, simpler than LAN's per-tab structure) and its response already includes
+`bartender_access_enabled`; `updatePaymentUI()` (called every poll) already ends by calling
+`updateBartenderPinUI()`. No render change needed.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

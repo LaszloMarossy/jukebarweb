@@ -491,3 +491,17 @@ shape as the existing Kill action), and (2) the PIN-off 404 now returns a small 
 access unavailable" HTML page instead of bare JSON/empty body, on all three page routes. Tab-close
 detection (also asked about) is confirmed not solvable server-side and not attempted — matches this
 codebase's existing "no automatic expiration" design for bartender sessions.
+
+## 2026-08-18 — LAN admin.html's Actions/Sessions tabs weren't live-refreshed, Android + iOS
+
+User enabled bartender access from the kiosk-native Admin screen while on LAN — the already-open
+LAN admin.html kept showing it off, no QR on Sessions. Traced the data path before assuming
+anything: `barDetails` propagation to the LAN `LocalServer` was correct and synchronous, and
+`/api/catalog` read it live on every call — not a propagation bug. The real gap: `loadActions()`
+(drives both the Actions toggle display and the Sessions tab's QR visibility) was only ever called
+on page load or an explicit Actions-tab click, never on `switchTab('sessions')` and never on a
+timer — unlike Requests/NowPlaying, which already have their own poll loops. Fixed on both
+platforms by extending the existing gated 5s poll timer to also call `loadActions()` whenever
+either the Actions or Sessions tab is active. Render's `static/admin.html` already polls
+unconditionally every 5s and already refreshes this state — confirmed via code read, no fix
+needed there.
