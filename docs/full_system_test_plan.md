@@ -926,6 +926,11 @@ wait, not a defense mechanism itself.
       LAN admin page picks up every one of these within a few seconds — no need to tap Launch
       Kiosk first. This was a genuinely missing propagate call, not a timing issue, so no need to
       rush or wait — should just work either way.
+- [ ] **New (2026-08-18): Bartender Sessions list itself auto-refreshes, all 3 admin surfaces** —
+      pair a bartender, open the Sessions tab and leave it open. From another device, pair a
+      second bartender (or Kill one, or let a lockout clear). Without touching Refresh or
+      switching tabs, confirm the list updates on its own within ~5s. Test render, then both LAN
+      admin.html pages.
 - [ ] **New (2026-08-18): LAN admin.html's Actions/Sessions tabs stay live without re-navigating,**
       **both platforms** — on LAN transport, open the LAN admin page and land on (or stay on) the
       Actions or Sessions tab. From the kiosk-native Admin screen on the same device, toggle

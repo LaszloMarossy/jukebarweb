@@ -532,3 +532,13 @@ own QR read it fine) but never reached the running `LocalServer`/`RelayService` 
 permanently missing wire, not a window. Fixed by adding the missing call; safe unconditionally
 even pre-launch. iOS has no equivalent split (`AdminView` always reads/writes the same
 `AppState`/`LocalStorage` singleton, wizard or live).
+
+## 2026-08-18 — Bartender Sessions list still needed manual refresh, all three admin surfaces
+
+After confirming the missing-propagate fix worked, user noticed the Sessions *list* itself
+(paired bartenders + lockouts) still needed the manual Refresh button or a tab round-trip, unlike
+everything else on that tab. The earlier live-refresh fix only wired up `loadActions()` (QR card +
+Actions toggles), never `loadBartenderSessions()`/`loadSystem()`. User asked me to check render
+too rather than assume LAN-only — correct guess, same gap existed there (`poll()` never called
+`loadBartenderSessions()`). Fixed on all three `admin.html` files: LAN pages' poll timers and
+render's `poll()` now also refresh the session list while the Sessions tab is active.

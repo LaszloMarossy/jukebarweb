@@ -913,6 +913,11 @@ async function poll() {
     updatePaymentUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    // Sessions tab's own list (paired bartenders + lockouts) previously only fetched on
+    // tab-switch or the manual Refresh button, unlike the QR/bartender-status card above (driven
+    // by updatePaymentUI(), refreshed every poll already) — 2026-08-18, user noticed this
+    // asymmetry after the same gap was found and fixed on both LAN admin.html pages.
+    if (S.activeTab === 'sessions') loadBartenderSessions();
   } catch {}
 }
 

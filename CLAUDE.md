@@ -1930,6 +1930,24 @@ sites with hand-written callback wiring at each, drift between them is the defau
 exception — worth grepping for every call site of a shared admin/settings component whenever one
 of its actions doesn't seem to propagate, not just the one path most recently touched.
 
+**Bartender Sessions list still needed a manual refresh after the Actions/Sessions live-refresh**
+**fix, all three admin surfaces (2026-08-18 follow-up).** User, after confirming the missing-
+propagate fix above worked (bartender access toggling now correctly hides/reveals the QR and
+status on both kiosk-native and LAN admin, and PIN/name-uniqueness/reuse-after-delete all still
+work): noticed the Sessions **list** itself (paired bartenders + lockouts) still required tapping
+"↻ Refresh" or leaving-and-re-entering the tab, unlike everything else on that tab which now
+auto-updates. Root cause: the earlier same-day fix (extending each page's poll timer to call
+`loadActions()` while on Actions/Sessions) only refreshes what `loadActions()` itself drives — the
+QR-visibility card and Actions-tab toggles — it never touched `loadBartenderSessions()`/`loadSystem()`,
+which are separate functions only ever called from `switchTab('sessions')` or the manual button.
+Same gap existed on render too (`poll()` already runs unconditionally every 5s and refreshes the
+QR/status via `updatePaymentUI()`, but never called `loadBartenderSessions()`) — user asked to check
+render directly rather than assuming it was LAN-only, correctly guessing the same class of bug.
+Fixed on all three: both LAN admin.html's poll timers now also call `loadBartenderSessions()` +
+`loadSystem()` while on the Sessions tab; render's `poll()` now also calls `loadBartenderSessions()`
+under the same `S.activeTab === 'sessions'` condition it already tracks. No iOS/Android Kotlin/Swift
+changes — purely the three `admin.html` files (`static/`, both `WebApps/`/`assets/`).
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
