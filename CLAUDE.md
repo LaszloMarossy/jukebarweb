@@ -1786,6 +1786,55 @@ interval-driven calls before pairing, no regression to the real flow. Render's e
 successful login — confirmed via direct re-read, no fix needed there. Pure static HTML/JS on both
 platforms, no build step applicable.
 
+**Turning off bartender access left existing paired sessions alive indefinitely, all three**
+**backends — a real bug, not a UI staleness issue (2026-08-18).** User, testing on render: turned
+off bartender access while a bartender session was live, saw the tab eventually show a raw
+`{"detail":"Not found"}` JSON blob instead of a friendly message ("your session was ended by admin
+or system"), and separately noticed the killed session kept showing as "active" on the Sessions
+tab. Also asked whether closing a bartender tab could be detected the same way.
+
+Traced precisely: turning off bartender access clears `bartender_pin_hash`, but nothing in
+`host_sync()`'s echo-confirm block (or the LAN/kiosk-native equivalents) ever touched
+`bartender_tokens`/`bartenders`/`storage.loadBartenders()` — `_require_bartender_token()` and its
+LAN/iOS equivalents only check *token presence*, never whether a PIN is currently set, so an
+already-issued token kept authenticating indefinitely. This explains both symptoms at once: the
+Sessions tab genuinely still had an active record (nothing had ever deleted it), and a live
+bartender tab's own polling (`/api/bar/{id}/requests` etc.) kept succeeding rather than ever
+401ing — so the only way to see a "kicked" state at all was a hard page reload, which hit
+`bartender_page()`'s pre-existing hard-lockout gate (`bar.bartender_pin_hash` empty → real 404,
+2026-08 PIN split, mirrors the customer `localOnly` lockout) and got FastAPI's bare default JSON
+error body, since that route had never needed a friendly response before — the gate was built for
+"this bar has never had bartender access," not "a legitimate bartender's access was just revoked."
+
+Fixed with two independent changes, all three backends:
+1. **Session purge.** Whenever the bartender PIN transitions to empty, immediately delete every
+   currently-active bartender-role session: relay (`host_sync()`'s echo block filters
+   `bar.bartender_tokens` down to non-bartender roles), Android (`LocalRequestManager
+   .purgeAllBartenderSessions()`, called from both `LocalServer.handleAdminSettings()` — the LAN
+   remote-admin path — and `MainActivity`'s kiosk-native `onSetBartenderPin` callback), iOS
+   (`LocalStorage.deleteAllBartenders(sessionId:)`, called from both `LocalServer.swift`'s
+   `/api/admin/settings` handler and `AdminView.swift`'s `clearBartenderPin()`). None of these
+   need a host round-trip — this is the same "just delete it now" shape as the existing
+   Kill-session action, not something that waits for host confirmation. Internet-mode Android/iOS
+   have no local bartender-session store at all (those bartenders pair against the relay
+   directly), so only the relay-side fix applies there — confirmed structurally, not assumed.
+2. **Friendly 404.** `bartender_page()` (relay), `/bartender` (both LAN `LocalServer`s) now
+   return a small styled HTML page ("Bartender access unavailable... Please check with bar
+   staff.") instead of a bare JSON/empty 404 body when the PIN is off — still a real 404 status
+   (the hard-lockout intent from the PIN-split design is unchanged, no page/feature is exposed),
+   just no longer looking like a crash. Deliberately generic wording — doesn't distinguish "never
+   configured" from "just turned off," so it reveals nothing more than the plain 404 already did.
+
+**Tab-close detection: confirmed not solvable, not attempted.** No `beforeunload`/`sendBeacon`
+kill-call exists on any of the three `bartender.html` pages, and none was added — a browser tab
+close is not reliably detectable server-side (network drop, backgrounding, and an actual close all
+look identical from the server's perspective; `beforeunload` handlers are unreliable across mobile
+browsers specifically). This matches the already-established, explicitly-confirmed design decision
+elsewhere in this file ("Bartender pairing has no automatic expiration — confirmed intentional") —
+a paired bartender's session is meant to stay valid until an explicit Kill or the bar's own
+End Session, not lapse from inactivity or a closed tab. The one thing that *is* now reliably
+detectable end-to-end, per this fix, is the admin explicitly turning bartender access off.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

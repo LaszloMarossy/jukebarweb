@@ -474,3 +474,20 @@ and fired the "kicked" message on a session that never existed. Fixed with a one
 (`if (!bartenderId) return;`) at the top of `loadRequests()` on both `assets/bartender.html`
 (Android) and `WebApps/bartender.html` (iOS). Render's equivalent interval was already correctly
 scoped inside `startMain()` — confirmed, no fix needed there.
+
+## 2026-08-18 — Turning off bartender access didn't kill existing sessions, all three backends
+
+User on render: turned off bartender access with a bartender session live — the tab eventually
+showed a raw `{"detail":"Not found"}` JSON blob instead of a friendly message, and the killed
+session kept listing as "active" on the Sessions tab. Root cause: clearing the PIN never touched
+`bartender_tokens`/local bartender-session stores at all — only *token presence* was ever checked,
+never whether a PIN is currently set — so an existing token authenticated forever, and the only way
+to see any "kicked" state was a hard page reload hitting the pre-existing hard-lockout 404 gate
+(built for "never had bartender access," not "access was just revoked," so it had no friendly
+response). Fixed with two changes on all three backends: (1) immediately purge every active
+bartender-role session the moment the PIN goes empty (relay's `host_sync()` echo, Android's
+`purgeAllBartenderSessions()`, iOS's `deleteAllBartenders()` — no host round-trip needed, same
+shape as the existing Kill action), and (2) the PIN-off 404 now returns a small styled "Bartender
+access unavailable" HTML page instead of bare JSON/empty body, on all three page routes. Tab-close
+detection (also asked about) is confirmed not solvable server-side and not attempted — matches this
+codebase's existing "no automatic expiration" design for bartender sessions.

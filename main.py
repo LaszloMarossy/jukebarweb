@@ -761,6 +761,19 @@ async def host_sync(body: dict[str, Any]):
         bar.bartender_pin_hash = pin_value
         if bar.desired_settings.get("bartender_pin_hash") == pin_value:
             bar.desired_settings.pop("bartender_pin_hash", None)
+        # Turning bartender access off must also kill any already-paired bartender sessions
+        # (2026-08-18) — previously bartender_tokens was untouched here, so an existing token
+        # kept working indefinitely (bartender_requests()/etc. only check token presence, never
+        # bar.bartender_pin_hash) and the Sessions tab kept listing it as "active" forever, since
+        # nothing ever removed it. Mirrors bartender_sessions_kill()'s direct deletion — no host
+        # round-trip needed for this either, this is relay-side session bookkeeping, not
+        # something the host owns. Admin tokens (role == "admin") are untouched; only bartender
+        # role tokens are purged.
+        if not pin_value:
+            bar.bartender_tokens = {
+                tok: rec for tok, rec in bar.bartender_tokens.items()
+                if rec.get("role") != "bartender"
+            }
 
     if "up_next" in body:
         bar.up_next_queue = body["up_next"]
@@ -904,13 +917,37 @@ async def bar_page(jukebar_id: str):
     return HTMLResponse((Path("static") / "customer.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
+_BARTENDER_OFF_HTML = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JukeBar</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#1a1a1a; color:#eee; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+         text-align:center; padding:24px; box-sizing:border-box; }
+  .card { max-width:360px; }
+  h1 { color:#fda185; font-size:1.3em; margin:0 0 12px; }
+  p { color:#bbb; line-height:1.5; margin:0; }
+</style></head>
+<body>
+  <div class="card">
+    <h1>Bartender access unavailable</h1>
+    <p>Bartender access for this bar is currently turned off, or your session was ended by the
+       admin. Please check with bar staff.</p>
+  </div>
+</body></html>"""
+
+
 @app.get("/bartender/{jukebar_id}", response_class=HTMLResponse)
 async def bartender_page(jukebar_id: str):
     # Bartender role is off entirely for this bar when no bartender PIN has been set (2026-08
     # PIN split) — real 404, not just an unadvertised link, mirroring bar_page()'s localOnly gate.
+    # Returns a friendly HTML page (not a bare JSON 404) since this route legitimately gets hit
+    # by a previously-paired bartender's browser too — a stale tab reload, or reopening after the
+    # admin turns access off underneath them (2026-08-18: was raising a bare HTTPException(404),
+    # showing raw `{"detail":"Not found"}` JSON with zero explanation, reported as confusing).
     bar = _bars.get(jukebar_id)
     if bar is not None and not bar.bartender_pin_hash:
-        raise HTTPException(404, "Not found")
+        return HTMLResponse(_BARTENDER_OFF_HTML, status_code=404, headers=_NO_CACHE)
     return HTMLResponse((Path("static") / "bartender.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 

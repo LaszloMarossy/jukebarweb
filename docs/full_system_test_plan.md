@@ -912,6 +912,13 @@ wait, not a defense mechanism itself.
       Sessions, no standalone System), and opening Sessions shows, top to bottom: QR card →
       Active Bartender Sessions → Waiting to Retry → the former System content (Server/Session
       stats/Configuration/Stripe) at the bottom, all loading correctly on tab open.
+- [ ] **New (2026-08-18): turning off bartender access kills existing sessions + shows a friendly**
+      **404, all 3 surfaces** — pair a bartender, then turn bartender access off from admin (any
+      surface). Confirm: (1) within one poll cycle, the bartender's own open tab shows the
+      "ended by the admin" message (not silently still working); (2) the Sessions tab no longer
+      lists that session at all (not just greyed out — actually gone); (3) reloading/reopening the
+      bartender URL now shows a small styled "Bartender access unavailable" page, not a raw JSON
+      or blank 404. Test on render, then repeat on LAN (both platforms).
 - [ ] **New (2026-08-18): LAN bartender.html no longer shows a misleading "ended by admin"**
       **message before ever pairing, both platforms** — load LAN bartender.html fresh (no prior
       pairing) and wait 15+ seconds without entering anything: confirm no error message appears at
