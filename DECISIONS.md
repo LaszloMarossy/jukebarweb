@@ -521,3 +521,14 @@ bug — its LAN routes read config fresh from disk on every request, no in-memor
 stale. A related claim (a LAN admin tab left open across a restart "kept working") wasn't
 independently confirmed as a distinct bug — flagged back to the user to retest since this race may
 have been the actual cause.
+
+## 2026-08-18 — Follow-up: the real bug wasn't a race, it was a missing propagate call
+
+User's precise counter-repro (deliberately unhurried, waited) ruled out timing entirely. Real cause:
+`AdminScreen` is wired from two places — the live post-launch overlay's callbacks correctly call
+`propagateBarDetails()`, but the wizard Summary screen's `onBarDetailsSaved` handler never did,
+so any toggle made there (PIN, Stripe, Bartender, AcceptingRequests) updated `barDetails` (kiosk's
+own QR read it fine) but never reached the running `LocalServer`/`RelayService` at all — a
+permanently missing wire, not a window. Fixed by adding the missing call; safe unconditionally
+even pre-launch. iOS has no equivalent split (`AdminView` always reads/writes the same
+`AppState`/`LocalStorage` singleton, wizard or live).

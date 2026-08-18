@@ -1903,6 +1903,33 @@ can still perform an actual *authenticated* action (settings/approve/deny) after
 wasn't independently reproduced — flagged to the user to retest specifically for that, since the
 race-condition fix above may have been the actual cause of what looked like session staleness.
 
+**Follow-up, same day: the actual bug wasn't a race at all — a genuinely missing propagate call**
+**on the wizard's Summary screen, Android only.** User pushed back on the race-condition theory
+above with a precise counter-repro: they deliberately took their time on the wizard's Summary
+screen (no fast action), connected a phone to the LAN admin page via its QR, *then* set the
+bartender PIN on the kiosk, and waited — the LAN admin page never picked it up, no matter how long.
+That ruled out timing entirely and pointed at something structurally missing instead of a narrow
+window. Found it: `AdminScreen` (the same composable) is wired up from **two different places**
+with two different callback implementations — the live post-launch overlay's `onSetBartenderPin`/
+`onToggleStripe`/etc. (inside `KioskView`'s block in `MainActivity.kt`) each correctly call
+`propagateBarDetails()` after updating `barDetails`, but the wizard's Summary step
+(`SetupWizardScreen.kt`) routes all of its own `AdminScreen` callbacks through one shared
+`onBarDetailsSaved` handler that only did `barDetails = details; savePartialState()` — **never**
+`propagateBarDetails()`. So any toggle made on the Summary screen (not just bartender PIN — Stripe/
+Bartender/AcceptingRequests too) updated `barDetails` (which is why the kiosk's own QR correctly
+showed the new state — it reads `barDetails` directly) but never reached the already-running
+`LocalServer` or `RelayService` at all. Not a window to beat, a permanently missing wire — this is
+why waiting never helped. Fixed by adding `propagateBarDetails()` to `onBarDetailsSaved` — safe to
+call unconditionally even during earlier wizard steps before any server exists yet, since
+`propagateBarDetails()` already no-ops safely when `localServer` is still null. iOS confirmed to
+have no equivalent split: `AdminView` reads/writes through the same `AppState`/`LocalStorage`
+singleton regardless of whether it's shown from the wizard or live, so there was never a second,
+diverging callback implementation to begin with — this class of bug is specific to Android's
+callback-wiring structure. Lesson: when the same composable/view is instantiated from two call
+sites with hand-written callback wiring at each, drift between them is the default risk, not the
+exception — worth grepping for every call site of a shared admin/settings component whenever one
+of its actions doesn't seem to propagate, not just the one path most recently touched.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

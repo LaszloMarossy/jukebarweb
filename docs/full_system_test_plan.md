@@ -919,6 +919,13 @@ wait, not a defense mechanism itself.
       access unavailable"), and that the LAN admin page's Actions/Sessions tabs show bartender
       access on within a few seconds. Repeat a few times — this was a timing race, so a single pass
       isn't conclusive.
+- [ ] **New (2026-08-18): settings toggled from the wizard's Summary screen (before Launch Kiosk)**
+      **propagate to LAN admin, Android only** — on the wizard's Summary screen (not yet tapped
+      Launch Kiosk), open the LAN admin page on another device via its QR, then toggle Stripe/
+      Bartender/AcceptingRequests and set a bartender PIN, all from the Summary screen. Confirm the
+      LAN admin page picks up every one of these within a few seconds — no need to tap Launch
+      Kiosk first. This was a genuinely missing propagate call, not a timing issue, so no need to
+      rush or wait — should just work either way.
 - [ ] **New (2026-08-18): LAN admin.html's Actions/Sessions tabs stay live without re-navigating,**
       **both platforms** — on LAN transport, open the LAN admin page and land on (or stay on) the
       Actions or Sessions tab. From the kiosk-native Admin screen on the same device, toggle
