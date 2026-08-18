@@ -945,6 +945,11 @@ wait, not a defense mechanism itself.
       lists that session at all (not just greyed out — actually gone); (3) reloading/reopening the
       bartender URL now shows a small styled "Bartender access unavailable" page, not a raw JSON
       or blank 404. Test on render, then repeat on LAN (both platforms).
+- [ ] **New (2026-08-18): LAN admin.html clearly logs out on a dead session, both platforms** —
+      open LAN admin, log in, leave the tab open. Restart the host app (forces a new session,
+      clearing admin tokens server-side). Without reloading the tab, wait ~5s or try toggling a
+      payment setting. Confirm the page kicks back to the PIN screen with an explanatory message
+      ("Your session ended...") — not a silently-failing toggle or a blank/generic error.
 - [ ] **New (2026-08-18): a second bartender's fresh LAN login isn't poisoned by a stale cached**
       **credential, both platforms** — pair one bartender on a device, then (without clearing
       browser data) reload the LAN bartender page fresh, as if a different bartender is now using

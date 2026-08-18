@@ -552,3 +552,16 @@ fell back to the pair screen correctly but never cleared it, so the still-uncond
 15s `loadRequests()` interval picked up the stale id moments later, got a real 401, and showed the
 alarming message. Fixed by clearing `localStorage`/`bartenderId` in that failure branch too, both
 platforms. Render unaffected — its `sessionStorage` is scoped per-tab by design.
+
+## 2026-08-18 — LAN admin.html had no session-expiry detection at all, both platforms
+
+User asked directly whether LAN admin sessions survive a restart. Server-side: no —
+`LocalRequestManager.reset()` clears admin tokens on every wizard-completion cycle, which always
+re-runs on restart. Client-side: `admin.html` had zero 401 handling anywhere (unlike
+`bartender.html`'s `bartenderKicked()`), so a dead token just made every admin action silently
+fail with no visible message — likely the real explanation for the earlier "leftover tab kept
+working" observation (public endpoints kept updating, masking that authenticated actions were
+actually broken). Added a shared `adminKicked()` wired into the highest-traffic admin-token-gated
+calls (main poll, Sessions list, the three payment toggles, bartender PIN save/clear) on both LAN
+admin.html files. Render already handles this correctly via its existing "Session expired" path —
+not touched.

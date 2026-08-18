@@ -1970,6 +1970,34 @@ uses `sessionStorage` (not `localStorage`) keyed by `jukebarId`+`session`, which
 by browser design — a genuinely new tab starts with no cached token at all, so this specific class
 of cross-bartender staleness doesn't arise there; not fixed, not needed.
 
+**LAN admin.html had zero session-expiry detection at all, unlike bartender.html — closed**
+**2026-08-18, both platforms.** User asked directly: do LAN admin sessions survive an app/session
+restart? Answer traced precisely: **no, not server-side** — `LocalRequestManager.reset(sessionId)`
+(called every `startLocalServer()`, i.e. every wizard-completion cycle, which always re-runs on
+restart since Android always re-shows the wizard) clears `adminTokens` unconditionally. But
+**client-side, a left-open admin.html tab had no way to find out** — unlike `bartender.html`
+(which has `bartenderKicked()`, wired into its main poll since day one), `admin.html` had *no*
+401-detection anywhere across its ~15 `barConfig.token`-bearing fetch calls. A dead token meant
+every admin-gated action just silently failed (`if (!res.ok) return;`/`throw` with no visible
+message) — a settings toggle wouldn't visibly flip, the Sessions list showed a generic "could not
+load," with nothing telling the operator to re-enter the PIN. This is very likely what produced
+the earlier same-day "leftover tab kept working" observation — the *public* endpoints (`/api/catalog`,
+`/api/nowplaying`) genuinely don't need a token and kept updating, giving the appearance of a live
+session, while any actual authenticated action would have been silently broken.
+
+Fixed by adding a shared `adminKicked()` (mirrors `bartenderKicked()` exactly: clears `barConfig`,
+calls `showPinScreen()`, shows an explanatory message) wired into the highest-traffic
+admin-token-gated call sites on both LAN `admin.html` files: `loadRequests()` (main 5s poll while
+on the Requests tab), `loadBartenderSessions()` (Sessions tab, both periodic-poll and manual-
+refresh calls — iOS already had a 401 branch here but it only showed inline text, never actually
+logged the admin out), `toggleLanPayment()` (Stripe/Bartender/AcceptingRequests toggles), and the
+bartender-PIN save/clear functions. Deliberately **not** exhaustively wired into every single
+admin.html fetch (report generation, kill-session, clear-lockout) — those are rarer, one-off
+actions where a silent failure is far less confusing (the button visibly does nothing, versus a
+toggle that looks like it should have flipped) — scoped to the paths that run continuously or are
+tapped often, not a full sweep of every endpoint. Render's `static/admin.html` was not touched —
+it already handles the analogous case correctly via its 403 "Session expired" `showError()` path.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
