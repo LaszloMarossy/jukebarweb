@@ -920,23 +920,30 @@ wait, not a defense mechanism itself.
       verified 2026-08-17** — user confirmed multiple bartenders can log into the same bar on
       render. Cross-surface isolation (LAN sessions not appearing in render's list) not separately
       re-confirmed this round.
-- [ ] **New (2026-08-18): bartender names must be unique among currently-active sessions.** Pair as
+- [X] **Wrong bartender PIN, access enabled, is rejected with a clear error** (not silently
+      accepted, not confused with the "access not enabled" 404). **Verified 2026-08-18 on render**
+      — LAN both platforms not yet tested.
+- [X] **New (2026-08-18): bartender names must be unique among currently-active sessions.** Pair as
       "Ted", then try to pair a second, different device/browser as "Ted" again while the first is
       still active — confirm the second attempt is rejected (409, "already in use") rather than
       silently creating a duplicate. Found broken on Android LAN specifically (user's own test);
-      fixed on all three pairing backends (render, LAN both platforms) — test all three.
+      fixed on all three pairing backends (render, LAN both platforms) — test all three. **Verified
+      2026-08-18 on render.** LAN both platforms not yet tested.
   - [ ] Case-insensitivity: "ted" / "TED" / "Ted" are all treated as the same name for this check.
-  - [ ] **Freed name becomes available again**: Kill the first "Ted" (or have it fail its own PIN
+  - [X] **Freed name becomes available again**: Kill the first "Ted" (or have it fail its own PIN
         lockout/deny on iOS's pending-approval path), then confirm a *new* pairing attempt with the
         same name "Ted" now succeeds — the check is against active sessions only, not permanent.
+        **Verified 2026-08-18 on render** — killed a session and re-registered under the same name
+        successfully. LAN both platforms not yet tested.
   - [ ] Confirm this doesn't affect admin logins (`role: "admin"` on render, or the LAN admin-auth
         path) — the uniqueness check is bartender-specific.
-- [ ] **New (2026-08-18): bartender name is required, minimum 2 characters, all 3 backends + all 3**
+- [X] **New (2026-08-18): bartender name is required, minimum 2 characters, all 3 backends + all 3**
       **bartender.html pages.** Found the same round: render "allowed me to log in without giving a
       name," silently defaulting to the literal "Bartender." Try to log in/pair with the name field
       left blank, or with just 1 character — confirm the submit button stays disabled client-side
       (can't even attempt it), and confirm a direct API call bypassing the UI still gets rejected
-      with a 400 server-side (defense in depth). 2+ characters succeeds normally.
+      with a 400 server-side (defense in depth). 2+ characters succeeds normally. **Verified
+      2026-08-18 on render (short name correctly rejected).** LAN both platforms not yet tested.
   - [ ] Confirm the two LAN pages' Pair button, which previously had **no gating of any kind** (was
         always clickable even with both fields empty), now correctly starts disabled and only
         enables once the name is long enough.
