@@ -912,6 +912,13 @@ wait, not a defense mechanism itself.
       Sessions, no standalone System), and opening Sessions shows, top to bottom: QR card →
       Active Bartender Sessions → Waiting to Retry → the former System content (Server/Session
       stats/Configuration/Stripe) at the bottom, all loading correctly on tab open.
+- [ ] **New (2026-08-18): kiosk-set bartender PIN survives right after Launch Kiosk, Android only**
+      — from a fresh Android app restart, complete the wizard, tap Launch Kiosk, then *immediately*
+      open the kiosk-native Admin screen and set a bartender PIN (as fast as possible, don't wait).
+      Confirm the kiosk's own bartender QR scans to a working bartender login page (not "Bartender
+      access unavailable"), and that the LAN admin page's Actions/Sessions tabs show bartender
+      access on within a few seconds. Repeat a few times — this was a timing race, so a single pass
+      isn't conclusive.
 - [ ] **New (2026-08-18): LAN admin.html's Actions/Sessions tabs stay live without re-navigating,**
       **both platforms** — on LAN transport, open the LAN admin page and land on (or stay on) the
       Actions or Sessions tab. From the kiosk-native Admin screen on the same device, toggle

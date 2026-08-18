@@ -505,3 +505,19 @@ platforms by extending the existing gated 5s poll timer to also call `loadAction
 either the Actions or Sessions tab is active. Render's `static/admin.html` already polls
 unconditionally every 5s and already refreshes this state — confirmed via code read, no fix
 needed there.
+
+## 2026-08-18 — Android startup race could drop a kiosk-set bartender PIN, Android only
+
+User set the bartender PIN from kiosk-native Admin right after starting the app — kiosk's own
+screen correctly showed the QR, but LAN admin kept saying access was off, and scanning the kiosk's
+own QR hit the new "Bartender access unavailable" page. Traced to `startLocalServer(details)`
+baking a one-time `details` snapshot into the new `LocalServer` before finally reassigning
+`localServer = server` — a settings change made via the Admin screen (reachable the instant
+`isLaunchKiosk` flips true, independent of whether `startQueue()`'s coroutine has reached
+`startLocalServer()` yet) could land on the not-yet-reassigned `localServer` reference and get lost
+when the new object then pointed at its already-stale baked-in snapshot. Fixed by re-syncing from
+the live `barDetails` immediately after `localServer = server`. iOS confirmed to have no equivalent
+bug — its LAN routes read config fresh from disk on every request, no in-memory snapshot to go
+stale. A related claim (a LAN admin tab left open across a restart "kept working") wasn't
+independently confirmed as a distinct bug — flagged back to the user to retest since this race may
+have been the actual cause.

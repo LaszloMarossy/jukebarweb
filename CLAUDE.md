@@ -1866,6 +1866,43 @@ visible, matching the existing gating idiom instead of polling unconditionally i
 `bartender_access_enabled`; `updatePaymentUI()` (called every poll) already ends by calling
 `updateBartenderPinUI()`. No render change needed.
 
+**Android: a real startup race could silently drop a kiosk-native settings change made right**
+**after Launch Kiosk, Android only (2026-08-18).** User: set the bartender PIN from the kiosk-native
+Admin screen right after starting the app — the kiosk's own screen correctly showed the bartender
+QR (proof `barDetails.bartenderPinHash` was set), but the LAN admin page kept saying no bartender
+access, and scanning the kiosk's own QR led to the just-added "Bartender access unavailable" page.
+Traced to a genuine race in `MainActivity.startLocalServer(details: BarDetails)`: it took `details`
+as a one-time parameter snapshot, baked it into the newly-constructed `LocalServer` at
+`server.barDetails = details`, then ran `localRequestManager.reset(sessionId)` and
+`server.startLanServer()` before finally doing `localServer = server`. Android always re-shows the
+setup wizard on restart (pre-filled) and only flips `isSetupComplete = true` — making the kiosk
+view and its Admin overlay reachable — from a separate, synchronous `onLaunchKiosk` tap that does
+**not** wait for `startQueue()`'s coroutine (Spotify playlist fetch, then eventually
+`startLocalServer()`) to finish. A PIN set via the Admin screen during that window called
+`propagateBarDetails()`, whose `localServer?.let { it.barDetails = details }` found `this.localServer`
+still pointing at the *previous* server (or null) — not yet reassigned — so the update landed on
+the wrong object and was silently lost the moment `localServer = server` then pointed at the new
+object's already-stale baked-in snapshot. The kiosk's own UI never showed anything wrong because it
+reads `barDetails` directly, never through `LocalServer` at all — only the LAN HTTP routes
+(`checkBartenderAllowed()`, `catalogJson()`, etc.) were affected, since those are what actually read
+`LocalServer.barDetails`. Fixed by re-syncing from the *live* `barDetails` immediately after
+`localServer = server` (`server.barDetails = barDetails ?: details`) — closes the window regardless
+of exactly when a change happens during construction, without needing to touch the trigger sites.
+**iOS has no equivalent bug** — checked directly, not assumed: iOS's `LocalServer.swift` route
+handlers all call `storage.loadConfig()` fresh from disk on every single request (no in-memory
+`barDetails` cache at all), so there's no snapshot to go stale in the first place.
+
+**Related claim, not independently confirmed**: same report also described a LAN admin.html browser
+tab left open from before a restart appearing to "keep working" against the new kiosk session.
+Investigated `LocalRequestManager.reset(sessionId)` (called every `startLocalServer()`, clears
+`adminTokens`/`bartenders`/`sessionToken`) — this should already invalidate a stale admin token on
+a genuine restart+relaunch. Public, unauthenticated LAN endpoints (`/api/catalog`, `/api/nowplaying`)
+legitimately keep working for anyone on the LAN regardless of session freshness, by design (same as
+`customer.html`) — a stale tab continuing to *display* data isn't itself a bug. Whether a stale tab
+can still perform an actual *authenticated* action (settings/approve/deny) after a genuine restart
+wasn't independently reproduced — flagged to the user to retest specifically for that, since the
+race-condition fix above may have been the actual cause of what looked like session staleness.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
