@@ -1948,6 +1948,28 @@ Fixed on all three: both LAN admin.html's poll timers now also call `loadBartend
 under the same `S.activeTab === 'sessions'` condition it already tracks. No iOS/Android Kotlin/Swift
 changes — purely the three `admin.html` files (`static/`, both `WebApps/`/`assets/`).
 
+**LAN bartender.html: a stale localStorage credential from a previous bartender could poison a**
+**second bartender's fresh login attempt, both platforms (2026-08-18).** User: a second bartender
+opening the LAN bartender page on a device that had paired a *different* bartender before, saw
+"Your access was ended by the admin" despite never submitting the pair form at all — same message
+as the earlier `loadRequests()`-before-pairing bug fixed the same day, but a genuinely different
+trigger. Root cause: `bartenderId` is seeded from `localStorage.getItem('bt_id')` at page load —
+shared across *any* bartender who has ever paired on this device/browser, not scoped per-login-
+attempt. `checkStatus()`'s failure branch (`if (!r.ok) { showPair(); return; }`, hit when
+`/api/bartender/status` 404s on an id that no longer exists) correctly fell back to the pair
+screen, but never cleared `bartenderId`/localStorage — so the module-level variable stayed set to
+the stale, invalid id. The earlier same-day fix's guard (`if (!bartenderId) return;` in
+`loadRequests()`) only checks *truthiness*, not *validity* — a stale-but-non-empty id sails right
+through it, and the still-unconditionally-armed `setInterval(loadRequests, 15000)` fires moments
+later with that same bad id, gets a real 401, and `bartenderKicked()` shows its "ended by the
+admin" message for a credential that was never actually revoked mid-session — it just never
+belonged to this login attempt to begin with. Fixed by clearing `localStorage`/`bartenderId` in
+`checkStatus()`'s `!r.ok` branch too, mirroring exactly what `bartenderKicked()` already does —
+both `assets/bartender.html` (Android) and `WebApps/bartender.html` (iOS). Render's equivalent
+uses `sessionStorage` (not `localStorage`) keyed by `jukebarId`+`session`, which is scoped per-tab
+by browser design — a genuinely new tab starts with no cached token at all, so this specific class
+of cross-bartender staleness doesn't arise there; not fixed, not needed.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

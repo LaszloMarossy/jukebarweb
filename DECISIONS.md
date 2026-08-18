@@ -542,3 +542,13 @@ Actions toggles), never `loadBartenderSessions()`/`loadSystem()`. User asked me 
 too rather than assume LAN-only — correct guess, same gap existed there (`poll()` never called
 `loadBartenderSessions()`). Fixed on all three `admin.html` files: LAN pages' poll timers and
 render's `poll()` now also refresh the session list while the Sessions tab is active.
+
+## 2026-08-18 — LAN bartender.html: stale localStorage credential poisoned a fresh pairing attempt
+
+A second bartender opening the LAN page on a device that had paired a different bartender before
+saw "ended by the admin" without ever submitting anything. `bartenderId` seeds from `localStorage`
+(shared across any bartender who ever paired on this device) — `checkStatus()`'s failure branch
+fell back to the pair screen correctly but never cleared it, so the still-unconditionally-armed
+15s `loadRequests()` interval picked up the stale id moments later, got a real 401, and showed the
+alarming message. Fixed by clearing `localStorage`/`bartenderId` in that failure branch too, both
+platforms. Render unaffected — its `sessionStorage` is scoped per-tab by design.

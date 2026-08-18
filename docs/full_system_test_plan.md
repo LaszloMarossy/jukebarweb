@@ -945,6 +945,11 @@ wait, not a defense mechanism itself.
       lists that session at all (not just greyed out — actually gone); (3) reloading/reopening the
       bartender URL now shows a small styled "Bartender access unavailable" page, not a raw JSON
       or blank 404. Test on render, then repeat on LAN (both platforms).
+- [ ] **New (2026-08-18): a second bartender's fresh LAN login isn't poisoned by a stale cached**
+      **credential, both platforms** — pair one bartender on a device, then (without clearing
+      browser data) reload the LAN bartender page fresh, as if a different bartender is now using
+      that same device. Confirm the pair form shows cleanly with no error message at all, even
+      after waiting 15+ seconds. Then pair the second bartender normally and confirm it works.
 - [ ] **New (2026-08-18): LAN bartender.html no longer shows a misleading "ended by admin"**
       **message before ever pairing, both platforms** — load LAN bartender.html fresh (no prior
       pairing) and wait 15+ seconds without entering anything: confirm no error message appears at
