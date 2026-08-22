@@ -2096,6 +2096,37 @@ a race like Android's, it's unconditional. Fixed by calling the same `purgeAdmin
 earlier the same day (for the Forgot-PIN fix) from `resetSetup()` too. Build-verified
 (`xcodebuild ... build`).
 
+## Planned next (not yet implemented — design only, recorded 2026-08-22)
+
+**"Managing requests" — auto-manage mode for `accepting_requests`, all 13 UI surfaces + relay.**
+New section (setup wizard + kiosk-native Admin screen, both platforms) offering two mutually
+exclusive modes for controlling request acceptance:
+- **Manual** (existing): the current Stop/Start-taking-requests button, unchanged.
+- **Auto-manage** (new): two operator-editable numbers, default **10** (max outstanding requests
+  — cross this and the host auto-invokes the existing "stop taking requests" behavior; requests
+  already in flight still complete normally, only new ones stop) and **5** (restart-requesting-at
+  — once outstanding count drops to this or below, auto re-enables). Both zero = feature disabled.
+  Classic hysteresis/watermark pattern (stop-above-max, resume-at-or-below-restart) to prevent
+  flapping right at the boundary.
+- **Mutual exclusivity is load-bearing, not cosmetic**: selecting Manual fades/disables the
+  Auto-manage section in the UI (and vice versa) — only one mode's logic may ever be "in effect"
+  at a time, mirroring this codebase's existing single-slot `desired_settings` latest-write-wins
+  pattern for avoiding exactly this class of race. Never let both a human's manual toggle and the
+  auto-manage watermark logic fight over the same `accepting_requests` field simultaneously.
+
+**Open question to resolve before implementation, not now**: does "outstanding requests" mean just
+*pending* (awaiting bartender approval), or pending + approved/up-next (everything not yet
+played)? Affects real-world behavior significantly — leaning toward the latter (reflects actual
+backlog) but this is a judgment call for whenever this gets built.
+
+**Scope note**: not small. Needs the same treatment every existing toggle in this app already
+gets — wizard step + kiosk-native Admin screen + both LAN admin.html + render admin.html, new
+persisted fields threaded through `bar_settings()`/`host_sync()` on the relay and
+`BarDetails`/`HostConfig` on both host platforms. The *evaluation* logic itself is cheap: it's just
+another host-computed writer of the existing `accepting_requests` field, riding the already-built
+propagate/echo path — no new wire concept needed, just new config fields plus a periodic host-side
+check against live queue depth.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
