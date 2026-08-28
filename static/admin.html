@@ -225,11 +225,25 @@
 
     /* ── auto-manage requests (Manual/Auto mode) ── */
     .am-section-intro { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-    .mode-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 0; border-top: 1px solid var(--border);
+    /* A two-position slide knob, not an on/off switch (2026-08-28) - an on/off switch implies
+       one side is "off"/disabled, which doesn't fit two equally-valid named positions. Both
+       labels sit above; the thumb fills whichever half of the wide track it's sitting in, so
+       position alone (not color-as-enabled) conveys the setting. */
+    .am-knob-labels { display: flex; justify-content: space-between; padding: 0 2px; margin-bottom: 6px; }
+    .am-knob-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .am-knob-label.active { color: var(--accent); }
+    .am-knob-track {
+      position: relative; width: 100%; height: 34px; margin-bottom: 10px;
+      background: #252525; border: 1.5px solid #4a4a4a; border-radius: 17px;
+      cursor: pointer; box-sizing: border-box;
     }
-    .mode-row:first-of-type { border-top: none; }
+    .am-knob-track.pending { cursor: default; pointer-events: none; opacity: .5; }
+    .am-knob-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: calc(50% - 3px); height: calc(100% - 6px);
+      background: var(--accent); border-radius: 14px; transition: transform .15s ease;
+    }
+    .am-knob-track.on .am-knob-thumb { transform: translateX(100%); }
     .am-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
     .am-fields { margin-top: 4px; }
     .am-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; }
@@ -472,9 +486,12 @@
     <div class="payment-card" style="margin-top:14px">
       <div class="payment-title">Requests</div>
       <div class="am-section-intro">Choose how you want to stop accepting more requests:</div>
-      <div class="mode-row">
-        <span class="pay-label" id="am-mode-label">Manually</span>
-        <div class="toggle-track" id="am-mode-toggle" onclick="setAutoManageMode(!S.autoManageRequests)"><div class="toggle-thumb"></div></div>
+      <div class="am-knob-labels">
+        <span class="am-knob-label" id="am-label-manual">Manually</span>
+        <span class="am-knob-label" id="am-label-auto">Automatically</span>
+      </div>
+      <div class="am-knob-track" id="am-mode-toggle" onclick="setAutoManageMode(!S.autoManageRequests)">
+        <div class="am-knob-thumb"></div>
       </div>
       <!-- Only the block for the CURRENTLY set mode renders at all - not just faded/disabled
            (2026-08-28 user feedback: the two-buttons-plus-both-controls layout read as "here are
@@ -745,8 +762,8 @@ function updateAutoManageUI() {
   const modePending = pending.includes('auto_manage_requests');
   $('am-mode-toggle')?.classList.toggle('on', S.autoManageRequests);
   $('am-mode-toggle')?.classList.toggle('pending', modePending);
-  const modeLabel = $('am-mode-label');
-  if (modeLabel) modeLabel.textContent = S.autoManageRequests ? 'Automatically' : 'Manually';
+  $('am-label-manual')?.classList.toggle('active', !S.autoManageRequests);
+  $('am-label-auto')?.classList.toggle('active', S.autoManageRequests);
   // Only the block for the currently set mode renders at all (2026-08-28) - not just
   // faded/disabled, so this reads as an either/or setting rather than a list of options.
   const manualBlock = $('am-manual-block');

@@ -2317,6 +2317,26 @@ begin with) — only needed the same knob-visual swap for consistency with the o
 no structural change there. Dead `.mode-switch`/`.mode-btn` CSS removed from all three
 `admin.html` copies. All three repos rebuilt clean.
 
+**Knob redesigned again, same day: a plain on/off switch still implied "off" meant "disabled,"**
+**even after the button-pair fix above.** User: "when it is on Manually, the knob infers that I
+should turn it on TO BE manually" — a real, distinct critique from the earlier one: a segmented
+button-pair reads as "here are your options" (fixed by the previous redesign), but a boolean
+switch/toggle carries its *own* baked-in semantic of "on = enabled, off = disabled" regardless of
+what label sits next to it, which doesn't fit two equally-valid named positions where neither is
+inherently the "off" one. Proposed fix, followed exactly: show both labels ("Manually" /
+"Automatically") above a single wide, fat slide control, with the control itself conveying
+"wherever you turn it, will be the setting" rather than "off vs on." Replaced the native
+`Toggle`/`Switch` on every surface with a custom two-position slide knob: a wide track (`height:
+34px` HTML, matching on both platforms) whose thumb fills exactly half the track and sits on
+whichever side (left/right) is currently active — position, not color-as-enabled, carries the
+meaning. New shared components, one per platform, used at all 4 native/wizard call sites:
+`JukeBar/ModeKnob.swift` (SwiftUI, plain `HStack`+`Spacer` trick to push a colored
+`RoundedRectangle` to either half, no `GeometryReader` needed) and
+`ui/ModeKnob.kt` (Compose, `Modifier.fillMaxWidth(0.5f)` + `Alignment.CenterStart`/`CenterEnd`).
+HTML surfaces reuse the identical `.am-knob-track`/`.am-knob-thumb`/`.am-knob-labels` CSS pattern
+(absolutely-positioned thumb, `transform: translateX(100%)` when "on") on all three `admin.html`
+copies — dead `.mode-row` CSS removed where it became unused. All three repos rebuilt clean.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

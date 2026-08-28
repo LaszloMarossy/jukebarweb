@@ -699,3 +699,14 @@ text flips between "Manually"/"Automatically". Below it, only the active mode's 
 the DOM at all. Same redesign applied to iOS (Toggle) and Android (Switch) kiosk-native + wizard
 surfaces in the same pass. Dead .mode-switch/.mode-btn CSS removed from all three admin.html
 copies.
+
+## 2026-08-28 (later still) — Knob redesigned again: slide control replaces on/off switch
+
+User caught a second, distinct issue with the previous fix: a boolean switch still implies
+"off = disabled" regardless of what label sits next to it, which doesn't fit two equally-valid
+named positions. Proposed: show both labels above a wide, fat slide control where thumb position
+alone (not color-as-enabled) conveys the setting. Replaced the toggle-track/lan-toggle switch with
+a wider track whose thumb fills exactly half and sits on whichever side is active. Applied to all
+7 places: 3 admin.html copies (new .am-knob-track/.am-knob-thumb/.am-knob-labels CSS), iOS
+(new ModeKnob.swift, HStack+Spacer trick), Android (new ui/ModeKnob.kt, fillMaxWidth(0.5f) +
+alignment).
