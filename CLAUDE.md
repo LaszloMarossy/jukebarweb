@@ -2380,6 +2380,24 @@ visible in practice since LAN applies synchronously with no multi-second host-sy
 through — the specific "hitting it like crazy" problem this fixes is a render/relay-latency issue,
 not present the same way on LAN.
 
+**Follow-up bug, same day: the optimistic values from the fix above still flipped back-then-**
+**forward during "···updating."** User: "Pay to bartender" (and others) visibly jumped back to the
+old value, then forward to the new one, instead of moving once and staying put. Root cause:
+`poll()` runs every 5s and unconditionally overwrote `S.stripeEnabled`/etc. with the relay's raw
+stored value on every tick — but `bar.field` on the relay only updates from the *host's own sync
+echo*, never from the admin's POST directly (per this file's `desired_settings` design), so it
+kept reporting the OLD value for as long as confirmation was still pending. That stomped the
+just-set optimistic value on the very next poll tick; the real confirmation then arrived a tick or
+two later and flipped it forward again — two visible transitions instead of one. Fixed by gating
+each field's overwrite on the server's own freshly-fetched `settings_pending` list: skip applying
+`d.stripe_enabled` etc. entirely while the server still calls that field pending, leaving the
+optimistic value untouched; apply it only once, on the first poll where the server agrees it's
+confirmed (at which point it's a no-op — the values already match, so nothing visibly moves).
+Verified directly against a live local relay, not just reasoned about: toggled a setting, polled
+`/requests` twice before simulating a host sync (raw value + `settings_pending` both stayed
+unchanged across both polls, exactly the condition the fix depends on), then simulated the host's
+sync confirming it.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

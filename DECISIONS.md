@@ -732,3 +732,16 @@ invisible and a failure reverts via a saved previous value. Added #am-knob-updat
 knob's missing indicator. Scoped to render only - checked both LAN admin.html copies first and
 confirmed the same multi-second-wait problem doesn't apply there (synchronous apply, no host-sync
 cycle to wait through).
+
+## 2026-08-28 (later still) — Fixed flip-back-then-forward flicker during "...updating"
+
+User: settings toggles (Pay to bartender named specifically) visibly jumped back to the old value
+then forward to the new one during "...updating" instead of moving once and staying put. Root
+cause: poll() ran every 5s and unconditionally overwrote S.stripeEnabled/etc. with the relay's raw
+stored value, which only updates from the host's own sync echo - it kept reporting the OLD value
+the whole time confirmation was pending, stomping the optimistic value on the very next poll tick,
+then the real confirmation arrived a tick later and flipped it forward again. Fixed by gating each
+field's overwrite on the server's own freshly-fetched settings_pending list - skip entirely while
+still pending, apply once confirmed (a no-op by then, since values already match). Verified
+directly against a live local relay: raw value + pending status both stayed unchanged across two
+polls before a simulated host sync confirmed.
