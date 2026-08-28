@@ -244,6 +244,7 @@
       background: var(--accent); border-radius: 14px; transition: transform .15s ease;
     }
     .am-knob-track.on .am-knob-thumb { transform: translateX(100%); }
+    .am-knob-updating { font-size: 11px; color: var(--muted); font-style: italic; margin-top: -4px; margin-bottom: 8px; }
     .am-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
     .am-fields { margin-top: 4px; }
     .am-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; }
@@ -493,6 +494,7 @@
       <div class="am-knob-track" id="am-mode-toggle" onclick="setAutoManageMode(!S.autoManageRequests)">
         <div class="am-knob-thumb"></div>
       </div>
+      <div class="am-knob-updating" id="am-knob-updating" style="display:none">··· updating</div>
       <!-- Only the block for the CURRENTLY set mode renders at all - not just faded/disabled
            (2026-08-28 user feedback: the two-buttons-plus-both-controls layout read as "here are
            your options" rather than "this is an either/or setting"). -->
@@ -764,6 +766,8 @@ function updateAutoManageUI() {
   $('am-mode-toggle')?.classList.toggle('pending', modePending);
   $('am-label-manual')?.classList.toggle('active', !S.autoManageRequests);
   $('am-label-auto')?.classList.toggle('active', S.autoManageRequests);
+  const knobUpdating = $('am-knob-updating');
+  if (knobUpdating) knobUpdating.style.display = modePending ? 'block' : 'none';
   // Only the block for the currently set mode renders at all (2026-08-28) - not just
   // faded/disabled, so this reads as an either/or setting rather than a list of options.
   const manualBlock = $('am-manual-block');
@@ -803,11 +807,17 @@ function onAutoManageNumInput() {
 async function setAutoManageMode(auto) {
   if (auto === S.autoManageRequests) return;
   if ((S.settingsPending || []).includes('auto_manage_requests')) return;
+  const previous = S.autoManageRequests;
+  // Optimistic (2026-08-28, see togglePayment's identical comment) - the knob slides to the
+  // chosen position and the Manual/Auto content blocks switch immediately, then lock with
+  // "···updating" until the host confirms.
+  S.autoManageRequests = auto;
   S.settingsPending = [...(S.settingsPending || []), 'auto_manage_requests'];
   updatePaymentUI();
   try {
     if (!await postSetting({ auto_manage_requests: auto })) throw new Error('post failed');
   } catch {
+    S.autoManageRequests = previous;
     S.settingsPending = S.settingsPending.filter(f => f !== 'auto_manage_requests');
     updatePaymentUI();
   }
@@ -817,12 +827,23 @@ async function saveAutoManage() {
   if (!autoManageNumsChanged()) return;
   const maxVal = parseInt($('am-max-input').value, 10);
   const restartVal = parseInt($('am-restart-input').value, 10);
+  const previousMax = S.autoManageMax;
+  const previousRestart = S.autoManageRestart;
   $('am-err').textContent = '';
+  // Optimistic (2026-08-28, see togglePayment's identical comment) - without this,
+  // updateAutoManageUI() would immediately overwrite the inputs back to the OLD numbers while
+  // "···updating" is showing (it re-syncs input.value from S.autoManageMax/Restart whenever the
+  // input isn't focused, which it no longer is once Save is clicked), making the just-typed
+  // values appear to silently revert for several seconds.
+  S.autoManageMax = maxVal;
+  S.autoManageRestart = restartVal;
   S.settingsPending = [...(S.settingsPending || []), 'auto_manage_max', 'auto_manage_restart'];
   updateAutoManageUI();
   try {
     if (!await postSetting({ auto_manage_max: maxVal, auto_manage_restart: restartVal })) throw new Error('post failed');
   } catch {
+    S.autoManageMax = previousMax;
+    S.autoManageRestart = previousRestart;
     S.settingsPending = S.settingsPending.filter(f => f !== 'auto_manage_max' && f !== 'auto_manage_restart');
     $('am-err').textContent = 'Connection error — try again.';
     updateAutoManageUI();
@@ -921,12 +942,25 @@ async function togglePayment(which) {
   if ((S.settingsPending || []).includes(field)) return;   // already locked, ignore extra clicks
   const newVal = !current;
   const body    = { [field]: newVal };
+  // Optimistic: show the desired value immediately, then lock with "···updating" while waiting
+  // for the host's confirmation, rather than freezing at the OLD value until it arrives (2026-08-28
+  // user feedback - they kept re-clicking because nothing visibly changed while waiting, and this
+  // matches every button on this page, not just this one). The value set here is provisional -
+  // the next poll() overwrites it with the host's real echo regardless, so a successful update is
+  // invisible (no flicker) and a failed one below reverts it.
+  if (which === 'stripe') S.stripeEnabled = newVal;
+  else if (which === 'bartender') S.bartenderEnabled = newVal;
+  else S.acceptingRequests = newVal;
   S.settingsPending = [...(S.settingsPending || []), field];
   updatePaymentUI();
   try {
     if (!await postSetting(body)) throw new Error('post failed');
   } catch {
-    // Nothing was actually queued server-side - unlock so the bartender can retry.
+    // Nothing was actually queued server-side - revert the optimistic value and unlock so the
+    // bartender can retry.
+    if (which === 'stripe') S.stripeEnabled = current;
+    else if (which === 'bartender') S.bartenderEnabled = current;
+    else S.acceptingRequests = current;
     S.settingsPending = S.settingsPending.filter(f => f !== field);
     updatePaymentUI();
   }
