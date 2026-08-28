@@ -643,3 +643,23 @@ burst of pending requests is already visible to the bartender to deny directly. 
 all three repos — only `approved`/`approved_jump` count toward the watermark now. Closes the abuse
 angle architecturally, no new anti-abuse mechanism needed. All three repos rebuilt clean and
 re-pushed.
+
+## 2026-08-28 (later same day) — Per-requester outstanding-request throttle, complementary to auto-manage
+
+User's follow-up scenario: even with auto-manage narrowed to approved-only, one anonymous guest
+could still spam free/pay-to-bartender requests to clutter the admin/bartender Requests screen
+(no cost, no auto-stop trigger since it's all pending). Asked whether per-IP throttling works over
+WiFi/Hotspot — confirmed yes (each device gets its own DHCP-assigned local IP, same assumption the
+bartender-PIN lockout already relies on), but flagged internet-mode customers can share a public
+IP behind CGNAT/café NAT. User then proposed combining IP with the existing customer_id
+(browser-persisted localStorage id already sent with every request) rather than IP alone.
+Implemented as a union of both signals (not their intersection): a request is rejected if the
+requester's own outstanding (pending+approved, not yet played/denied) count already exceeds 2,
+matching on either the same source IP or the same customer_id — so an abuser has to evade both to
+reset their count. Relay, iOS LocalServer, and Android LocalServer all check this at request-
+creation time (bar_request()/handleSubmitRequest equivalents), not at kiosk-native or Stripe
+payment endpoints. Smoke-tested directly: 3 requests from one customer_id succeed, the 4th 429s;
+a different customer_id sharing the same source IP also correctly collides, confirming the
+union-match behaves as designed. Found and fixed a latent Android bug along the way: jsonError()
+had no 429 case (would have returned 500). All three customer.html copies show a lightweight
+alert() on 429, not the heavier full-screen error state used for expired/offline sessions.

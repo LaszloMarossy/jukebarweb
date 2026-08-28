@@ -2186,6 +2186,57 @@ tracking needed. Fixed in all 6 places that computed this count: relay `static/a
 reworded to state the exclusion explicitly, not just silently changed. All three repos
 rebuilt/re-verified clean after the change and re-pushed.
 
+**Per-requester outstanding-request throttle, added 2026-08-28, same session — a separate,**
+**complementary anti-abuse mechanism, not a replacement for the auto-manage narrowing above.**
+Follow-up scenario the user raised: even with auto-manage's watermark now immune to a pending-
+request flood, one anonymous, unauthenticated guest could still spam the free/pay-to-bartender
+path purely to clutter the admin/bartender Requests screen (no cost to them, no auto-stop
+triggered since it's all `pending`). User first asked whether per-IP throttling is viable over
+WiFi/Hotspot — confirmed yes: each device gets its own DHCP-assigned local IP in both LAN modes
+(same assumption `_bartender_lockouts` already relies on), but internet/relay-mode customers can
+share a public IP behind carrier CGNAT/café NAT, so IP alone risks false-positives there — then
+proposed combining IP with `customer_id` (the browser-persisted localStorage id every request
+already carries, previously used only for admin.html's truncated device-label display). Landed as
+a **union of the two signals**, not their intersection: a new request is rejected
+(`MAX_OUTSTANDING_REQUESTS_PER_REQUESTER = 2`, i.e. blocked once the requester already has 3+
+outstanding) if the count of the requester's own not-yet-played/denied/unfulfilled requests
+matching **either** the same source IP **or** the same `customer_id` already exceeds the limit —
+matching on just one signal alone doesn't let an abuser reset their count, they'd need to evade
+both simultaneously (new IP *and* cleared browser storage). Deliberately the broader outstanding
+definition (pending **+** approved/up-next, not the auto-manage narrowing above) — the whole point
+here is stopping pending-request spam specifically, unlike auto-manage's counter which exists to
+protect the venue's overall pipeline capacity.
+
+Implemented on the three surfaces that actually receive an anonymous request over the network —
+**not** kiosk-native (no meaningful "requester IP" for a walk-up guest at the physical device, and
+trivially self-limiting since a human bartender/staff is right there) and **not**
+create-payment-intent/payment-confirmed (a completed Stripe charge is real money changing hands,
+already self-limiting, and blocking post-charge would be customer-hostile):
+- **Relay** (`main.py`): new `SongRequest.requester_ip` field (captured via `request.client.host`,
+  same idiom `bar_authenticate()`'s `client_ip` already established), new `_requester_outstanding_
+  count()` helper, checked in `bar_request()` only — returns `429` with a clear message on
+  rejection. Smoke-tested directly against a local server (3 requests from the same customer_id
+  succeed, the 4th correctly 429s; a different customer_id sharing the same source IP also
+  correctly collides — confirms the union-match works as designed, not just asserted).
+- **iOS** (`LocalServer.swift`'s `/api/request`): new `SongRequest.requesterIp` field (`String? =
+  nil` — must have an explicit default for Swift's synthesized memberwise init to treat it as
+  omittable, easy to get wrong), captured via `req.address` (Swifter, already used elsewhere for
+  hotspot/wifi IP-range detection), same union-count check inline in the handler.
+- **Android** (`LocalServer.kt`'s `handleSubmitRequest`): new `LocalRequest.requesterIp` field,
+  captured via `session.remoteIpAddress` (NanoHTTPD, already used for bartender-pairing IP
+  recording), same union-count check. Incidentally found and fixed a real latent gap while wiring
+  this up: `jsonError()`'s status-code `when` block had no `429` case (would have silently
+  returned `500` instead) — same class of bug as the pre-existing 401 gap documented earlier in
+  this file, fixed the same way.
+- **All three `customer.html` copies** (`static/`, `WebApps/`, `assets/`) gained a `res.status ===
+  429` branch in `submitRequest()`/`reqSubmit()`, surfaced via a plain `alert()` (not the heavier
+  full-screen `showError()` state the 403/404 cases use) — deliberately lighter-weight, since this
+  isn't a dead-end: the guest's basket selection is still valid, they just need to wait for an
+  existing request to resolve, unlike a truly expired/offline session.
+
+All three repos rebuilt clean (`xcodebuild ... build`, `:app:compileDebugKotlin` +
+`:app:assembleDebug`) and pushed per the standing cross-repo policy.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

@@ -102,6 +102,10 @@ class SongRequest:
     # Frozen at request creation (mirrors iOS/Android's immutable SongRequest.price) so historical
     # rows still show what was actually charged/quoted even if the bar's pricing changes later.
     price: float = 0.0
+    # Source IP at creation time (2026-08-28) — used only for the per-requester outstanding-
+    # request throttle in bar_request(), same idiom as bar_authenticate()'s client_ip. Not sent
+    # to or displayed on any host/admin surface; purely a relay-local anti-flood signal.
+    requester_ip: str = ""
 
 
 @dataclass
@@ -253,6 +257,23 @@ _profiles_loaded_at: float = 0.0
 _bartender_lockouts: dict[tuple[str, str, str], dict[str, float]] = {}
 BARTENDER_LOCKOUT_MAX_ATTEMPTS = 3
 BARTENDER_LOCKOUT_SECONDS = 15 * 60
+
+# Per-requester outstanding-request throttle (2026-08-28) — an anonymous, unauthenticated guest
+# (free or pay-to-bartender path only; Stripe is self-limiting since it costs real money) could
+# otherwise flood-submit requests purely to clutter the admin/bartender Requests screen. Capped
+# at MAX_OUTSTANDING_REQUESTS_PER_REQUESTER (not yet played/denied) per requester - identity is
+# the UNION of two independent signals, not their intersection, deliberately: source IP (reliable
+# on LAN, where each device gets its own DHCP-assigned address, same assumption the bartender-PIN
+# lockout above already relies on) and customer_id (the browser-persisted localStorage id
+# customer.html already sends with every request, survives a network change but not a cleared
+# browser). Matching on EITHER means an abuser has to defeat BOTH signals at once (get a new IP
+# *and* a fresh customer_id) to reset their count - matching just one doesn't help them evade.
+# Same "raise the bar for casual abuse, not hacker-proof" philosophy as the PIN lockout's own
+# accepted per-IP limitation. Only checked in bar_request() (the free/pay-to-bartender creation
+# endpoint) - not create-payment-intent/payment-confirmed, since a completed Stripe charge is
+# already a real cost to the requester and a request row there is proof of actual payment, not
+# spam.
+MAX_OUTSTANDING_REQUESTS_PER_REQUESTER = 2
 
 
 # ---------------------------------------------------------------------------
@@ -1188,8 +1209,19 @@ def _compute_price(bar: "BarSession", song_ids: list[str]) -> float:
     return p3 if (len(song_ids) == 3 and p3 > 0) else pps * len(song_ids)
 
 
+def _requester_outstanding_count(bar: "BarSession", ip: str, customer_id: str) -> int:
+    """See MAX_OUTSTANDING_REQUESTS_PER_REQUESTER's comment for the union-of-two-signals design."""
+    count = 0
+    for r in bar.requests.values():
+        if r.status in ("played", "denied", "unfulfilled"):
+            continue
+        if (ip and r.requester_ip == ip) or (customer_id and r.customer_id == customer_id):
+            count += 1
+    return count
+
+
 @app.post("/api/bar/{jukebar_id}/request")
-async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
+async def bar_request(jukebar_id: str, request: Request, s: str = Query(..., alias="s"), body: dict[str, Any] = ...):
     bar = _customer_bar(jukebar_id, s)
     if bar.kiosk_mode == "localOnly":
         raise HTTPException(404, "Not found")
@@ -1200,13 +1232,18 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
     if not song_ids:
         raise HTTPException(400, "song_ids required")
 
+    client_ip = request.client.host if request.client else ""
+    customer_id = body.get("customer_id", "")
+    if _requester_outstanding_count(bar, client_ip, customer_id) > MAX_OUTSTANDING_REQUESTS_PER_REQUESTER:
+        raise HTTPException(429, "You already have requests waiting to be reviewed — please wait before submitting more")
+
     rid = str(uuid.uuid4())
     req = SongRequest(
         id=rid,
         song_ids=song_ids,
         song_titles=body.get("song_titles", []),
         requester_name=body.get("requester_name", ""),
-        customer_id=body.get("customer_id", ""),
+        customer_id=customer_id,
         jump=body.get("jump", False),
         status="pending",  # always pending; host confirms via up_next — relay is not the authority
         # This endpoint ("Submit to Bartender") is only ever reached for the free/pay-to-bartender
@@ -1215,6 +1252,7 @@ async def bar_request(jukebar_id: str, s: str = Query(..., alias="s"), body: dic
         # auto-accept request is never charged, regardless of whatever price_per_song/
         # price_for_three happen to still be configured.
         price=_compute_price(bar, song_ids) if bar.bartender_enabled else 0.0,
+        requester_ip=client_ip,
     )
     bar.requests[rid] = req
     return {"request_id": rid, "status": req.status}

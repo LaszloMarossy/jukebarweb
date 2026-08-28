@@ -1194,6 +1194,13 @@ async function submitRequest() {
       }),
     });
     if (res.status === 403) { btn.disabled = false; btn.textContent = !S.requireApproval ? 'Submit (free)' : 'Submit to Bartender'; showError('Link expired', 'Please scan the current QR code at the bar to request songs.'); return; }
+    if (res.status === 429) {
+      // Not a dead-end like the 403/404 cases above (which use showError's full-screen state) -
+      // the basket is still valid and the guest just needs to wait, so keep them on this screen.
+      btn.disabled = false; btn.textContent = !S.requireApproval ? 'Submit (free)' : 'Submit to Bartender';
+      alert('You already have requests waiting to be reviewed. Please wait for one to be approved or played before submitting more.');
+      return;
+    }
     if (!res.ok) throw new Error(res.status);
     const { status } = await res.json();
     const submitted = [...S.selected];
