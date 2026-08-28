@@ -710,3 +710,12 @@ a wider track whose thumb fills exactly half and sits on whichever side is activ
 7 places: 3 admin.html copies (new .am-knob-track/.am-knob-thumb/.am-knob-labels CSS), iOS
 (new ModeKnob.swift, HStack+Spacer trick), Android (new ui/ModeKnob.kt, fillMaxWidth(0.5f) +
 alignment).
+
+## 2026-08-28 (later still) — iOS ModeKnob bug: thumb was always full-width solid orange
+
+User caught live on-device: the knob was solid orange with no visible position/movement. Root
+cause: a bare Shape (RoundedRectangle) has no intrinsic size and expands to fill all available
+space in a stack, same as Color - the HStack+Spacer trick used to try to get "half width" didn't
+actually constrain it, it just filled the entire track regardless of state. Fixed with an explicit
+GeometryReader-computed width/offset. Android and the HTML surfaces were never affected (Compose's
+fillMaxWidth(fraction) and plain CSS width are unambiguous).

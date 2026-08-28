@@ -2330,12 +2330,27 @@ inherently the "off" one. Proposed fix, followed exactly: show both labels ("Man
 34px` HTML, matching on both platforms) whose thumb fills exactly half the track and sits on
 whichever side (left/right) is currently active — position, not color-as-enabled, carries the
 meaning. New shared components, one per platform, used at all 4 native/wizard call sites:
-`JukeBar/ModeKnob.swift` (SwiftUI, plain `HStack`+`Spacer` trick to push a colored
-`RoundedRectangle` to either half, no `GeometryReader` needed) and
-`ui/ModeKnob.kt` (Compose, `Modifier.fillMaxWidth(0.5f)` + `Alignment.CenterStart`/`CenterEnd`).
-HTML surfaces reuse the identical `.am-knob-track`/`.am-knob-thumb`/`.am-knob-labels` CSS pattern
-(absolutely-positioned thumb, `transform: translateX(100%)` when "on") on all three `admin.html`
-copies — dead `.mode-row` CSS removed where it became unused. All three repos rebuilt clean.
+`JukeBar/ModeKnob.swift` (SwiftUI) and `ui/ModeKnob.kt` (Compose, `Modifier.fillMaxWidth(0.5f)` +
+`Alignment.CenterStart`/`CenterEnd`). HTML surfaces reuse the identical `.am-knob-track`/
+`.am-knob-thumb`/`.am-knob-labels` CSS pattern (absolutely-positioned thumb, `transform:
+translateX(100%)` when "on") on all three `admin.html` copies — dead `.mode-row` CSS removed
+where it became unused. All three repos rebuilt clean.
+
+**iOS bug, found and fixed same day: the thumb was always full-width solid orange, no movement**
+**at all.** User caught it live on-device. Root cause: `ModeKnob.swift`'s first cut used a plain
+`HStack(spacing: 0) { if isAutomatic { Spacer() }; RoundedRectangle()...; if !isAutomatic {
+Spacer() } }` to try to get a "half-width" thumb — but a bare `Shape` (like `RoundedRectangle`)
+has no intrinsic size and expands to fill all available space in a stack, exactly like `Color`
+does; the `Spacer()` trick doesn't actually constrain it to half, so the rectangle just filled the
+entire track every time regardless of state — solid orange, no visible left/right position ever.
+Fixed by switching to an explicit `GeometryReader`-computed width and `.offset(x:)` (`thumbWidth =
+(geo.size.width - inset*2) / 2`, offset left or right depending on `isAutomatic`) — deterministic,
+not dependent on stack-layout flex-sizing ambiguity. Android's `Modifier.fillMaxWidth(0.5f)` and
+the HTML surfaces' static `calc(50% - 3px)` were never affected — Compose's fraction-based
+`fillMaxWidth` and plain CSS `width` are unambiguous in a way SwiftUI's bare-`Shape`-in-`HStack`
+isn't, so this was an iOS-only fix. Lesson: a Shape's default sizing behavior in a flex container
+is a known SwiftUI gotcha — always give it an explicit `.frame(width:)` or size it via
+`GeometryReader`, never rely on sibling `Spacer()`s to imply a fraction.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
