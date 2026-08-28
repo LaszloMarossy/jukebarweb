@@ -243,10 +243,10 @@
     .am-field-row label { font-size: 14px; color: var(--text); }
     .am-num-field {
       width: 64px; box-sizing: border-box;
-      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-      color: var(--text); font-size: 15px; font-weight: 600; text-align: center; padding: 8px 6px;
+      background: #252525; border: 1.5px solid #4a4a4a; border-radius: 8px;
+      color: var(--text); font-size: 16px; font-weight: 700; text-align: center; padding: 9px 6px;
     }
-    .am-num-field:focus { outline: none; border-color: var(--accent); }
+    .am-num-field:focus { outline: none; border-color: var(--accent); background: #2c2c2c; }
     .am-field-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .btn-am-save { width: 100%; margin-top: 10px; }
 
@@ -495,11 +495,11 @@
       <div class="am-fields" id="am-fields" style="display:none">
         <div class="am-field-row">
           <label for="am-max-input">Stop accepting at</label>
-          <input class="am-num-field" id="am-max-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()">
+          <input class="am-num-field" id="am-max-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()" onfocus="this.select()">
         </div>
         <div class="am-field-row">
           <label for="am-restart-input">Resume at</label>
-          <input class="am-num-field" id="am-restart-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()">
+          <input class="am-num-field" id="am-restart-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()" onfocus="this.select()">
         </div>
         <div class="am-field-hint">Outstanding = approved/up-next only, not yet played. Pending (unreviewed) requests don't count. Currently <span id="am-current-count">—</span>.</div>
         <button class="btn-report btn-am-save" id="am-save" onclick="saveAutoManage()" disabled>Save</button>

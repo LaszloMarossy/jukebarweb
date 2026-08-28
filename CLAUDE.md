@@ -2272,6 +2272,32 @@ platforms' local bartender-approve handlers directly: `LocalServer.swift`'s `/ap
 and `LocalRequestManager.kt`'s `approveRequest()` both flip `status` to `.approved`/`APPROVED`
 synchronously, in the same call, since LAN mode has no separate host to wait for.
 
+**Auto-manage number fields: select-all-on-focus + visible-as-an-input styling, all 7 places**
+**(2026-08-28).** User: "hard to see that the numbers are actually input fields; also hard to
+select the number to delete it" — traced the visibility complaint to real low-contrast CSS/colors
+(the HTML surfaces' `.am-num-field` used a background essentially the same shade as its own
+container card, with a near-invisible border), fixed on all three `admin.html` copies with a
+lighter fill + more visible border, plus `onfocus="this.select()"` so a tap highlights the
+existing digits (JS's own native behavior, no extra plumbing needed). Android's Compose fields
+needed converting from a plain `String` state to `TextFieldValue` + `Modifier.onFocusChanged {
+if (it.isFocused) field = field.copy(selection = TextRange(0, field.text.length)) }`, done
+identically on both `AdminScreen.kt` and `AutoManageStep.kt`, plus the same lighter-fill/
+more-visible-border treatment via `OutlinedTextFieldDefaults.colors()`'s container/border params.
+**iOS needed real UIKit bridging** — SwiftUI's native `TextField` has no select-all-on-focus
+capability at all (tapping in only places a cursor); new `SelectAllTextField.swift` wraps a plain
+`UITextField` (`UIViewRepresentable`, first new Swift file added this session — confirmed the
+project uses Xcode's synchronized-file-groups feature so it needed no manual `.pbxproj` edit,
+picked up automatically by a rebuild) with `textFieldDidBeginEditing` calling `selectAll(nil)`,
+matching env `isEnabled` for the Requests card's disabled-in-Manual-mode state, and its own
+`inputAccessoryView` Done button — a bridged `UITextField` isn't tracked by SwiftUI's
+`.focused()`/`.toolbar(.keyboard)` mechanism the way a native field is, and `.numberPad` has no
+Return key, so the existing shared `autoManageFieldFocused` `@FocusState` (no longer needed once
+these two fields stopped being native `TextField`s) was removed, along with a direct
+`UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder)...)` call replacing
+its one remaining use (dismissing the keyboard programmatically after `saveAutoManageThresholds()`
+completes). Used on `AdminView.swift`'s two live fields and `SetupView.swift`'s wizard-step
+equivalents — 4 call sites, one shared component. All three repos rebuilt clean.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

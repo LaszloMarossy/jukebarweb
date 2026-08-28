@@ -679,3 +679,11 @@ until then) - not a bug, the architecture working as designed. Retested with a s
 /api/host/sync call echoing the confirmed status in between submissions - behaved exactly as
 specified. iOS/Android LAN approve handlers flip status synchronously (no host round-trip needed
 there), so this timing note is relay-only.
+
+## 2026-08-28 (later still) — Auto-manage number fields: select-all-on-focus + visible styling
+
+User: hard to see the auto-manage number fields are inputs, hard to select the existing number to
+overwrite it. Root cause on the HTML surfaces: `.am-num-field`'s background was essentially the
+same shade as its own container card, border nearly invisible. Fixed with a lighter fill + more
+visible border on all three admin.html copies, plus `onfocus="this.select()"` so a tap highlights
+the existing digits for immediate overwrite.
