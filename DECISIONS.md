@@ -719,3 +719,16 @@ space in a stack, same as Color - the HStack+Spacer trick used to try to get "ha
 actually constrain it, it just filled the entire track regardless of state. Fixed with an explicit
 GeometryReader-computed width/offset. Android and the HTML surfaces were never affected (Compose's
 fillMaxWidth(fraction) and plain CSS width are unambiguous).
+
+## 2026-08-28 (later still) — All settings controls made optimistic; mode knob got "...updating"
+
+User: the mode knob had no "...updating" indicator at all, leading to repeated re-clicks while
+waiting on the relay's next host-sync cycle. Investigating surfaced a broader gap: every settings
+control froze showing the OLD value while pending instead of the desired one - S.stripeEnabled
+etc. were never touched until poll() received the host's real echo. Fixed by setting the
+optimistic value immediately in togglePayment()/setAutoManageMode()/saveAutoManage(), before
+marking the field pending - poll()'s unconditional resync corrects it either way, so a success is
+invisible and a failure reverts via a saved previous value. Added #am-knob-updating for the mode
+knob's missing indicator. Scoped to render only - checked both LAN admin.html copies first and
+confirmed the same multi-second-wait problem doesn't apply there (synchronous apply, no host-sync
+cycle to wait through).

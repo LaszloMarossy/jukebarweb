@@ -2352,6 +2352,34 @@ isn't, so this was an iOS-only fix. Lesson: a Shape's default sizing behavior in
 is a known SwiftUI gotcha — always give it an explicit `.frame(width:)` or size it via
 `GeometryReader`, never rely on sibling `Spacer()`s to imply a fraction.
 
+**Render `static/admin.html`: all settings controls made optimistic, mode knob got its missing**
+**"···updating" feedback (2026-08-28), render only.** User: the new mode knob had no pending-state
+indicator at all — clicking it gave no visible sign anything was happening, so they kept
+re-clicking while waiting on the relay's next host-sync cycle (up to 5s). Investigating surfaced
+a broader, pre-existing gap the knob had just inherited: every settings control on this page
+(`togglePayment()` for Stripe/Bartender/Accepting, `setAutoManageMode()`, `saveAutoManage()`'s
+number fields) locked into `···updating`/disabled state on click, but **froze showing the OLD
+value** the whole time — `S.stripeEnabled`/etc. were never touched until the next `poll()`
+received the host's real echo, so the UI looked like nothing had registered for several seconds
+even for successful changes. User's proposed fix, followed exactly: flip to the *desired* value
+immediately, then lock with `···updating`, then unlock (staying at that value) once confirmed.
+Fixed by setting the optimistic value (`S.stripeEnabled = newVal`, etc.) before marking the field
+pending, in all four functions — `poll()`'s unconditional resync already overwrites it with the
+host's authoritative value every 5s regardless, so a successful change is invisible (no flicker)
+and a failed POST reverts the saved-off previous value in the `catch` branch. `saveAutoManage()`
+needed the same fix for a subtler reason: `updateAutoManageUI()` re-syncs the number inputs from
+`S.autoManageMax`/`Restart` whenever they're not focused, which they no longer are the instant
+Save is clicked — without the optimistic set, the just-typed digits would visibly snap back to
+the old numbers the moment `···updating` appeared. New `#am-knob-updating` element (reuses the
+`.pay-row.pending .pay-label::after` idea, but as its own element since the knob has no single
+`.pay-label` to attach a `::after` to) shows/hides with `modePending`, mirroring the pay-row
+toggles' existing pattern. **Scoped to render only** — checked both LAN `admin.html` copies first:
+`setAutoManageMode()` there already sets the optimistic value before its `fetch()` (was already
+correct), and `toggleLanPayment()`'s wait-for-response-before-flipping behavior is much less
+visible in practice since LAN applies synchronously with no multi-second host-sync cycle to wait
+through — the specific "hitting it like crazy" problem this fixes is a render/relay-latency issue,
+not present the same way on LAN.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
