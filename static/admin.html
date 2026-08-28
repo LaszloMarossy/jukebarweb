@@ -223,6 +223,31 @@
     .pay-warning { font-size: 11px; color: #fbbf24; margin-top: 8px; display: none; }
     .pay-warning.show { display: block; }
 
+    /* ── auto-manage requests (Manual/Auto mode) ── */
+    .mode-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-top: 1px solid var(--border);
+    }
+    .mode-row:first-of-type { border-top: none; }
+    .mode-switch { display: flex; background: var(--bg); border-radius: 8px; padding: 2px; gap: 2px; }
+    .mode-btn {
+      border: none; background: transparent; color: var(--muted);
+      font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    }
+    .mode-btn.active { background: rgba(251,190,132,.45); color: var(--text); }
+    .mode-btn.pending { opacity: .5; pointer-events: none; }
+    .am-fields { margin-top: 4px; }
+    .am-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; }
+    .am-field-row label { font-size: 14px; color: var(--text); }
+    .am-num-field {
+      width: 64px; box-sizing: border-box;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 15px; font-weight: 600; text-align: center; padding: 8px 6px;
+    }
+    .am-num-field:focus { outline: none; border-color: var(--accent); }
+    .am-field-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .btn-am-save { width: 100%; margin-top: 10px; }
+
     /* ── bartender PIN control ── */
     .bt-pin-status { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
     .bt-pin-status.on { color: #4ade80; }
@@ -451,11 +476,32 @@
     </div>
     <div class="payment-card" style="margin-top:14px">
       <div class="payment-title">Requests</div>
+      <div class="mode-row">
+        <span class="pay-label">Mode</span>
+        <div class="mode-switch">
+          <button class="mode-btn" id="am-mode-manual" onclick="setAutoManageMode(false)">Manual</button>
+          <button class="mode-btn" id="am-mode-auto" onclick="setAutoManageMode(true)">Auto</button>
+        </div>
+      </div>
       <div class="pay-row" id="row-accepting">
         <span class="pay-label">Accepting requests</span>
         <div class="toggle-track" id="tog-accepting" onclick="togglePayment('accepting')"><div class="toggle-thumb"></div></div>
       </div>
       <div class="pay-warning show" id="accepting-warning" style="display:none">Off — customers can't submit new requests; the device keeps shuffling its current playlist</div>
+      <div class="pay-warning show" id="am-auto-note" style="display:none">Auto mode is controlling this toggle — it stops/resumes on its own using the numbers below.</div>
+      <div class="am-fields" id="am-fields" style="display:none">
+        <div class="am-field-row">
+          <label for="am-max-input">Stop accepting at</label>
+          <input class="am-num-field" id="am-max-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()">
+        </div>
+        <div class="am-field-row">
+          <label for="am-restart-input">Resume at</label>
+          <input class="am-num-field" id="am-restart-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()">
+        </div>
+        <div class="am-field-hint">Outstanding = pending + up-next, not yet played. Currently <span id="am-current-count">—</span>.</div>
+        <button class="btn-report btn-am-save" id="am-save" onclick="saveAutoManage()" disabled>Save</button>
+        <div class="bt-pin-err" id="am-err"></div>
+      </div>
     </div>
     <div class="payment-card" style="margin-top:14px">
       <div class="payment-title">Bartender Access</div>
@@ -490,7 +536,7 @@
 </div>
 
 <script>
-const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote', bartenderAccessEnabled: false, spotifyOutageActive: false };
+const S = { jukebarId: '', session: '', token: '', barName: '', pollTimer: null, isPlaying: false, playStateReady: false, historyData: [], activeTab: 'requests', pricePerSong: 0, priceForThree: 0, currency: '', wakeLock: null, stripeEnabled: false, bartenderEnabled: true, settingsPending: [], kioskMode: 'localAndRemote', bartenderAccessEnabled: false, spotifyOutageActive: false, autoManageRequests: false, autoManageMax: 10, autoManageRestart: 5, outstandingCount: 0 };
 const actedRequests = new Map(); // requestId → label; cleared when server confirms non-pending
 
 function colorize(el, text) {
@@ -671,13 +717,96 @@ function updatePaymentUI() {
   $('row-bartender')?.classList.toggle('pending', pending.includes('bartender_enabled'));
   $('tog-accepting')?.classList.toggle('on', S.acceptingRequests);
   $('tog-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
+  // Auto mode owns accepting_requests once selected — the manual toggle becomes a read-only
+  // display of whatever the host's watermark logic currently has it set to, same "disabled"
+  // idiom already used for Stripe in Local Only mode, so a human toggle can never race the
+  // host's own auto-manage evaluation over the same field.
+  $('tog-accepting')?.classList.toggle('disabled', S.autoManageRequests);
   $('row-accepting')?.classList.toggle('pending', pending.includes('accepting_requests'));
   // pay-warning ("Both off: all requests auto-accepted for free") is always visible now
   // (2026-08-17) -- was previously conditional on stripe/bartender both being off, which meant
   // an operator only ever saw it after leaving both off, not as a heads-up beforehand.
   const acceptWarn = $('accepting-warning');
-  if (acceptWarn) acceptWarn.style.display = S.acceptingRequests ? 'none' : 'block';
+  if (acceptWarn) acceptWarn.style.display = (!S.autoManageRequests && !S.acceptingRequests) ? 'block' : 'none';
+  updateAutoManageUI();
   updateBartenderPinUI();
+}
+
+// ── Auto-manage requests (Manual/Auto mode, 2026-08-28) ────────────────────────
+// Manual: the Accepting Requests toggle above works exactly as it always has. Auto: two
+// operator-set watermarks (auto_manage_max/auto_manage_restart) — the HOST watches its own live
+// outstanding-request count every tick and flips accepting_requests on/off itself, mirrored down
+// here through the same accepting_requests echo everything else already uses. Mutually
+// exclusive by construction (see updatePaymentUI's tog-accepting.disabled toggle above) so a
+// human click and the host's own watermark logic never fight over the same field.
+function updateAutoManageUI() {
+  const pending = S.settingsPending || [];
+  const modePending = pending.includes('auto_manage_requests');
+  $('am-mode-manual')?.classList.toggle('active', !S.autoManageRequests);
+  $('am-mode-auto')?.classList.toggle('active', S.autoManageRequests);
+  $('am-mode-manual')?.classList.toggle('pending', modePending);
+  $('am-mode-auto')?.classList.toggle('pending', modePending);
+  const note = $('am-auto-note');
+  if (note) note.style.display = S.autoManageRequests ? 'block' : 'none';
+  const fields = $('am-fields');
+  if (fields) fields.style.display = S.autoManageRequests ? 'block' : 'none';
+  const numPending = pending.includes('auto_manage_max') || pending.includes('auto_manage_restart');
+  const maxInput = $('am-max-input');
+  const restartInput = $('am-restart-input');
+  if (maxInput && document.activeElement !== maxInput) maxInput.value = S.autoManageMax;
+  if (restartInput && document.activeElement !== restartInput) restartInput.value = S.autoManageRestart;
+  if (maxInput) maxInput.disabled = numPending;
+  if (restartInput) restartInput.disabled = numPending;
+  const saveBtn = $('am-save');
+  if (saveBtn) saveBtn.disabled = numPending || !autoManageNumsChanged();
+  const countEl = $('am-current-count');
+  if (countEl) countEl.textContent = S.outstandingCount;
+}
+
+function autoManageNumsChanged() {
+  const maxInput = $('am-max-input');
+  const restartInput = $('am-restart-input');
+  if (!maxInput || !restartInput) return false;
+  const maxVal = parseInt(maxInput.value, 10);
+  const restartVal = parseInt(restartInput.value, 10);
+  if (isNaN(maxVal) || isNaN(restartVal) || maxVal < 0 || restartVal < 0) return false;
+  return maxVal !== S.autoManageMax || restartVal !== S.autoManageRestart;
+}
+
+function onAutoManageNumInput() {
+  $('am-err').textContent = '';
+  const pending = (S.settingsPending || []);
+  const numPending = pending.includes('auto_manage_max') || pending.includes('auto_manage_restart');
+  $('am-save').disabled = numPending || !autoManageNumsChanged();
+}
+
+async function setAutoManageMode(auto) {
+  if (auto === S.autoManageRequests) return;
+  if ((S.settingsPending || []).includes('auto_manage_requests')) return;
+  S.settingsPending = [...(S.settingsPending || []), 'auto_manage_requests'];
+  updatePaymentUI();
+  try {
+    if (!await postSetting({ auto_manage_requests: auto })) throw new Error('post failed');
+  } catch {
+    S.settingsPending = S.settingsPending.filter(f => f !== 'auto_manage_requests');
+    updatePaymentUI();
+  }
+}
+
+async function saveAutoManage() {
+  if (!autoManageNumsChanged()) return;
+  const maxVal = parseInt($('am-max-input').value, 10);
+  const restartVal = parseInt($('am-restart-input').value, 10);
+  $('am-err').textContent = '';
+  S.settingsPending = [...(S.settingsPending || []), 'auto_manage_max', 'auto_manage_restart'];
+  updateAutoManageUI();
+  try {
+    if (!await postSetting({ auto_manage_max: maxVal, auto_manage_restart: restartVal })) throw new Error('post failed');
+  } catch {
+    S.settingsPending = S.settingsPending.filter(f => f !== 'auto_manage_max' && f !== 'auto_manage_restart');
+    $('am-err').textContent = 'Connection error — try again.';
+    updateAutoManageUI();
+  }
 }
 
 // ── Bartender PIN (2026-08 admin/bartender PIN split) ─────────────────────────
@@ -766,6 +895,7 @@ async function postSetting(body) {
 
 async function togglePayment(which) {
   if (which === 'stripe' && S.kioskMode === 'localOnly') return;  // disabled, not just visually
+  if (which === 'accepting' && S.autoManageRequests) return;  // auto mode owns this field, not just visually
   const field   = which === 'stripe' ? 'stripe_enabled' : which === 'bartender' ? 'bartender_enabled' : 'accepting_requests';
   const current = which === 'stripe' ? S.stripeEnabled  : which === 'bartender' ? S.bartenderEnabled  : S.acceptingRequests;
   if ((S.settingsPending || []).includes(field)) return;   // already locked, ignore extra clicks
@@ -909,6 +1039,10 @@ async function poll() {
     S.acceptingRequests  = d.accepting_requests !== false;
     S.kioskMode          = d.kiosk_mode || 'localAndRemote';
     S.bartenderAccessEnabled = !!d.bartender_access_enabled;
+    S.autoManageRequests = !!d.auto_manage_requests;
+    S.autoManageMax      = d.auto_manage_max ?? 10;
+    S.autoManageRestart  = d.auto_manage_restart ?? 5;
+    S.outstandingCount   = (d.requests || []).length;
     S.settingsPending    = d.settings_pending || [];
     updatePaymentUI();
     renderRequests(d.requests || []);

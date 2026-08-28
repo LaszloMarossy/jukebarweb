@@ -2096,36 +2096,70 @@ a race like Android's, it's unconditional. Fixed by calling the same `purgeAdmin
 earlier the same day (for the Forgot-PIN fix) from `resetSetup()` too. Build-verified
 (`xcodebuild ... build`).
 
-## Planned next (not yet implemented — design only, recorded 2026-08-22)
+**"Managing requests" — auto-manage mode for `accepting_requests`, implemented 2026-08-28, all 13**
+**UI surfaces + relay.** Closes the design placeholder recorded 2026-08-22 (see that day's open
+questions, resolved below). Two mutually exclusive modes for controlling request acceptance, on
+every Admin surface (kiosk-native both platforms, both LAN `admin.html`, render `static/admin.html`)
+grouped in the same "Requests"/"🚫 Requests" card as the pre-existing Accepting-requests toggle,
+per explicit user direction not to scatter it into a new section:
+- **Manual** (default, unchanged): the existing Start/Stop toggle, admin-controlled.
+- **Auto**: two operator-set watermarks, default **10** (`auto_manage_max` — stop accepting once
+  outstanding count reaches this) and **5** (`auto_manage_restart` — resume once it drops to this
+  or below). Both zero = inert even if Auto is selected (safety valve before an operator fills in
+  real numbers). Outstanding = every live request not yet in a terminal state (pending + approved/
+  up-next, i.e. not `played`/`denied`/`unfulfilled`) — resolves the 2026-08-22 open question in
+  favor of the broader definition (reflects actual backlog, not just the review queue).
+- **Mutual exclusivity enforced, not cosmetic**: selecting Auto greys out the manual toggle
+  (read-only, mirrors the existing disabled-but-visible idiom already used for Stripe in Local
+  Only mode) so a human tap and the host's own watermark evaluation can never race over the same
+  `accepting_requests` field. Selecting Manual fades the two number fields instead of hiding them,
+  so the operator can still see the configured values.
+- **Switching modes (or editing the thresholds) takes effect immediately** — every apply path
+  (kiosk-native direct edit, LAN's synchronous `/api/admin/settings`, and a relay-queued
+  `desired_settings` change landing via sync) triggers one evaluation pass right away rather than
+  waiting for the next periodic tick.
 
-**"Managing requests" — auto-manage mode for `accepting_requests`, all 13 UI surfaces + relay.**
-New section (setup wizard + kiosk-native Admin screen, both platforms) offering two mutually
-exclusive modes for controlling request acceptance:
-- **Manual** (existing): the current Stop/Start-taking-requests button, unchanged.
-- **Auto-manage** (new): two operator-editable numbers, default **10** (max outstanding requests
-  — cross this and the host auto-invokes the existing "stop taking requests" behavior; requests
-  already in flight still complete normally, only new ones stop) and **5** (restart-requesting-at
-  — once outstanding count drops to this or below, auto re-enables). Both zero = feature disabled.
-  Classic hysteresis/watermark pattern (stop-above-max, resume-at-or-below-restart) to prevent
-  flapping right at the boundary.
-- **Mutual exclusivity is load-bearing, not cosmetic**: selecting Manual fades/disables the
-  Auto-manage section in the UI (and vice versa) — only one mode's logic may ever be "in effect"
-  at a time, mirroring this codebase's existing single-slot `desired_settings` latest-write-wins
-  pattern for avoiding exactly this class of race. Never let both a human's manual toggle and the
-  auto-manage watermark logic fight over the same `accepting_requests` field simultaneously.
+**Wire contract** — three new fields ride the exact same self-healing pattern as the existing
+`bartender_enabled`/`stripe_enabled`/`accepting_requests`/`bartender_pin_hash` settings, no new
+concept: `BarSession.auto_manage_requests` (bool, default `False`), `auto_manage_max` (int, default
+`10`), `auto_manage_restart` (int, default `5`). Sent top-level in `host_register()`'s body (like
+`accepting_requests`), nested under `settings` in every `host_sync()` call (host's unconditional
+every-5s echo of its own truth — the relay just trusts and stores it, same as the three bools), and
+may appear in a sync response's `desired_settings` for the host to apply. `bar_settings()` requires
+an **admin** token specifically for all three (like `bartender_pin_hash` — not exposed on
+bartender.html, admin-only by UI convention there too). `bartender_requests()`'s response — what
+`admin.html` polls — now also echoes the three raw current values so the UI can render current
+mode/thresholds; the existing `settings_pending` list (`= list(desired_settings.keys())`) covers
+these three automatically, no separate plumbing needed.
 
-**Open question to resolve before implementation, not now**: does "outstanding requests" mean just
-*pending* (awaiting bartender approval), or pending + approved/up-next (everything not yet
-played)? Affects real-world behavior significantly — leaning toward the latter (reflects actual
-backlog) but this is a judgment call for whenever this gets built.
+**The evaluation itself is entirely host-side, per the governing "host is bible" principle** — the
+relay never computes or overrides `accepting_requests`, it only ever echoes whatever the host
+already decided, exactly like the manual toggle always worked. Both host platforms implement one
+setter (`AppState.setAcceptingRequests()` / `MainActivity.setAcceptingRequests()`) shared between
+the manual UI control and the new `evaluateAutoManageRequests()`/`evaluateAutoManage()` watermark
+check, so auto-manage never introduces a second parallel path to the same field. Runs regardless of
+transport (internet/WiFi/hotspot) since it's driven by a transport-independent hook on each
+platform — iOS: the existing 2s `KioskView` ticker (already ran in every mode, previously only used
+to push now-playing/mark-played); Android: a new 5s coroutine loop started alongside playback in
+`startQueue()` (not gated to the internet-only branch), independent of whether `RelayService` or
+`LocalServer` end up running that session.
 
-**Scope note**: not small. Needs the same treatment every existing toggle in this app already
-gets — wizard step + kiosk-native Admin screen + both LAN admin.html + render admin.html, new
-persisted fields threaded through `bar_settings()`/`host_sync()` on the relay and
-`BarDetails`/`HostConfig` on both host platforms. The *evaluation* logic itself is cheap: it's just
-another host-computed writer of the existing `accepting_requests` field, riding the already-built
-propagate/echo path — no new wire concept needed, just new config fields plus a periodic host-side
-check against live queue depth.
+**Setup wizard**: new step on both platforms, inserted right after the payment/approval-mode step
+(iOS: `.autoManage`, between `.approvalMode` and `.guidedAccess`, wizard `MARK: Step N` comments
+renumbered 6→9 to stay honest; Android: `WizardStep.AUTO_MANAGE`, between `APPROVAL_MODE` and
+`PRICING`, new `ui/setup/AutoManageStep.kt`) — same Manual/Auto + two-field UI as the live Admin
+screen, always-valid defaults so Next never blocks, matching the non-blocking-advisory philosophy
+already established for Device Protection/Guided Access.
+
+Both platforms build-verified (`xcodebuild ... build`, `:app:compileDebugKotlin` +
+`:app:assembleDebug`) and diffs spot-checked directly against the wire contract above — field
+names/shapes confirmed identical between the two independent implementations. iOS's own
+`DECISIONS.md` was deliberately left untouched — its "Session log" section stopped being maintained
+on 2026-07-22 (confirmed via `git log`), with this CLAUDE.md having been the sole cross-repo record
+since; Android's got a dated entry anyway (added mid-implementation before that inconsistency was
+noticed) — left in place rather than reverted, but the asymmetry is noted here so a future pass
+doesn't assume both repos follow the same convention. Not committed as of this writing — left for
+review.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

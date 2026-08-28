@@ -160,8 +160,28 @@ class BarSession:
     # field -> value an admin/bartender asked for that the host hasn't echoed back yet;
     # presence = pending. Latest write per field wins, no queue — see bar_settings()/host_sync().
     # bool for the three toggle fields, str for bartender_pin_hash (empty string is a valid
-    # desired value — it means "admin wants to turn bartender access off").
-    desired_settings: dict[str, bool | str] = field(default_factory=dict)
+    # desired value — it means "admin wants to turn bartender access off"), bool/int for the
+    # auto-manage-requests fields below.
+    desired_settings: dict[str, bool | str | int] = field(default_factory=dict)
+    # Request-management mode (2026-08-28): False (default) = manual, admin controls
+    # accepting_requests directly via the existing Start/Stop button. True = auto — the HOST
+    # (never the relay) watches its own live outstanding-request count every tick and flips
+    # accepting_requests on/off itself, using the two watermarks below, then broadcasts the
+    # result out through the exact same accepting_requests echo path manual mode already uses —
+    # no new wire concept, this field only tells the host which logic gets to drive that one
+    # existing field. Mirrors the raw-stored-preference pattern of the other toggles: this and
+    # the two thresholds below always echo the host's actual configured values, never something
+    # the relay computes or overrides.
+    auto_manage_requests: bool = False
+    # Outstanding-request count (pending + approved/up-next, i.e. everything not yet played) at
+    # or above which the host stops accepting new requests. Default 10.
+    auto_manage_max: int = 10
+    # Outstanding-request count at or below which the host resumes accepting. Default 5. Must
+    # stay <= auto_manage_max for the hysteresis band to make sense; the host is responsible for
+    # applying that ordering, the relay just stores and forwards whatever it's told. Both fields
+    # at 0 means the feature is inert even if auto_manage_requests is true (e.g. before an
+    # operator has filled in real numbers yet) — the host skips evaluation entirely in that case.
+    auto_manage_restart: int = 5
     # "localOnly" | "localAndRemote" | "remoteOnly" (2026-07-22+) — governs CUSTOMERS only, set at
     # register time from the host's own wizard choice. "localOnly" is a hard lockout enforced here
     # too (bar_request()/bar_create_payment_intent()/bar_payment_confirmed()/bar_page()), not just
@@ -617,6 +637,9 @@ async def host_register(body: dict[str, Any]):
         bar.pin_hash = body.get("pin_hash", "")
         bar.bartender_pin_hash = body.get("bartender_pin_hash", "")
         bar.kiosk_mode = body.get("kiosk_mode", "localAndRemote")
+        bar.auto_manage_requests = body.get("auto_manage_requests", False)
+        bar.auto_manage_max = int(body.get("auto_manage_max", 10))
+        bar.auto_manage_restart = int(body.get("auto_manage_restart", 5))
         reports_needed = _reconcile_reports(bar, body.get("report_filenames"))
         bar.last_seen = time.time()
     else:
@@ -639,6 +662,9 @@ async def host_register(body: dict[str, Any]):
             pin_hash=body.get("pin_hash", ""),
             bartender_pin_hash=body.get("bartender_pin_hash", ""),
             kiosk_mode=body.get("kiosk_mode", "localAndRemote"),
+            auto_manage_requests=body.get("auto_manage_requests", False),
+            auto_manage_max=int(body.get("auto_manage_max", 10)),
+            auto_manage_restart=int(body.get("auto_manage_restart", 5)),
         )
         # Fresh BarSession's reports dict starts empty regardless of what the host already has
         # locally (a genuine new session replaces the object outright) - everything the host
@@ -709,13 +735,19 @@ async def host_sync(body: dict[str, Any]):
                              CLAUDE.md's host-broadcasts-state note.
       up_next                — host's live queue, for bar_display() only (not request status —
                              see requests above).
-      settings              — {field: bool | str}; the host's current values for
-                             bartender_enabled/stripe_enabled/accepting_requests (bool) and
-                             bartender_pin_hash (str, "" meaning bartender role off), sent
-                             unconditionally on every call. Trusted outright and applied
+      settings              — {field: bool | str | int}; the host's current values for
+                             bartender_enabled/stripe_enabled/accepting_requests/
+                             auto_manage_requests (bool), bartender_pin_hash (str, "" meaning
+                             bartender role off), and auto_manage_max/auto_manage_restart (int),
+                             sent unconditionally on every call. Trusted outright and applied
                              immediately — the host is the only thing that actually knows
                              its own settings, and it re-sends them every 5s regardless, so
                              a single dropped or out-of-order call self-heals on the next tick.
+                             auto_manage_requests being true means the HOST is the one deciding
+                             accepting_requests's value every tick (see BarSession docstring) —
+                             the relay still just echoes whatever accepting_requests value shows
+                             up here, same as always, with no special-casing for which mode
+                             produced it.
 
     Server returns:
       requests         — new customer requests since last sync (status == "pending"), including
@@ -746,10 +778,20 @@ async def host_sync(body: dict[str, Any]):
     # request went out — if a newer request changed the desired value in the meantime, this
     # simply won't match and the entry stays pending, re-sent as-is on the next response.
     echoed = body.get("settings", {})
-    for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests"):
+    for field_name in ("bartender_enabled", "stripe_enabled", "accepting_requests", "auto_manage_requests"):
         if field_name not in echoed:
             continue
         value = bool(echoed[field_name])
+        setattr(bar, field_name, value)
+        if bar.desired_settings.get(field_name) == value:
+            bar.desired_settings.pop(field_name, None)
+
+    # auto_manage_max/auto_manage_restart: same self-healing echo pattern as the bools above, but
+    # int-valued rather than bool-valued.
+    for field_name in ("auto_manage_max", "auto_manage_restart"):
+        if field_name not in echoed:
+            continue
+        value = int(echoed[field_name])
         setattr(bar, field_name, value)
         if bar.desired_settings.get(field_name) == value:
             bar.desired_settings.pop(field_name, None)
@@ -1352,6 +1394,9 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s"), to
             "stripe_enabled": bar.stripe_enabled, "bartender_enabled": bar.bartender_enabled,
             "accepting_requests": bar.accepting_requests, "kiosk_mode": bar.kiosk_mode,
             "bartender_access_enabled": bool(bar.bartender_pin_hash),
+            "auto_manage_requests": bar.auto_manage_requests,
+            "auto_manage_max": bar.auto_manage_max,
+            "auto_manage_restart": bar.auto_manage_restart,
             "settings_pending": list(bar.desired_settings.keys())}
 
 
@@ -1484,9 +1529,10 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: s
     request for the same field before the host catches up just overwrites the desired value in
     place - only the latest matters, nothing is queued or ordered.
 
-    bartender_pin_hash requires an admin token specifically (2026-08, Bartender Sessions work) —
-    unlike the three toggle fields below, which any valid bartender token can still set, same as
-    always.
+    bartender_pin_hash and the three auto-manage-requests fields require an admin token
+    specifically (2026-08, Bartender Sessions work; 2026-08-28, auto-manage — neither is exposed
+    on bartender.html, admin-only by UI convention there too) — unlike the three toggle fields
+    below, which any valid bartender token can still set, same as always.
     """
     bar = _customer_bar(jukebar_id, s)
     _require_bartender_token(bar, token)
@@ -1496,6 +1542,13 @@ async def bar_settings(jukebar_id: str, s: str = Query(..., alias="s"), token: s
     if "bartender_pin_hash" in body:
         _require_admin_token(bar, token)
         bar.desired_settings["bartender_pin_hash"] = str(body["bartender_pin_hash"] or "")
+    if "auto_manage_requests" in body:
+        _require_admin_token(bar, token)
+        bar.desired_settings["auto_manage_requests"] = bool(body["auto_manage_requests"])
+    for field_name in ("auto_manage_max", "auto_manage_restart"):
+        if field_name in body:
+            _require_admin_token(bar, token)
+            bar.desired_settings[field_name] = int(body[field_name])
     return {"ok": True}
 
 

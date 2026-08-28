@@ -599,3 +599,26 @@ a worse, unconditional gap: iOS's `LocalServer.shared` is a true process-lifetim
 `adminTokens` was never cleared anywhere, including `resetSetup()` (End Session) — an admin token
 stayed valid across any number of new sessions for as long as the app process lived. Fixed by
 calling `purgeAdminTokens()` from `resetSetup()`.
+
+## 2026-08-28 — Auto-manage requests: Manual/Auto mode for accepting_requests, all 13 surfaces
+
+Implemented the "Managing requests" feature recorded as a design-only placeholder in CLAUDE.md on
+2026-08-22. User: manual mode keeps today's Start/Stop button; auto mode uses two watermark
+numbers (default 10 stop / 5 resume) to auto-manage `accepting_requests`, mode switches take
+effect immediately, and both must live in the same UI area as the existing toggle rather than a
+new section. Resolved the design doc's open question (outstanding = pending + up-next, not just
+pending-awaiting-approval) in favor of the broader definition. Relay: three new self-healing
+`BarSession` fields (`auto_manage_requests`/`auto_manage_max`/`auto_manage_restart`), riding the
+exact same desired_settings/echo mechanism as the three existing toggles, admin-token-gated.
+`static/admin.html`'s Requests card got the Manual/Auto switch + threshold fields; smoke-tested the
+full register→settings→sync-echo→pending-clear cycle directly against a local server before
+trusting it. iOS and Android implemented in parallel (background forks) — both independently
+arrived at the identical wire contract, confirmed by diff review; each added a shared
+`setAcceptingRequests()`/equivalent setter used by both the manual toggle and the new host-side
+watermark evaluator (transport-independent: iOS's existing 2s ticker, Android's new 5s loop
+started in `startQueue()`), a new wizard step, and matching kiosk-native + LAN admin.html UI with
+the manual toggle disabled while Auto is active. Verified all three repos build clean myself
+(fresh `xcodebuild`/`gradlew compileDebugKotlin`) rather than trusting fork self-reports alone,
+after one fork's report described briefly touching the other platform's repo when it hit a
+same-agent-can't-nest-fork limitation — working-tree diffs on both host repos came out as single,
+coherent, non-duplicated changesets, so no corruption resulted.
