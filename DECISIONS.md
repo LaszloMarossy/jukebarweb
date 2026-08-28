@@ -663,3 +663,19 @@ a different customer_id sharing the same source IP also correctly collides, conf
 union-match behaves as designed. Found and fixed a latent Android bug along the way: jsonError()
 had no 429 case (would have returned 500). All three customer.html copies show a lightweight
 alert() on 429, not the heavier full-screen error state used for expired/offline sessions.
+
+## 2026-08-28 (later still) — Per-requester throttle refined: pending songs only, approved excluded
+
+User walked through a concrete scenario: X requests 3 songs, approved and queued to play — X
+should still be able to request 3 more (0 songs actually awaiting review); only after that second
+batch (bringing pending to 3) should X be barred, until it drops below 3. "Already approved (and
+paid) requests do not count here" — explicit. Reworked to count individual songs (not request
+objects) in status=="pending" AND payment_method != "stripe" requests only. Renamed
+MAX_OUTSTANDING_REQUESTS_PER_REQUESTER -> MAX_PENDING_SONGS_PER_REQUESTER,
+_requester_outstanding_count() -> _requester_pending_song_count(). First manual retest looked
+broken (2nd submission still blocked after approving the 1st) - traced to bartender_approve()'s
+own documented behavior ("host confirms via up_next on next sync", raw status stays "pending"
+until then) - not a bug, the architecture working as designed. Retested with a simulated
+/api/host/sync call echoing the confirmed status in between submissions - behaved exactly as
+specified. iOS/Android LAN approve handlers flip status synchronously (no host round-trip needed
+there), so this timing note is relay-only.

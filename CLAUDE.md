@@ -2237,6 +2237,41 @@ already self-limiting, and blocking post-charge would be customer-hostile):
 All three repos rebuilt clean (`xcodebuild ... build`, `:app:compileDebugKotlin` +
 `:app:assembleDebug`) and pushed per the standing cross-repo policy.
 
+**Per-requester throttle refined to count PENDING SONGS only, same day, after user walked through**
+**a concrete example.** User's scenario: guest X requests 3 songs, they get approved and queued to
+play — X should still be able to request 3 more (since 0 songs are actually awaiting review at
+that point); only after that second batch is submitted (bringing the to-be-approved count to 3)
+should X be barred, and only until that count drops back below 3. Explicitly: "already approved
+(and paid) requests do not count here" — a fundamentally different rule than what shipped a few
+hours earlier, which counted `pending + approved/approved_jump` together (mirroring auto-manage's
+*original*, pre-narrowing outstanding definition — the two features had drifted back toward the
+same bug auto-manage itself was fixed for earlier the same day). Reworked all three
+implementations: counts **individual songs** (not request objects — a 3-song bundle is common via
+the `price_for_three` feature, and the user's own example is phrased in songs, not requests) in
+requests that are `status == "pending"` **and** `payment_method != "stripe"` (a Stripe item can
+transiently read raw-status "pending" too, before the host's own echo confirms it — see
+`bartender_requests()`'s docstring on relay-side pending/approved display timing — but it was
+never headed for bartender review, so it must never count). `MAX_OUTSTANDING_REQUESTS_PER_REQUESTER`
+renamed to `MAX_PENDING_SONGS_PER_REQUESTER` (relay), `_requester_outstanding_count()` renamed to
+`_requester_pending_song_count()`; iOS/Android equivalents renamed/reworked the same way. The
+union-of-IP-and-customer_id identity design from the initial cut is unchanged — only what counts
+as "outstanding" changed.
+
+**Caught a real relay-side timing subtlety while re-testing, not a bug — the architecture working**
+**as designed.** A first manual smoke test (bartender-approve a bundle via `bar_authenticate()` +
+`bartender_approve()`, immediately resubmit) showed the second submission still blocked — traced
+to `bartender_approve()`'s own docstring: "Don't mark approved here — host confirms via up_next on
+next sync." The relay's raw `bar.requests[rid].status` genuinely stays `"pending"` until a real
+connected host's next 5s sync echoes back the confirmed status (same async window
+`bartender_requests()`'s display-status override exists to paper over for the *admin's own view*,
+which this new count doesn't get to use since it needs the raw stored status, not a display
+computation). Re-tested with a simulated `/api/host/sync` call carrying the confirmed status in
+between the two submissions — behaved exactly as designed (2nd bundle succeeds, 3rd blocked at
+3 pending songs). **iOS and Android don't have this lag at all** — confirmed by reading both
+platforms' local bartender-approve handlers directly: `LocalServer.swift`'s `/api/request/approve`
+and `LocalRequestManager.kt`'s `approveRequest()` both flip `status` to `.approved`/`APPROVED`
+synchronously, in the same call, since LAN mode has no separate host to wait for.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout

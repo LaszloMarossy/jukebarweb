@@ -258,22 +258,34 @@ _bartender_lockouts: dict[tuple[str, str, str], dict[str, float]] = {}
 BARTENDER_LOCKOUT_MAX_ATTEMPTS = 3
 BARTENDER_LOCKOUT_SECONDS = 15 * 60
 
-# Per-requester outstanding-request throttle (2026-08-28) — an anonymous, unauthenticated guest
-# (free or pay-to-bartender path only; Stripe is self-limiting since it costs real money) could
-# otherwise flood-submit requests purely to clutter the admin/bartender Requests screen. Capped
-# at MAX_OUTSTANDING_REQUESTS_PER_REQUESTER (not yet played/denied) per requester - identity is
-# the UNION of two independent signals, not their intersection, deliberately: source IP (reliable
-# on LAN, where each device gets its own DHCP-assigned address, same assumption the bartender-PIN
-# lockout above already relies on) and customer_id (the browser-persisted localStorage id
-# customer.html already sends with every request, survives a network change but not a cleared
-# browser). Matching on EITHER means an abuser has to defeat BOTH signals at once (get a new IP
-# *and* a fresh customer_id) to reset their count - matching just one doesn't help them evade.
-# Same "raise the bar for casual abuse, not hacker-proof" philosophy as the PIN lockout's own
-# accepted per-IP limitation. Only checked in bar_request() (the free/pay-to-bartender creation
-# endpoint) - not create-payment-intent/payment-confirmed, since a completed Stripe charge is
-# already a real cost to the requester and a request row there is proof of actual payment, not
-# spam.
-MAX_OUTSTANDING_REQUESTS_PER_REQUESTER = 2
+# Per-requester pending-song throttle (2026-08-28, refined same day) — an anonymous,
+# unauthenticated guest (free or pay-to-bartender path only; Stripe is self-limiting since it
+# costs real money) could otherwise flood-submit requests purely to clutter the admin/bartender
+# Requests screen. Counts individual SONGS, not request objects, and ONLY ones still genuinely
+# sitting in the "to be approved by a bartender" queue — status == "pending" AND
+# payment_method != "stripe" (a Stripe item can briefly read raw-status "pending" too, before the
+# host's echo confirms it - see bartender_requests()'s docstring - but it was never headed for
+# human review, so it must not count here). The moment a bartender approves (or denies) one of
+# the requester's songs, it stops counting immediately, freeing them to submit more even while
+# their earlier, already-approved songs are still sitting in Up Next unplayed - already-approved
+# (and by definition already-paid, for the bartender-pay path) requests are trusted, not spam.
+# Capped at MAX_PENDING_SONGS_PER_REQUESTER: a submission is allowed only if the requester's
+# CURRENT pending-song count (before this submission) doesn't already exceed the limit - the
+# incoming request's own size isn't weighed against it, so a request that pushes the total over
+# the limit still goes through as long as they weren't already over it.
+#
+# Identity is the UNION of two independent signals, not their intersection, deliberately: source
+# IP (reliable on LAN, where each device gets its own DHCP-assigned address, same assumption the
+# bartender-PIN lockout above already relies on) and customer_id (the browser-persisted
+# localStorage id customer.html already sends with every request, survives a network change but
+# not a cleared browser). Matching on EITHER means an abuser has to defeat BOTH signals at once
+# (get a new IP *and* a fresh customer_id) to reset their count - matching just one doesn't help
+# them evade. Same "raise the bar for casual abuse, not hacker-proof" philosophy as the PIN
+# lockout's own accepted per-IP limitation. Only checked in bar_request() (the free/
+# pay-to-bartender creation endpoint) - not create-payment-intent/payment-confirmed, since a
+# completed Stripe charge is already a real cost to the requester and proof of actual payment,
+# not spam.
+MAX_PENDING_SONGS_PER_REQUESTER = 2
 
 
 # ---------------------------------------------------------------------------
@@ -1209,14 +1221,14 @@ def _compute_price(bar: "BarSession", song_ids: list[str]) -> float:
     return p3 if (len(song_ids) == 3 and p3 > 0) else pps * len(song_ids)
 
 
-def _requester_outstanding_count(bar: "BarSession", ip: str, customer_id: str) -> int:
-    """See MAX_OUTSTANDING_REQUESTS_PER_REQUESTER's comment for the union-of-two-signals design."""
+def _requester_pending_song_count(bar: "BarSession", ip: str, customer_id: str) -> int:
+    """See MAX_PENDING_SONGS_PER_REQUESTER's comment for the design."""
     count = 0
     for r in bar.requests.values():
-        if r.status in ("played", "denied", "unfulfilled"):
+        if r.status != "pending" or r.payment_method == "stripe":
             continue
         if (ip and r.requester_ip == ip) or (customer_id and r.customer_id == customer_id):
-            count += 1
+            count += len(r.song_ids)
     return count
 
 
@@ -1234,7 +1246,7 @@ async def bar_request(jukebar_id: str, request: Request, s: str = Query(..., ali
 
     client_ip = request.client.host if request.client else ""
     customer_id = body.get("customer_id", "")
-    if _requester_outstanding_count(bar, client_ip, customer_id) > MAX_OUTSTANDING_REQUESTS_PER_REQUESTER:
+    if _requester_pending_song_count(bar, client_ip, customer_id) > MAX_PENDING_SONGS_PER_REQUESTER:
         raise HTTPException(429, "You already have requests waiting to be reviewed — please wait before submitting more")
 
     rid = str(uuid.uuid4())
