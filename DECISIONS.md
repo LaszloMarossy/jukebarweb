@@ -687,3 +687,15 @@ overwrite it. Root cause on the HTML surfaces: `.am-num-field`'s background was 
 same shade as its own container card, border nearly invisible. Fixed with a lighter fill + more
 visible border on all three admin.html copies, plus `onfocus="this.select()"` so a tap highlights
 the existing digits for immediate overwrite.
+
+## 2026-08-28 (later still) — Mode selector redesigned as an either/or knob, all 7 places
+
+User: the Manually/Automatically button pair "is more like seeing options" than an either/or
+setting; wanted "a knob that they either turn toward Manually or toward Automatically," and only
+the controls for the currently active mode should display at all - not the other mode's controls
+faded/disabled underneath. Replaced the two-button row with the existing single-switch component
+(`.toggle-track` on render, `.lan-toggle` on both LAN pages - reused, not reinvented) whose label
+text flips between "Manually"/"Automatically". Below it, only the active mode's block renders in
+the DOM at all. Same redesign applied to iOS (Toggle) and Android (Switch) kiosk-native + wizard
+surfaces in the same pass. Dead .mode-switch/.mode-btn CSS removed from all three admin.html
+copies.

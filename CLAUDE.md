@@ -2298,6 +2298,25 @@ its one remaining use (dismissing the keyboard programmatically after `saveAutoM
 completes). Used on `AdminView.swift`'s two live fields and `SetupView.swift`'s wizard-step
 equivalents — 4 call sites, one shared component. All three repos rebuilt clean.
 
+**Mode selector redesigned as a real either/or knob, controls scoped to only the active mode, all**
+**7 places (2026-08-28).** User: the button-pair (Manually/Automatically, both always visible)
+"is more like seeing options" than conveying an either/or setting, and wanted "a knob that they
+either turn toward Manually or toward Automatically" — plus, once a mode is picked, only the
+controls for *that* mode should render at all, not the other mode's controls faded/disabled
+underneath. Replaced the two-button row with each surface's own existing single-switch component
+(reused, not reinvented) on every surface: render/LAN `admin.html`'s `.toggle-track`/`.lan-toggle`
+(already used for the Stripe/Bartender/Accepting-requests toggles elsewhere on the same card),
+iOS's `Toggle` (`AdminView.swift` + `SetupView.swift`'s wizard step), Android's `Switch`
+(`AdminScreen.kt` + `AutoManageStep.kt`) — the switch's own label text flips between "Manually"/
+"Automatically" as it's dragged. Below it, `if (autoManage) { auto-only controls } else {
+Accepting-requests toggle + its "Start/Stop on the Admin screens" note }` — the inactive mode's
+block doesn't render in the DOM/tree at all on any surface, not just `display:none`/`.disabled`.
+The wizard step (`AutoManageStep.kt`/`SetupView.swift`'s `autoManageStep`) already conditionally
+showed only the relevant controls before this pass (it never had an Accepting-requests toggle to
+begin with) — only needed the same knob-visual swap for consistency with the other 5 surfaces,
+no structural change there. Dead `.mode-switch`/`.mode-btn` CSS removed from all three
+`admin.html` copies. All three repos rebuilt clean.
+
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy
 - Stripe live key: apply under own business account to validate payment flow end-to-end before bar rollout
