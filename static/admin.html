@@ -1088,19 +1088,30 @@ async function poll() {
     S.pricePerSong  = d.price_per_song  || 0;
     S.priceForThree = d.price_for_three || 0;
     S.currency      = d.currency        || '';
-    S.stripeEnabled      = !!d.stripe_enabled;
-    S.bartenderEnabled   = d.bartender_enabled !== false;
-    S.acceptingRequests  = d.accepting_requests !== false;
-    S.kioskMode          = d.kiosk_mode || 'localAndRemote';
-    S.bartenderAccessEnabled = !!d.bartender_access_enabled;
-    S.autoManageRequests = !!d.auto_manage_requests;
-    S.autoManageMax      = d.auto_manage_max ?? 10;
-    S.autoManageRestart  = d.auto_manage_restart ?? 5;
+    // Only apply the server's raw value for a field once the SERVER's own settings_pending list
+    // (freshly fetched, not S.settingsPending's stale copy) no longer lists it (2026-08-28).
+    // bar.field on the relay only updates once the host's own sync echo confirms it - until then
+    // every poll() tick keeps returning the OLD value while desired_settings is still queued.
+    // Applying it unconditionally (as this used to) stomped the optimistic value set at click
+    // time on the very next 5s tick, then the confirmed value arrived a tick or two later and
+    // flipped it again - the toggle visibly flipped back-then-forward instead of moving once and
+    // staying put. Skipping the field entirely while the server still calls it pending leaves the
+    // already-correct optimistic value alone; the field is applied exactly once, on the first
+    // poll where the server agrees it's confirmed.
+    const pendingNow = d.settings_pending || [];
+    if (!pendingNow.includes('stripe_enabled'))      S.stripeEnabled      = !!d.stripe_enabled;
+    if (!pendingNow.includes('bartender_enabled'))   S.bartenderEnabled   = d.bartender_enabled !== false;
+    if (!pendingNow.includes('accepting_requests'))  S.acceptingRequests  = d.accepting_requests !== false;
+    if (!pendingNow.includes('bartender_pin_hash'))  S.bartenderAccessEnabled = !!d.bartender_access_enabled;
+    if (!pendingNow.includes('auto_manage_requests')) S.autoManageRequests = !!d.auto_manage_requests;
+    if (!pendingNow.includes('auto_manage_max'))     S.autoManageMax      = d.auto_manage_max ?? 10;
+    if (!pendingNow.includes('auto_manage_restart')) S.autoManageRestart  = d.auto_manage_restart ?? 5;
+    S.kioskMode = d.kiosk_mode || 'localAndRemote';
     // Approved/up-next only, NOT pending - a still-pending pay-to-bartender request hasn't been
     // reviewed or paid for, so it can't be used to flood-trip the stop-accepting watermark
     // before a bartender ever looks at it (2026-08-28 refinement).
     S.outstandingCount   = (d.requests || []).filter(r => r.status === 'approved' || r.status === 'approved_jump').length;
-    S.settingsPending    = d.settings_pending || [];
+    S.settingsPending    = pendingNow;
     updatePaymentUI();
     renderRequests(d.requests || []);
     $('refresh-badge').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
