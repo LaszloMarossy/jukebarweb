@@ -224,11 +224,13 @@
     .pay-warning.show { display: block; }
 
     /* ── auto-manage requests (Manual/Auto mode) ── */
+    .am-section-intro { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
     .mode-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 0; border-top: 1px solid var(--border);
     }
     .mode-row:first-of-type { border-top: none; }
+    .am-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
     .mode-switch { display: flex; background: var(--bg); border-radius: 8px; padding: 2px; gap: 2px; }
     .mode-btn {
       border: none; background: transparent; color: var(--muted);
@@ -476,19 +478,20 @@
     </div>
     <div class="payment-card" style="margin-top:14px">
       <div class="payment-title">Requests</div>
+      <div class="am-section-intro">Choose how you want to stop accepting more requests:</div>
       <div class="mode-row">
-        <span class="pay-label">Mode</span>
         <div class="mode-switch">
-          <button class="mode-btn" id="am-mode-manual" onclick="setAutoManageMode(false)">Manual</button>
-          <button class="mode-btn" id="am-mode-auto" onclick="setAutoManageMode(true)">Auto</button>
+          <button class="mode-btn" id="am-mode-manual" onclick="setAutoManageMode(false)">Manually</button>
+          <button class="mode-btn" id="am-mode-auto" onclick="setAutoManageMode(true)">Automatically</button>
         </div>
       </div>
+      <div class="am-note" id="am-manual-note" style="display:none">Start/Stop on the Admin screens.</div>
       <div class="pay-row" id="row-accepting">
         <span class="pay-label">Accepting requests</span>
         <div class="toggle-track" id="tog-accepting" onclick="togglePayment('accepting')"><div class="toggle-thumb"></div></div>
       </div>
       <div class="pay-warning show" id="accepting-warning" style="display:none">Off — customers can't submit new requests; the device keeps shuffling its current playlist</div>
-      <div class="pay-warning show" id="am-auto-note" style="display:none">Auto mode is controlling this toggle — it stops/resumes on its own using the numbers below.</div>
+      <div class="am-note" id="am-auto-note" style="display:none">Automatically stop taking requests when reaching set number of outstanding approved requests, and resume when this number falls below set number.</div>
       <div class="am-fields" id="am-fields" style="display:none">
         <div class="am-field-row">
           <label for="am-max-input">Stop accepting at</label>
@@ -498,7 +501,7 @@
           <label for="am-restart-input">Resume at</label>
           <input class="am-num-field" id="am-restart-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()">
         </div>
-        <div class="am-field-hint">Outstanding = pending + up-next, not yet played. Currently <span id="am-current-count">—</span>.</div>
+        <div class="am-field-hint">Outstanding = approved/up-next only, not yet played. Pending (unreviewed) requests don't count. Currently <span id="am-current-count">—</span>.</div>
         <button class="btn-report btn-am-save" id="am-save" onclick="saveAutoManage()" disabled>Save</button>
         <div class="bt-pin-err" id="am-err"></div>
       </div>
@@ -746,6 +749,8 @@ function updateAutoManageUI() {
   $('am-mode-auto')?.classList.toggle('active', S.autoManageRequests);
   $('am-mode-manual')?.classList.toggle('pending', modePending);
   $('am-mode-auto')?.classList.toggle('pending', modePending);
+  const manualNote = $('am-manual-note');
+  if (manualNote) manualNote.style.display = S.autoManageRequests ? 'none' : 'block';
   const note = $('am-auto-note');
   if (note) note.style.display = S.autoManageRequests ? 'block' : 'none';
   const fields = $('am-fields');
@@ -1042,7 +1047,10 @@ async function poll() {
     S.autoManageRequests = !!d.auto_manage_requests;
     S.autoManageMax      = d.auto_manage_max ?? 10;
     S.autoManageRestart  = d.auto_manage_restart ?? 5;
-    S.outstandingCount   = (d.requests || []).length;
+    // Approved/up-next only, NOT pending - a still-pending pay-to-bartender request hasn't been
+    // reviewed or paid for, so it can't be used to flood-trip the stop-accepting watermark
+    // before a bartender ever looks at it (2026-08-28 refinement).
+    S.outstandingCount   = (d.requests || []).filter(r => r.status === 'approved' || r.status === 'approved_jump').length;
     S.settingsPending    = d.settings_pending || [];
     updatePaymentUI();
     renderRequests(d.requests || []);

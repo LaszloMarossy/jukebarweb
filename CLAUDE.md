@@ -2158,8 +2158,33 @@ names/shapes confirmed identical between the two independent implementations. iO
 on 2026-07-22 (confirmed via `git log`), with this CLAUDE.md having been the sole cross-repo record
 since; Android's got a dated entry anyway (added mid-implementation before that inconsistency was
 noticed) — left in place rather than reverted, but the asymmetry is noted here so a future pass
-doesn't assume both repos follow the same convention. Not committed as of this writing — left for
-review.
+doesn't assume both repos follow the same convention. All three repos committed and pushed the same
+day, per the standing cross-repo push policy — verified independently (fresh `xcodebuild`/
+`gradlew` rebuilds + direct diff review on both host repos, not just trusted from the two
+implementing forks' self-reports) after one fork's completion report described briefly touching
+the other platform's repo mid-task; both repos' working trees came out as single, coherent,
+non-duplicated changesets, so nothing was actually corrupted.
+
+**"Outstanding" narrowed to approved/up-next only, same day, closing an abuse angle before it**
+**shipped to real users.** User's own review of the exact wizard/kiosk copy above ("outstanding
+approved requests") surfaced a mismatch: the copy already said "approved," but every
+implementation's counting logic included `pending` too. Thinking through why prompted the real
+question — a bad actor could otherwise spam pay-to-bartender requests with no intent to pay or
+show up, purely to inflate the outstanding count and trip the stop-accepting watermark, freezing
+requests for genuine customers. First instinct was IP-based request throttling per source address
+to prevent this; user proposed a simpler, architecturally cleaner fix instead: **exclude `pending`**
+**from the count entirely** — a still-pending pay-to-bartender request hasn't been reviewed *or*
+paid for yet (a bartender's Approve tap **is** the payment confirmation, per the `payment_method`
+design elsewhere in this file), so it can't do anything until a human actually approves it, and
+the bartender already sees a suspicious burst of pending requests directly and can deny them. Only
+`approved`/`approved_jump` (already-vetted or pre-approved, e.g. Stripe-paid) count toward the
+watermark now — a flood of no-show pending requests literally cannot trip auto-stop, no IP
+tracking needed. Fixed in all 6 places that computed this count: relay `static/admin.html`'s
+`S.outstandingCount`, both LAN `admin.html` files' outstanding-count fetch, iOS
+`AppState.evaluateAutoManageRequests()` + `AdminView`'s live count caption, Android
+`MainActivity.evaluateAutoManage()` — plus every "Outstanding = …" caption across all 13 surfaces
+reworded to state the exclusion explicitly, not just silently changed. All three repos
+rebuilt/re-verified clean after the change and re-pushed.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

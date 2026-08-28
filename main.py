@@ -173,8 +173,14 @@ class BarSession:
     # the two thresholds below always echo the host's actual configured values, never something
     # the relay computes or overrides.
     auto_manage_requests: bool = False
-    # Outstanding-request count (pending + approved/up-next, i.e. everything not yet played) at
-    # or above which the host stops accepting new requests. Default 10.
+    # Outstanding-request count at or above which the host stops accepting new requests. Default
+    # 10. "Outstanding" = approved/up-next only, NOT pending-awaiting-bartender-review (2026-08-28
+    # refinement, decided after this shipped) — a still-pending pay-to-bartender request hasn't
+    # been reviewed or paid for yet (a bartender's Approve tap IS the payment confirmation, see
+    # payment_method notes above), so counting it would let someone flood-submit no-show requests
+    # specifically to trip this watermark before a human ever looks at them. Computed host-side
+    # from the host's own local request store, never by the relay - this comment just documents
+    # the semantics the host is expected to apply, not something enforced here.
     auto_manage_max: int = 10
     # Outstanding-request count at or below which the host resumes accepting. Default 5. Must
     # stay <= auto_manage_max for the hysteresis band to make sense; the host is responsible for

@@ -622,3 +622,24 @@ the manual toggle disabled while Auto is active. Verified all three repos build 
 after one fork's report described briefly touching the other platform's repo when it hit a
 same-agent-can't-nest-fork limitation — working-tree diffs on both host repos came out as single,
 coherent, non-duplicated changesets, so no corruption resulted.
+
+## 2026-08-28 — Auto-manage copy rewrite + "outstanding" narrowed to approved-only
+
+User gave exact copy for the auto-manage section ("Choose how you want to stop accepting more
+requests:" / "Manually" / "Automatically" / "Start/Stop on the Admin screens." / "Automatically
+stop taking requests when reaching set number of outstanding approved requests, and resume when
+this number falls below set number.") — applied verbatim across all 13 surfaces (render
+admin.html, both LAN admin.html files, both kiosk-native Admin screens, both wizard steps).
+Reviewing that exact wording ("outstanding approved requests") against the shipped counting logic
+(which still included `pending`) surfaced a real gap: a bad actor could spam pay-to-bartender
+requests with no intent to pay, inflating the outstanding count to trip auto-stop and freeze
+requests for real customers. User asked whether per-IP request throttling could help, and whether
+customers get distinct IPs over hotspot/wifi (yes — the host's own DHCP/router assigns each device
+a distinct LAN-local IP in both modes, same assumption the existing per-IP PIN-lockout mechanism
+already relies on) — but then proposed a simpler fix instead of IP tracking: exclude `pending`
+requests from the count entirely, since an unreviewed request can't do anything until a bartender
+approves it (which is also the payment-confirmation moment for pay-to-bartender), and a suspicious
+burst of pending requests is already visible to the bartender to deny directly. Implemented across
+all three repos — only `approved`/`approved_jump` count toward the watermark now. Closes the abuse
+angle architecturally, no new anti-abuse mechanism needed. All three repos rebuilt clean and
+re-pushed.
