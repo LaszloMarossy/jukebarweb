@@ -3080,3 +3080,29 @@ Verified directly against a live local relay, not just reasoned about: toggled a
 unchanged across both polls, exactly the condition the fix depends on), then simulated the host's
 sync confirming it.
 
+
+---
+
+### 2026-09-30 — CLAUDE.md split: historical decision narrative moved here, condensed summary left behind
+
+**User's request:** CLAUDE.md had grown to ~207k chars, over Claude Code's 150k-char instruction-file
+limit. Asked what to do about it — summarize, or move things to a different file.
+
+**What was done:** Recommended and (on confirmation) executed a split rather than a lossy trim.
+Moved the full verbatim text of two sections out of CLAUDE.md into this file (see "Archived from
+CLAUDE.md (2026-09-30)" above): the long-form narrative behind the host-is-source-of-truth /
+settings-propagation architecture, and the entire dated "Key decisions" changelog (2026-07-22
+through 2026-08-28). CLAUDE.md now carries only a condensed, current-state summary of the same
+material (organized by topic — transport/Stripe, requests/payments, bartender security, kiosk
+lock-down, reports, misc) with explicit pointers back to this archive for full context. Nothing
+was deleted, only relocated — the archived text is byte-for-byte what CLAUDE.md used to contain.
+CLAUDE.md dropped from ~207k to ~22k chars. `## UI surface matrix` and `## Planned next` were left
+untouched (already compact, high-value, not narrative). Committed but not pushed (doc-only change
+to jukebarweb, per the standing push policy — a push here would restart the live relay for no
+benefit).
+
+**Lesson for future sessions:** CLAUDE.md had been growing at roughly this rate (~150k chars in
+~6 weeks) because every dated fix/feature got a full narrative entry appended directly to it. Going
+forward, prefer appending detailed narrative to this file (DECISIONS.md) and keeping CLAUDE.md
+entries to a short, current-state summary from the start, rather than writing the long version into
+CLAUDE.md and splitting it out later.
