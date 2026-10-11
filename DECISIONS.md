@@ -3298,3 +3298,8 @@ request from me for the admin, and that is why I could not request anymore.. onc
 I could request again." The throttle behaved as designed (Android host, render client). The
 `requestedSongIds` pruning fix above stands on its own as a real defect; the shared-source-IP
 question on render remains unverified.
+
+**Device test results, 2026-10-11:** per-requester throttle confirmed by the user on both hosts and
+both connection types — Android host (hotspot + render clients) and iOS host (WiFi + render
+clients). Test plan A10 Part 2's blocked-4th-submission step ticked. Not yet run: a second device on
+a different connection through render (the shared-source-IP question).
