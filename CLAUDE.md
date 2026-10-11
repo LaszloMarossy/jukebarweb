@@ -173,6 +173,15 @@ assume the short form captures every edge case the original entry reasoned throu
   any consumer must adopt by checking local existence (e.g. `LocalRequestManager.getRequest(id)`),
   never a separately-tracked "have I seen this" set (Android had this bug; iOS's file-keyed upsert
   never could).
+- Both LAN hosts' `/api/nowplaying` embeds a filtered, minimal `requests` array (approved/
+  `approved_jump` only — no `price`/`payment_method`/`customer_id`) for the LAN `customer.html`
+  pages' Up Next badge, mirroring the relay's own public `bar_display()`. **Not** the
+  admin/bartender-only `GET /api/requests` (`isValidActionToken`-gated on Android,
+  `isValidAdminToken || isValidBartenderToken`-gated on iOS) — an anonymous customer page has no
+  token for that endpoint and will silently get a 401 on every poll if pointed at it (a real
+  regression that shipped 2026-08-02 and went unnoticed until 2026-10-11, since the kiosk's own
+  on-screen Up Next strip reads `PlaybackCoordinator`/`AppState` directly and was never affected —
+  see `DECISIONS.md`'s archive for the full diagnosis).
 - Auto-accept is a mode, not a timer — no `auto_accept_minutes` fallback exists anywhere.
 - Payment labels everywhere: "Stripe 💳", "Pay to bartender", "Auto (free requests)". "Both off:
   all requests auto-accepted for free" is unconditionally visible (not reactive-only) on every

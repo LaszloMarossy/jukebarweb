@@ -3106,3 +3106,66 @@ benefit).
 forward, prefer appending detailed narrative to this file (DECISIONS.md) and keeping CLAUDE.md
 entries to a short, current-state summary from the start, rather than writing the long version into
 CLAUDE.md and splitting it out later.
+
+---
+
+### 2026-10-11 — Found and fixed: LAN customer page's Up Next badge was always empty — both platforms, no relay involvement
+
+**User's report, from live testing**: iOS host and Android-over-LAN both had a customer submit 3
+songs paid by credit card. On the Android LAN customer view, the 3 songs never appeared in Up
+Next; "on the iOS host they are visible" (the iOS kiosk's own on-screen display). My first-pass
+diagnosis was wrong — I assumed Stripe/CC payment was relay-only (based on this file's own "the
+relay is simply the only thing Stripe can talk to" framing, which turns out to describe only
+render's situation, not a system-wide truth) and spent a round chasing a transport-mismatch
+explanation. User corrected this directly: both `LocalServer.swift` and `LocalServer.kt` have
+their own fully independent Stripe integration (`handleCreatePaymentIntent`/`handlePaymentConfirmed`,
+calling `api.stripe.com` directly with the stored secret key) — Stripe payment over LAN, with no
+relay involved at all, has existed since early in both platforms' history. **Lesson: a sentence in
+this file describing one surface's architecture is not evidence about every surface — verify
+against the actual code for the surface actually being asked about, not a related one.**
+
+**Real root cause, found by reading the actual display pipeline rather than re-guessing**: both
+platforms' `customer.html` (`WebApps/customer.html` on iOS, `assets/customer.html` on Android)
+poll `GET /api/requests` with no token at all to build the Up Next badge/overlay. That endpoint
+requires an admin or bartender token on both platforms — Android's gained
+`isValidActionToken(...)` on **2026-08-02** (commit `11b04414`, a broad auth-hardening pass;
+confirmed via `git log -p` that the handler was ungated before that commit and `fetchUpNext()`
+never sent a token either before or after). iOS's equivalent gate is in its current code too
+(`isValidAdminToken || isValidBartenderToken`); iOS's git history for this file is one squashed
+"initial push" commit so the exact date it broke there can't be dated the same way, but the
+current code is broken identically. Every poll has 401'd silently (`if (!res.ok) return`) — Up
+Next has shown nothing on either platform's LAN customer page, **for every payment method**, not
+just Stripe — the user's test happened to use CC-paid songs, that's not what triggered it. "On the
+iOS host they are visible" was almost certainly the iOS kiosk's own native on-screen Up Next strip
+(`KioskView.swift`, reads `AppState`/`PlaybackCoordinator` in-process, never touches this HTTP
+endpoint) — a completely separate, unaffected code path from iOS's own LAN `customer.html`.
+
+**Fix, both platforms, mirrors the relay's own existing pattern**: the relay's public
+`/api/bar/{id}/display` (`main.py`'s `bar_display()`) already solves exactly this — embeds a
+filtered, minimal `requests` array (approved/`approved_jump` only; `song_ids`/`requester_name`/
+`approved_at`/`created_at`/`paid` — deliberately **not** `price`/`payment_method`/`customer_id`,
+the same fields the admin/bartender-only list exposes) directly into the public now-playing poll,
+no token needed. Both LAN hosts' `/api/nowplaying` handler now does the same:
+`handleNowPlaying()` (Android) and the `/api/nowplaying` closure (iOS, via `storage.loadRequests
+(sessionId:)`) each gained a `requests` field with that same minimal shape. Both `customer.html`
+files dropped their separate `fetchUpNext()`/10s-interval entirely — `processUpNext(d)` now runs
+inline from inside `fetchNowPlaying()`'s existing success handler (already polled every 5s), one
+fewer request, no separate token-less call left to 401.
+
+**Not a relay bug — `main.py`'s `bar_display()` already had this right from the start**,
+confirmed by reading it directly; no jukebarweb code change needed. This entry exists purely to
+record the cross-repo diagnosis and point at the two real fixes, per the standing decisions-log
+policy.
+
+Both host repos build-verified (`xcodebuild ... build` for iOS/simulator, `:app:compileDebugKotlin`
+for Android) and committed + pushed immediately (real code, not docs) — `JukeBar@684da3f`,
+`spotonjukebar@0f4b08c`. This jukebarweb entry is doc-only; held per the standing push policy.
+
+**Test-plan note**: `docs/full_system_test_plan.md`'s scenario A3 ("Stripe payment on Render
+customer reaches the kiosk queue...") only exercises the **render** customer path end to end — it
+never had an LAN-transport equivalent checking the LAN customer page's own Up Next badge, which is
+exactly the gap that let this regression sit unnoticed since 2026-08-02. Worth adding a LAN-specific
+Up Next regression check (request approved/paid by any method → appears in the LAN customer page's
+badge within one poll, not just on the host's own kiosk screen) the next time A-series scenarios
+are revisited — not added in this pass since the immediate ask was diagnosis + fix, not test-plan
+authoring.
