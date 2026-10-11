@@ -3249,3 +3249,46 @@ reset the store, so internet now simply matches LAN there. iOS is not affected: 
 live in a per-session directory keyed by session id. No relay change.
 
 Compile-verified only; not yet re-tested on device.
+
+
+---
+
+## 2026-10-11 — End Session destroys all session state immediately (both hosts)
+
+**User:** "when I end session on the kiosk (or on the admin client UI), do we destroy EVERYTHING
+that belonged to that session (request queues, up next queues, etc)? Since the server can start up
+with an entirely new configuration and mode after resetting the session, I am thinking this would
+be in order." Audit answer: effectively yes, but lazily — Android cleared its request store at the
+*next* session's start (and, before the same-day fix above, only for LAN sessions); iOS left the
+old session directory on disk until the next `startNewSession()`; the relay's `BarSession` is
+deleted on unregister, but that call was sent once with no retry. The only prior note in the area
+is the report design's "pending+approved get a snapshot, never deleted", written for mid-session
+"Generate report" — nothing ever said session data should outlive End Session. User: "yes, go ahead
+and fix that on all platforms and modes".
+
+**Change:**
+- iOS: `LocalStorage.endCurrentSession()` (archive report → remove session directory → clear
+  `currentSessionId`), called from `AppState.resetSetup()`. `BarConfig` lives outside the session
+  directory, so wizard pre-fill is unaffected.
+- Android: `MainActivity.clearSessionState()` after `stopLocalServer()` (which writes the report) in
+  both `restartSession()` and `resetSetup()` — `LocalRequestManager.reset("")` +
+  `PlaybackCoordinator.clearRequestedSongs()`.
+- Both: relay unregister retried up to 4 times, 3s apart.
+- Relay: no change needed.
+
+**Related Android defect found while tracing a throttle report** (user, Android host + render
+client: after 3 pending songs got a 4th blocked — correct — "after all songs have been played and
+non-requested songs started playing, I still was blocked from entering new requests"). The relay,
+Android-LAN and iOS-LAN throttle code all read correctly for that sequence (only `pending`,
+non-Stripe songs count), so the block's cause is **not yet identified** — open questions put to the
+user: which message was shown (the "already have requests waiting" pop-up vs. the Request button
+gone), and whether any request was still listed under Requests on an admin page. What was found
+and fixed along the way: `PlaybackCoordinator.requestedSongIds` was never pruned after a song
+played, so at each queue-exhaustion reshuffle every song ever requested was treated as still owed —
+front of the queue, shown in Up Next, and (since the same-day switch to song counting) counted
+toward the auto-manage limit, which can close requests with nothing genuinely waiting. Fixed with
+`forgetRequested()` in `advance()`. Also still unverified: whether the relay sees every internet
+guest as the same source IP behind Render's proxy (`request.client.host`, no X-Forwarded-For
+handling), which would make the throttle's IP half shared across all internet guests of a bar.
+
+Both apps compile-verified only.

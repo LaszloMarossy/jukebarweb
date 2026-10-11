@@ -279,8 +279,18 @@ assume the short form captures every edge case the original entry reasoned throu
   a **paid** request's remaining songs `UNFULFILLED` and advances; 2nd consecutive failure (any
   type) trips a full-stop PIN-gated outage screen. Counter resets only on an actual successful
   Spotify play, deliberately not inside a reconnect attempt.
+- **End Session destroys everything session-scoped, immediately, on every transport**
+  (2026-10-11): requests, Up Next/requested-song bookkeeping, bartender sessions, admin tokens,
+  plus the relay's whole `BarSession` (unregister, retried up to 4x). The session-end report is
+  written first and is the only surviving record of anything still pending/approved. Kept on
+  purpose: report files, bar config (wizard pre-fill), the map entry, Android's Spotify refresh
+  token on a kiosk End Session. iOS `LocalStorage.endCurrentSession()`, Android
+  `MainActivity.clearSessionState()` (+ `LocalRequestManager.reset()` again at every session
+  start, any transport).
 - Android's queue-exhaustion reshuffle keeps not-yet-played Up Next requests in their existing
-  relative position, only shuffling the filler portion — no dedup between the two groups (accepted
+  relative position (a song stops being "requested" once playback moves off it —
+  `PlaybackCoordinator.forgetRequested()`, 2026-10-11; before that every song ever requested was
+  re-queued as Up Next at each reshuffle), only shuffling the filler portion — no dedup between the two groups (accepted
   as a minor, non-engineered-around cosmetic edge case). iOS has no equivalent (native opaque
   shuffle).
 - 13-UI-surface parity passes (admin/bartender/customer × kiosk/LAN/internet × iOS/Android) found
