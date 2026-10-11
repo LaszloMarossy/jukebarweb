@@ -3222,3 +3222,30 @@ clients — "the feature all works". Test plan A10 Part 1 / section 16 steps tic
 (`docs/full_system_test_plan.md`, per-platform notes inline). The iOS LAN customer Up Next fix
 (`JukeBar@684da3f`) was also confirmed working on device the same day; a LAN regression step for it
 was added under A3.
+
+
+---
+
+## 2026-10-11 — Android: previous session's requests reappeared on render after a session reset
+
+**User report** (Android host): internet session → reset → hotspot session → reset → internet
+again, "and to my surprise, the request on render were still around for me to see on my page...
+If I stop a session on the kiosk, the session on render should also die."
+
+**Diagnosis — the relay session did die; the host re-sent the old requests.** `restartSession()`/
+`resetSetup()` call `relayService.stop()`, which unregisters and the relay deletes the
+`BarSession`; a new session id always gets a fresh `BarSession`. But Android's
+`LocalRequestManager.reset()` was only ever called from `startLocalServer()` (wifi/hotspot), so an
+**internet** session started with whatever the previous session left in memory. Pending/approved
+requests survive the session-end report by design, so the new session's first `host_sync()`
+`requests` echo upserted them into the new relay session. In the reported sequence the leftovers
+were most likely the *hotspot* session's (the hotspot start had already cleared the first internet
+session's). The same gap carried over bartender sessions and admin tokens host-side.
+
+**Fix** (`spotonjukebar@MainActivity.startQueue()`): `localRequestManager.reset(sessionId)` now runs
+right where the new session id is generated, on every transport. `startQueue()` is also what Admin's
+"Refresh catalog" calls — that already minted a new session id, rebuilt the queue and (on LAN)
+reset the store, so internet now simply matches LAN there. iOS is not affected: its request files
+live in a per-session directory keyed by session id. No relay change.
+
+Compile-verified only; not yet re-tested on device.
