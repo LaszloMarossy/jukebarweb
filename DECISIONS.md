@@ -3213,3 +3213,12 @@ real tiles — including for the existing `light_all` style and `@2x`, so the ma
 `__CARTO_API_KEY__`); declared in `render.yaml` with `sync: false`. The key is visible to every
 browser in the tile URLs, so this is hygiene/rotation, not secrecy; the key as issued is not
 referrer-restricted (worked with an arbitrary Referer).
+
+**Device test results, 2026-10-11 (same day):** user confirmed the song-count limit on both hosts.
+iOS host: LAN (Android client) + render — requests close at the limit, Request button disappears
+on clients and on the host's own kiosk, reappears when the count allows, and the Up Next counter
+drops per song rather than per request. Android host: Local + Remote mode with hotspot and render
+clients — "the feature all works". Test plan A10 Part 1 / section 16 steps ticked accordingly
+(`docs/full_system_test_plan.md`, per-platform notes inline). The iOS LAN customer Up Next fix
+(`JukeBar@684da3f`) was also confirmed working on device the same day; a LAN regression step for it
+was added under A3.
