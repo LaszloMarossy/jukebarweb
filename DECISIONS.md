@@ -3292,3 +3292,9 @@ guest as the same source IP behind Render's proxy (`request.client.host`, no X-F
 handling), which would make the throttle's IP half shared across all internet guests of a bar.
 
 Both apps compile-verified only.
+
+**Resolved same day — not a bug.** User: "that was my fault; there was still a pending non-approved
+request from me for the admin, and that is why I could not request anymore.. once I approved that,
+I could request again." The throttle behaved as designed (Android host, render client). The
+`requestedSongIds` pruning fix above stands on its own as a real defect; the shared-source-IP
+question on render remains unverified.
