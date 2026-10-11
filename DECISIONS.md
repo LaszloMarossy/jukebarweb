@@ -3325,3 +3325,12 @@ not investigated. Display-only: the auto-manage limit uses the host's live song 
 **Decision:** user — "I am hesitant to let you fix anything, as now, things seem to be working
 right." No code change. Proposed fix if revisited: serve only the still-waiting songs per request
 on every page (and lift Android's 4-row cap on the relay `up_next`).
+
+**Partly reversed the same day — LAN customer badge fixed.** User, on being told the page rebuilds
+Up Next from approved requests: "I do not believe so; what it SHOULD do is to listen to the host
+messages arriving about how many songs are left, and what those are", then "go ahead and fix it".
+Both LAN hosts' `/api/nowplaying` now emit one entry per song from the live queue (iOS: the
+`_upNextSongIds` cache the kiosk ticker refreshes; Android: `coordinator.upNextSongs`), each
+carrying its request's requester/paid/approved_at. No `customer.html` change. The admin/bartender
+Up Next lists (six pages) are still per request — unchanged, still a known issue. Compile-verified
+only.

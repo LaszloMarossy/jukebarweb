@@ -175,7 +175,11 @@ assume the short form captures every edge case the original entry reasoned throu
   never could).
 - Both LAN hosts' `/api/nowplaying` embeds a filtered, minimal `requests` array (approved/
   `approved_jump` only — no `price`/`payment_method`/`customer_id`) for the LAN `customer.html`
-  pages' Up Next badge, mirroring the relay's own public `bar_display()`. **Not** the
+  pages' Up Next badge, mirroring the relay's own public `bar_display()`. It is **one entry per
+  song still waiting, built from the host's live queue** (2026-10-11), never an approved
+  request's full stored song list — a multi-song request only flips to played on its last song,
+  so request-based lists keep showing already-played songs (admin/bartender Up Next lists on all
+  six pages still work per request; known, unfixed). **Not** the
   admin/bartender-only `GET /api/requests` (`isValidActionToken`-gated on Android,
   `isValidAdminToken || isValidBartenderToken`-gated on iOS) — an anonymous customer page has no
   token for that endpoint and will silently get a 401 on every poll if pointed at it (a real
