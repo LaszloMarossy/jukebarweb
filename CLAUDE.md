@@ -197,8 +197,14 @@ assume the short form captures every edge case the original entry reasoned throu
   toggle) or Auto (two watermarks, default max=10/restart=5, both-zero=inert), mutually exclusive
   and applied immediately on any change. Wire contract: `auto_manage_requests`/`auto_manage_max`/
   `auto_manage_restart`, same self-healing echo pattern as other settings. Evaluation is entirely
-  host-side. "Outstanding" for the watermark = approved/up-next only, **excluding pending** (closes
-  a no-show-spam abuse angle). A separate, complementary **per-requester pending-song throttle**
+  host-side. The watermarks count **songs still waiting in Up Next, not requests** (2026-10-11 —
+  a request holds up to 3 songs, so the old request count let "stop at 5" reach 7+ songs), read
+  from each host's live queue (iOS `MusicService.upNextSongIds`, Android
+  `PlaybackCoordinator.upNextSongs`); pending requests aren't in Up Next so are still **excluded**
+  (closes a no-show-spam abuse angle). One multi-song request can overshoot max by up to 2 songs —
+  accepted by the user, not engineered around. Every admin page's "Currently N" shows the host's
+  own `up_next_count` (in the relay sync payload and both LAN hosts' `GET /api/requests`), never a
+  client-side recount. A separate, complementary **per-requester pending-song throttle**
   (`MAX_PENDING_SONGS_PER_REQUESTER = 2`) blocks a requester at 3+ pending, non-Stripe songs,
   matched by the union of source IP and `customer_id` — applied only at the 3 anonymous
   network-request entry points, never at kiosk-native or post-payment endpoints.
@@ -286,6 +292,10 @@ assume the short form captures every edge case the original entry reasoned throu
   while the user is actively live-testing** — Render auto-deploys on every push, which restarts the
   process and wipes all in-memory `BarSession` state (bartender tokens included), and this was once
   mistaken for a client-side session bug.
+
+- `discover.html`'s CARTO map tiles need an API key (keyless requests get a placeholder tile):
+  Render env var `CARTO_API_KEY`, injected into the page by `discover()`. It's a browser-visible
+  key, not a secret — the env var only keeps it out of git and rotatable.
 
 ## Planned next
 - Song counts from iOS/Android on register: `artists: [{name, song_count}]` instead of `[String]` — improves pie chart accuracy

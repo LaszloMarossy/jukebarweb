@@ -8,6 +8,8 @@ services:
     envVars:
       - key: DATA_DIR
         value: /data
+      - key: CARTO_API_KEY
+        sync: false
     disk:
       name: jukebar-data
       mountPath: /data

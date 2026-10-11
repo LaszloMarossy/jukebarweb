@@ -516,11 +516,11 @@
             <label for="am-restart-input">Resume at</label>
             <input class="am-num-field" id="am-restart-input" type="number" min="0" inputmode="numeric" oninput="onAutoManageNumInput()" onfocus="this.select()">
           </div>
-          <div class="am-field-hint">Outstanding = approved/up-next only, not yet played. Pending (unreviewed) requests don't count. Currently <span id="am-current-count">—</span>.</div>
+          <div class="am-field-hint">Counts songs waiting in Up Next (approved, not yet played). Pending (unreviewed) requests don't count. Currently <span id="am-current-count">—</span>.</div>
           <button class="btn-report btn-am-save" id="am-save" onclick="saveAutoManage()" disabled>Save</button>
           <div class="bt-pin-err" id="am-err"></div>
         </div>
-        <div class="am-note">Automatically stop taking requests when reaching set number of outstanding approved requests, and resume when this number falls below set number.</div>
+        <div class="am-note">Automatically stop taking requests when Up Next reaches the set number of songs, and resume once it drops to the lower number. A multi-song request can overshoot the limit by up to 2 songs.</div>
       </div>
     </div>
     <div class="payment-card" style="margin-top:14px">
@@ -1107,10 +1107,11 @@ async function poll() {
     if (!pendingNow.includes('auto_manage_max'))     S.autoManageMax      = d.auto_manage_max ?? 10;
     if (!pendingNow.includes('auto_manage_restart')) S.autoManageRestart  = d.auto_manage_restart ?? 5;
     S.kioskMode = d.kiosk_mode || 'localAndRemote';
-    // Approved/up-next only, NOT pending - a still-pending pay-to-bartender request hasn't been
-    // reviewed or paid for, so it can't be used to flood-trip the stop-accepting watermark
-    // before a bartender ever looks at it (2026-08-28 refinement).
-    S.outstandingCount   = (d.requests || []).filter(r => r.status === 'approved' || r.status === 'approved_jump').length;
+    // Songs still waiting in Up Next, as counted by the host itself (2026-10-11: the watermarks
+    // count songs, not requests) - the same number it compares against the watermarks, so this
+    // readout can't disagree with what's enforced. Pending requests aren't in Up Next, so they
+    // still don't count.
+    S.outstandingCount   = d.up_next_count ?? 0;
     S.settingsPending    = pendingNow;
     updatePaymentUI();
     renderRequests(d.requests || []);

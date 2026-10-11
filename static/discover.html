@@ -472,7 +472,9 @@ function fgFor(hex) {
 
 // ── Map init ─────────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: false }).setView([30, 10], 3);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+// Filled in by main.py's discover() from the CARTO_API_KEY env var; empty = keyless request.
+const CARTO_KEY = '__CARTO_API_KEY__';
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' + (CARTO_KEY ? '?key=' + encodeURIComponent(CARTO_KEY) : ''), {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   maxZoom: 19,
 }).addTo(map);

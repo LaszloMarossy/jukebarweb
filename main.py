@@ -54,6 +54,11 @@ BAR_CLEANUP_INACTIVE = 7200   # last_seen must be this old (2 h) before cleanup 
 BAR_CLEANUP_MIN_AGE  = 1800   # session must also be at least this old (30 min) to be swept
 CLEANUP_INTERVAL     = 300    # sweep runs every 5 minutes
 
+# CARTO basemap key for discover.html's map tiles (keyless requests now get a "key required"
+# placeholder tile). Injected into the page by discover() — it ends up in every tile URL the
+# browser requests, so it isn't a secret; the env var just keeps it out of the repo and lets it
+# be rotated without a code change.
+CARTO_API_KEY     = os.environ.get("CARTO_API_KEY", "")
 PROFILING_ON      = os.environ.get("PROFILING_ON", "false").lower() == "true"
 PROFILE_CACHE_TTL = 300.0   # seconds between GCS profile re-reads
 
@@ -150,6 +155,11 @@ class BarSession:
     requests: dict[str, SongRequest] = field(default_factory=dict)
     pending_actions: list[dict] = field(default_factory=list)
     up_next_queue: list[dict] = field(default_factory=list)  # authoritative host queue, pushed every sync
+    # Songs still waiting in Up Next, as counted by the host (2026-10-11) — the exact number its
+    # auto-manage evaluator compares against auto_manage_max/restart (which count songs, not
+    # requests). Display-only here, for admin.html's "Currently N"; not derivable from
+    # up_next_queue because Android caps that list at 4 rows for display.
+    up_next_count: int = 0
     pin_hash: str = ""  # SHA-256 hex of admin PIN — set at register; required for admin.html auth
     # SHA-256 hex of bartender PIN — separate secret from pin_hash (2026-08). Optional: empty
     # means the bartender role is entirely off for this bar (no bartender QR, no bartender.html
@@ -422,7 +432,8 @@ async def android_docs():
 
 @app.get("/discover", response_class=HTMLResponse)
 async def discover():
-    return HTMLResponse((Path("static") / "discover.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
+    html = (Path("static") / "discover.html").read_text(encoding="utf-8")
+    return HTMLResponse(html.replace("__CARTO_API_KEY__", CARTO_API_KEY), headers=_NO_CACHE)
 
 
 @app.get("/youwouldnotguesss/architecture", response_class=HTMLResponse)
@@ -774,6 +785,9 @@ async def host_sync(body: dict[str, Any]):
                              CLAUDE.md's host-broadcasts-state note.
       up_next                — host's live queue, for bar_display() only (not request status —
                              see requests above).
+      up_next_count          — number of songs still waiting in the host's Up Next (uncapped,
+                             unlike up_next on Android); what the host's auto-manage watermarks
+                             are compared against. Display-only on the relay.
       settings              — {field: bool | str | int}; the host's current values for
                              bartender_enabled/stripe_enabled/accepting_requests/
                              auto_manage_requests (bool), bartender_pin_hash (str, "" meaning
@@ -858,6 +872,8 @@ async def host_sync(body: dict[str, Any]):
 
     if "up_next" in body:
         bar.up_next_queue = body["up_next"]
+        # Older host builds don't send up_next_count; fall back to the list length.
+        bar.up_next_count = int(body.get("up_next_count", len(bar.up_next_queue)))
 
     # Host's full request-list broadcast (see docstring): upsert only, never delete — a
     # customer-web/Stripe request the relay just created may not be in this echo yet (host
@@ -1453,6 +1469,7 @@ async def bartender_requests(jukebar_id: str, s: str = Query(..., alias="s"), to
             "auto_manage_requests": bar.auto_manage_requests,
             "auto_manage_max": bar.auto_manage_max,
             "auto_manage_restart": bar.auto_manage_restart,
+            "up_next_count": bar.up_next_count,
             "settings_pending": list(bar.desired_settings.keys())}
 
 

@@ -3169,3 +3169,47 @@ Up Next regression check (request approved/paid by any method → appears in the
 badge within one poll, not just on the host's own kiosk screen) the next time A-series scenarios
 are revisited — not added in this pass since the immediate ask was diagnosis + fix, not test-plan
 authoring.
+
+
+---
+
+## 2026-10-11 — Auto-manage watermarks count songs in Up Next, not requests
+
+**User report** (iOS host, LAN): "even though I have the auto request set to stop at 5 and resume
+at 2, I am free to request more, up to 7 songs already". Not a malfunction — the evaluator on both
+hosts counted approved **requests**, and a request holds up to 3 songs, so 7 songs was ~3 requests,
+under the limit. User's decision when asked: "let's switch to how many songs are in the Up Next;
+guest can overshoot if they request multiple, but that only ever results in max + 2 songs."
+
+**Change (all three repos):**
+- iOS `AppState.evaluateAutoManageRequests()` now compares `MusicService.shared.upNextSongIds.count`;
+  Android `MainActivity.evaluateAutoManage()` compares the new `PlaybackCoordinator.upNextSongs.size`
+  (one shared definition, replacing three copies of the same queue filter in `KioskView.kt`/
+  `RelayService.kt`). Both are the live queue, so a played song of a still-approved multi-song
+  request stops counting as soon as it starts. Pending requests are still excluded (not in Up Next).
+- "Currently N" on every admin surface now shows the host's own number instead of recounting
+  approved requests client-side: new `up_next_count` in the relay sync payload (stored on
+  `BarSession`, returned by `/api/bar/{id}/requests`; falls back to `len(up_next)` for older host
+  builds) and in both LAN hosts' `GET /api/requests`. It can't be derived from `up_next` on the
+  relay because Android caps that list at 4 rows. iOS caches the count under `nowPlayingLock`
+  (refreshed by the kiosk's 2s ticker) since the queue arrays are main-thread state. Android's
+  kiosk Admin screen gained the "Currently N" readout it previously lacked.
+- Captions reworded on all admin surfaces and both setup wizards to say songs in Up Next and to
+  state the up-to-2-song overshoot.
+
+**Known, unchanged timing:** the evaluator runs on a tick (iOS 2s, Android 5s) and internet
+customers see the result one 5s sync later, so requests landing inside that window can add to the
+overshoot; a bartender approving a backlog of pending requests can also exceed max. Not addressed.
+
+Build-verified (`xcodebuild` simulator build, `:app:compileDebugKotlin`), relay smoke-tested with
+`TestClient`. Not yet exercised on real devices.
+
+## 2026-10-11 — CARTO map tiles need an API key (`CARTO_API_KEY`)
+
+User: the /discover map "now complains about lack of API key" and they obtained one. Confirmed by
+fetching tiles directly: keyless requests return a ~2 KB placeholder tile, keyed requests return
+real tiles — including for the existing `light_all` style and `@2x`, so the map style is unchanged.
+`discover()` now injects the `CARTO_API_KEY` env var into `discover.html` (placeholder
+`__CARTO_API_KEY__`); declared in `render.yaml` with `sync: false`. The key is visible to every
+browser in the tile URLs, so this is hygiene/rotation, not secrecy; the key as issued is not
+referrer-restricted (worked with an arbitrary Referer).

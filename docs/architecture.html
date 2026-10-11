@@ -625,7 +625,7 @@
         <div class="head"><b>jukebarweb - main.py</b><span class="sub">FastAPI, jukebars.com</span></div>
         <div class="route-list">
           <div class="route-item"><span class="verb post">POST</span>/api/host/register<span class="fn">host_register() - full re-register, catalog (playlist bands) + settings</span></div>
-          <div class="route-item"><span class="verb post">POST</span>/api/host/sync<span class="fn">host_sync() - the 5s heartbeat, two channels: host's settings/up_next/full requests-list echo (unconditional, upserted into bar.requests - flow A) down; new pending customer/Stripe requests + queued bartender actions up</span></div>
+          <div class="route-item"><span class="verb post">POST</span>/api/host/sync<span class="fn">host_sync() - the 5s heartbeat, two channels: host's settings/up_next/up_next_count/full requests-list echo (unconditional, upserted into bar.requests - flow A) down; new pending customer/Stripe requests + queued bartender actions up</span></div>
           <div class="route-item"><span class="verb post">POST</span>/api/host/nowplaying<span class="fn">host_nowplaying() - the currently playing song by the host</span></div>
           <div class="route-item"><span class="verb post">POST</span>/api/host/unregister<span class="fn">host_unregister() - when End Session is triggered; invalidates session</span></div>
           <div class="route-item"><span class="verb get">GET</span>/api/bar/&#123;id&#125;/catalog<span class="fn">bar_catalog() - customer.html/admin.html fetch the full browsable catalog + live settings on page load</span></div>
