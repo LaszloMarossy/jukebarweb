@@ -3303,3 +3303,25 @@ question on render remains unverified.
 both connection types — Android host (hotspot + render clients) and iOS host (WiFi + render
 clients). Test plan A10 Part 2's blocked-4th-submission step ticked. Not yet run: a second device on
 a different connection through render (the shared-source-IP question).
+
+
+---
+
+## 2026-10-11 — Known issue, deliberately NOT fixed: Up Next lags per request on LAN/admin pages
+
+**User observation** (iOS host, WiFi): kiosk Up Next went 4 → 3 after a skip while the WiFi
+**customer** page stayed at 4; the next skip took both to 2. Also confirmed: pending requests never
+affect the Up Next count on either host.
+
+**Cause (read from code, not reproduced):** the kiosk reads the live queue per song; the LAN
+customer badge (`/api/nowplaying`'s `requests`) and the admin/bartender Up Next lists (all six
+pages, LAN + render) are rebuilt from approved *requests*, and a multi-song request only flips to
+played when its LAST song starts. So an earlier song of a multi-song request keeps being listed
+until the whole request finishes, then the page catches up at once. The customer page's
+now-playing filter should have hidden the playing song (showing 3, not 4) — that it didn't
+suggests the artist/title match between `/api/nowplaying` and the catalog missed for that song;
+not investigated. Display-only: the auto-manage limit uses the host's live song count.
+
+**Decision:** user — "I am hesitant to let you fix anything, as now, things seem to be working
+right." No code change. Proposed fix if revisited: serve only the still-waiting songs per request
+on every page (and lift Android's 4-row cap on the relay `up_next`).
